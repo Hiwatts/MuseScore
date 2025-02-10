@@ -23,25 +23,70 @@
 
 #include <QAccessible>
 
-#include "config.h"
+using namespace muse::accessibility;
 
-using namespace mu::accessibility;
+class AccessibilityActivationObserver : public QAccessible::ActivationObserver
+{
+public:
+    AccessibilityActivationObserver()
+    {
+        m_isAccessibilityActive = QAccessible::isActive();
+    }
+
+    bool isAccessibilityActive() const
+    {
+        return m_isAccessibilityActive;
+    }
+
+    void accessibilityActiveChanged(bool active) override
+    {
+        m_isAccessibilityActive = active;
+    }
+
+private:
+    bool m_isAccessibilityActive = false;
+};
+
+AccessibilityActivationObserver* s_accessibilityActivationObserver = nullptr;
+
+AccessibilityConfiguration::~AccessibilityConfiguration()
+{
+    QAccessible::installActivationObserver(nullptr);
+    delete s_accessibilityActivationObserver;
+}
+
+void AccessibilityConfiguration::init()
+{
+    s_accessibilityActivationObserver = new AccessibilityActivationObserver();
+
+    QAccessible::installActivationObserver(s_accessibilityActivationObserver);
+
+    m_inited = true;
+}
 
 bool AccessibilityConfiguration::enabled() const
 {
+    if (!m_inited) {
+        return false;
+    }
+
     if (!navigationController()) {
         return false;
     }
 
-#ifdef BUILD_DIAGNOSTICS
-    return true;
-#else
-
-    if (!QAccessible::isActive()) {
+    if (!active()) {
         return false;
     }
 
     //! NOTE Accessibility available if navigation is used
     return navigationController()->activeSection() != nullptr;
-#endif
+}
+
+bool AccessibilityConfiguration::active() const
+{
+    if (!m_inited) {
+        return false;
+    }
+
+    return s_accessibilityActivationObserver->isAccessibilityActive();
 }

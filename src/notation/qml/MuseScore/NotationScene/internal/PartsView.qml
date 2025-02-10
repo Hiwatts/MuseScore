@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.12
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 Item {
     id: root
@@ -32,15 +32,11 @@ Item {
 
     property alias navigationPanel: view.navigationPanel
 
-    function focusOnFirst() {
-        root.model.selectPart(0)
-    }
-
     QtObject {
         id: prv
 
         readonly property int sideMargin: 36
-        property var currentItemNavigationName: ""
+        property string currentItemNavigationName: ""
     }
 
     Column {
@@ -56,7 +52,7 @@ Item {
         StyledTextLabel {
             width: parent.width
 
-            text: qsTrc("notation", "NAME")
+            text: qsTrc("notation", "Name")
 
             horizontalAlignment: Qt.AlignLeft
             font.capitalization: Font.AllUppercase
@@ -65,7 +61,7 @@ Item {
         SeparatorLine { anchors.margins: -prv.sideMargin }
     }
 
-    ListView {
+    StyledListView {
         id: view
 
         anchors.top: header.bottom
@@ -76,33 +72,27 @@ Item {
 
         model: root.model
 
-        boundsBehavior: Flickable.StopAtBounds
         interactive: height < contentHeight
-        clip: true
 
         property NavigationPanel navigationPanel: NavigationPanel {
             name: "PartsView"
+            enabled: root.enabled && root.visible
             direction: NavigationPanel.Both
             accessible.name: qsTrc("notation", "Parts view")
-            onActiveChanged: {
+            onActiveChanged: function(active) {
                 if (active) {
                     root.forceActiveFocus()
                 }
             }
 
-            onNavigationEvent: {
+            onNavigationEvent: function(event) {
                 if (event.type === NavigationEvent.AboutActive) {
                     event.setData("controlName", prv.currentItemNavigationName)
                 }
             }
         }
 
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
-            anchors.rightMargin: 8
-        }
+        ScrollBar.vertical: StyledScrollBar { policy: ScrollBar.AlwaysOn }
 
         Connections {
             target: root.model
@@ -120,7 +110,8 @@ Item {
             title: model.title
             currentPartIndex: view.currentIndex
             isSelected: model.isSelected
-            isCreated: model.isCreated
+            canReset: model.isInited
+            canDelete: model.isCustom
 
             navigation.name: model.title + model.index
             navigation.panel: view.navigationPanel
@@ -137,16 +128,20 @@ Item {
                 view.currentIndex = model.index
             }
 
-            onTitleEdited: {
-                root.model.setPartTitle(model.index, newTitle)
-            }
-
-            onTitleEditingFinished: {
-                root.model.validatePartTitle(model.index)
+            onResetPartRequested: {
+                root.model.resetPart(model.index)
             }
 
             onRemovePartRequested: {
                 root.model.removePart(model.index)
+            }
+
+            onTitleEdited: function(newTitle) {
+                incorrectTitleWarning = root.model.validatePartTitle(model.index, newTitle)
+            }
+
+            onTitleEditingFinished: function(newTitle) {
+                root.model.setPartTitle(model.index, newTitle)
             }
 
             onCopyPartRequested: {

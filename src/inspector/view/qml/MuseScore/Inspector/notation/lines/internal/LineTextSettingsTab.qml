@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,8 +23,8 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 
 import MuseScore.Inspector 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 import "../../../common"
 import "../../../"
@@ -50,67 +50,80 @@ FocusableItem {
         TextSection {
             id: beginningTextSection
             titleText: qsTrc("inspector", "Beginning text")
-            propertyItem: root.model ? root.model.beginingText : null
+            propertyItem: root.model ? root.model.beginningText : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: root.navigationRowStart + 1
-            navigationEnabled: root.enabled && visible
         }
 
         OffsetSection {
             id: beginningTextOffsetSection
-            horizontalOffset: root.model ? root.model.beginingTextHorizontalOffset : null
-            verticalOffset: root.model ? root.model.beginingTextVerticalOffset : null
+            titleText: qsTrc("inspector", "Offset")
+            propertyItem: root.model ? root.model.beginningTextOffset : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: beginningTextSection.navigationRowEnd + 1
-            navigationEnabled: root.enabled && visible
         }
 
-        SeparatorLine { anchors.margins: -10 }
+        SeparatorLine { anchors.margins: -12 }
 
         TextSection {
-            id: continiousTextSection
-            titleText:  qsTrc("inspector", "Text when continuing to a new system")
-            propertyItem: root.model ? root.model.continiousText : null
+            id: continuousTextSection
+            titleText: qsTrc("inspector", "Text when continuing to a new system")
+            propertyItem: root.model ? root.model.continuousText : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: beginningTextOffsetSection.navigationRowEnd + 1
-            navigationEnabled: root.enabled && visible
         }
 
         OffsetSection {
-            id: continiousTextOffsetSection
-            horizontalOffset: root.model ? root.model.continiousTextHorizontalOffset : null
-            verticalOffset: root.model ? root.model.continiousTextVerticalOffset : null
+            id: continuousTextOffsetSection
+            titleText: qsTrc("inspector", "Offset")
+            propertyItem: root.model ? root.model.continuousTextOffset : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: continiousTextSection.navigationRowEnd + 1
-            navigationEnabled: root.enabled && visible
+            navigationRowStart: continuousTextSection.navigationRowEnd + 1
         }
 
-        SeparatorLine { anchors.margins: -10; visible: endTextSection.visible }
+        SeparatorLine { anchors.margins: -12 }
 
         TextSection {
             id: endTextSection
-
-            titleText:  qsTrc("inspector", "End text")
+            titleText: qsTrc("inspector", "End text")
             propertyItem: root.model ? root.model.endText : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: continiousTextOffsetSection.navigationRowEnd + 1
-            navigationEnabled: root.enabled && visible
+            navigationRowStart: continuousTextOffsetSection.navigationRowEnd + 1
         }
 
         OffsetSection {
             id: endTextOffsetSection
-
-            horizontalOffset: root.model ? root.model.endTextHorizontalOffset : null
-            verticalOffset: root.model ? root.model.endTextVerticalOffset : null
+            titleText: qsTrc("inspector", "Offset")
+            propertyItem: root.model ? root.model.endTextOffset : null
 
             navigationPanel: root.navigationPanel
             navigationRowStart: endTextSection.navigationRowEnd + 1
-            navigationEnabled: root.enabled && visible
+        }
+
+        SeparatorLine { anchors.margins: -12 }
+
+        SpinBoxPropertyView {
+            id: gapBetweenTextAndLineControl
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.rightMargin: 2
+
+            titleText: qsTrc("inspector", "Gap between text and line")
+            propertyItem: root.model ? root.model.gapBetweenTextAndLine : null
+
+            step: 0.1
+            maxValue: 100.0
+            minValue: 0.0
+            decimals: 2
+
+            navigationName: "GapBetweenTextAndLine"
+            navigationPanel: root.navigationPanel
+            navigationRowStart: endTextOffsetSection.navigationRowEnd + 1
         }
     }
 }

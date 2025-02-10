@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,24 +22,25 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
-Item {
+FocusableControl {
     id: root
 
-    property var treeView: undefined
+    required property var originalParent
+
+    property var item: null
+    property TreeView treeView: undefined
     property var index: styleData.index
     property string filterKey
-    property int type: InstrumentsTreeItemType.UNDEFINED
-    property bool isSelected: false
-    property bool isDragAvailable: false
-    property alias isExpandable: expandButton.visible
-    property alias isEditable: settingsButton.visible
 
-    property int navigationRow: 0
-    property NavigationPanel navigationPanel: null
+    readonly property int type: item ? item.type : InstrumentsTreeItemType.UNDEFINED
+    readonly property bool isSelected: item && item.isSelected
+    readonly property bool isDragAvailable: item && item.isSelectable
+    readonly property bool isExpandable: item && item.isExpandable
+    readonly property bool isEditable: item && item.isEditable
 
     property int sideMargin: 0
 
@@ -47,10 +48,15 @@ Item {
 
     signal clicked(var mouse)
     signal doubleClicked(var mouse)
-    signal focusActived()
+    signal removeSelectionRequested()
 
     signal popupOpened(var popupX, var popupY, var popupHeight)
     signal popupClosed()
+
+    signal visibilityChanged(bool visible)
+
+    signal dragStarted()
+    signal dropped()
 
     QtObject {
         id: prv
@@ -58,33 +64,14 @@ Item {
         property bool dragged: mouseArea.drag.active && mouseArea.pressed
 
         onDraggedChanged: {
-            if (dragged && styleData.isExpanded) {
-                root.treeView.collapse(styleData.index)
+            if (dragged) {
+                root.dragStarted()
+                if (styleData.isExpanded) {
+                    root.treeView.collapse(styleData.index)
+                }
+            } else {
+                root.dropped()
             }
-        }
-
-        property var openedPopup: null
-        property bool isPopupOpened: Boolean(openedPopup) && openedPopup.isOpened
-
-        function openPopup(popup, item) {
-            if (Boolean(popup)) {
-                openedPopup = popup
-                popup.load(item)
-                root.popupOpened(popup.x, popup.y, popup.height)
-                popup.open()
-            }
-        }
-
-        function closeOpenedPopup() {
-            if (isPopupOpened) {
-                openedPopup.close()
-                resetOpenedPopup()
-            }
-        }
-
-        function resetOpenedPopup() {
-            root.popupClosed()
-            openedPopup = null
         }
     }
 
@@ -103,113 +90,35 @@ Item {
     Drag.hotSpot.x: width / 2
     Drag.hotSpot.y: height / 2
 
-    NavigationControl {
-        id: navCtrl
-        name: "ItemInstrumentsTree"
-        panel: root.navigationPanel
-        row: root.navigationRow
-        column: 0
-        enabled: root.visible
+    navigation.name: "InstrumentsTreeItemDelegate"
+    navigation.column: 0
 
-        onActiveChanged: {
-            if (active) {
-                root.focusActived()
-            }
+    navigation.accessible.role: MUAccessible.ListItem
+    navigation.accessible.name: titleLabel.text
+
+    onNavigationTriggered: { root.clicked(null) }
+
+    mouseArea.preventStealing: true
+    mouseArea.propagateComposedEvents: true
+
+    mouseArea.hoverEnabled: root.visible
+
+    mouseArea.onClicked: function(mouse) { root.clicked(mouse) }
+    mouseArea.onDoubleClicked: function(mouse) { root.doubleClicked(mouse) }
+
+    mouseArea.drag.target: root
+    mouseArea.drag.axis: Drag.YAxis
+
+    Keys.onShortcutOverride: function(event) {
+        switch (event.key) {
+        case Qt.Key_Backspace:
+        case Qt.Key_Delete:
+            event.accepted = true
+            root.removeSelectionRequested()
+            break
+        default:
+            break
         }
-    }
-
-    Rectangle {
-        id: background
-
-        anchors.fill: parent
-        anchors.margins: navCtrl.active ? ui.theme.navCtrlBorderWidth : 0
-
-        color: ui.theme.backgroundPrimaryColor
-        opacity: 1
-
-        NavigationFocusBorder { navigationCtrl: navCtrl }
-
-        states: [
-            State {
-                name: "HOVERED"
-                when: mouseArea.containsMouse && !mouseArea.pressed && !root.isSelected && !prv.dragged
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.buttonColor
-                    opacity: ui.theme.buttonOpacityHover
-                }
-            },
-
-            State {
-                name: "PRESSED"
-                when: mouseArea.pressed && !root.isSelected && !prv.dragged
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.buttonColor
-                    opacity: ui.theme.buttonOpacityHit
-                }
-            },
-
-            State {
-                name: "SELECTED"
-                when: root.isSelected && !mouseArea.containsMouse && !mouseArea.pressed
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.accentColor
-                    opacity: ui.theme.accentOpacityNormal
-                }
-            },
-
-            State {
-                name: "SELECTED_HOVERED"
-                when: root.isSelected && mouseArea.containsMouse && !mouseArea.pressed
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.accentColor
-                    opacity: ui.theme.accentOpacityHover
-                }
-            },
-
-            State {
-                name: "SELECTED_PRESSED"
-                when: root.isSelected && mouseArea.pressed
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.accentColor
-                    opacity: ui.theme.accentOpacityHit
-                }
-            },
-
-            State {
-                name: "PART_EXPANDED"
-                when: styleData.isExpanded && !root.isSelected &&
-                      root.type === InstrumentsTreeItemType.PART
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.textFieldColor
-                    opacity: 1
-                }
-            },
-
-            State {
-                name: "PARENT_EXPANDED"
-                when: root.visible && !root.isSelected &&
-                      (root.type === InstrumentsTreeItemType.INSTRUMENT ||
-                       root.type === InstrumentsTreeItemType.STAFF)
-
-                PropertyChanges {
-                    target: background
-                    color: ui.theme.textFieldColor
-                    opacity: 1
-                }
-            }
-        ]
     }
 
     StyledDropShadow {
@@ -220,35 +129,39 @@ Item {
         visible: false
     }
 
-    MouseArea {
-        id: mouseArea
-
-        anchors.fill: root
-
-        propagateComposedEvents: true
-        preventStealing: true
-
-        hoverEnabled: root.visible
-
-        drag.target: root
-        drag.axis: Drag.YAxis
-
-        onClicked: function(mouse) {
-            root.clicked(mouse)
-        }
-
-        onDoubleClicked: function(mouse) {
-            root.doubleClicked(mouse)
-        }
-    }
-
     Loader {
         id: popupLoader
 
-        function createPopup(comp, btn) {
+        readonly property StyledPopupView openedPopup: popupLoader.item as StyledPopupView
+        readonly property bool isPopupOpened: Boolean(openedPopup) && openedPopup.isOpened
+
+        function openPopup(comp: Component, btn: Item, item) {
             popupLoader.sourceComponent = comp
-            popupLoader.item.parent = btn
-            return popupLoader.item
+            if (!openedPopup) {
+                return
+            }
+
+            openedPopup.parent = btn
+            openedPopup.needActiveFirstItem = btn.navigation.highlight
+
+            openedPopup.load(item)
+
+            openedPopup.opened.connect(function() {
+                root.popupOpened(openedPopup.x, openedPopup.y, openedPopup.height)
+            })
+
+            openedPopup.closed.connect(function() {
+                root.popupClosed()
+                sourceComponent = null
+            })
+
+            openedPopup.open()
+        }
+
+        function closeOpenedPopup() {
+            if (isPopupOpened) {
+                openedPopup.close()
+            }
         }
     }
 
@@ -256,12 +169,22 @@ Item {
         id: instrumentSettingsComp
 
         InstrumentSettingsPopup {
-            navigationParentControl: settingsButton.navigation
             anchorItem: popupAnchorItem
 
-            onClosed: {
-                prv.resetOpenedPopup()
-                popupLoader.sourceComponent = null
+            onReplaceInstrumentRequested: {
+                // The popup would close when the dialog to select the new
+                // instrument is shown; when it closes, it is unloaded, i.e.
+                // deleted, which means that it is deleted while a signal
+                // handler inside it is being executed. This causes a crash.
+                // To prevent that, let the popup close itself, and perform the
+                // actual operation "later", i.e. not (directly or indirectly)
+                // inside the signal handler in the popup.
+                Qt.callLater(model.itemRole.replaceInstrument)
+            }
+
+            onResetAllFormattingRequested: {
+                // Same as above
+                Qt.callLater(model.itemRole.resetAllFormatting)
             }
         }
     }
@@ -270,13 +193,7 @@ Item {
         id: staffSettingsComp
 
         StaffSettingsPopup {
-            navigationParentControl: settingsButton.navigation
             anchorItem: popupAnchorItem
-
-            onClosed: {
-                prv.resetOpenedPopup()
-                popupLoader.sourceComponent = null
-            }
         }
     }
 
@@ -292,8 +209,8 @@ Item {
             Layout.preferredWidth: width
 
             objectName: "VisibleBtnInstrument"
-            navigation.panel: root.navigationPanel
-            navigation.row: root.navigationRow
+            navigation.panel: root.navigation.panel
+            navigation.row: root.navigation.row
             navigation.column: 1
 
             isVisible: model && model.itemRole.isVisible
@@ -303,7 +220,11 @@ Item {
                     return
                 }
 
-                model.itemRole.isVisible = !isVisible
+                if (root.isSelected) {
+                    root.visibilityChanged(!isVisible)
+                } else {
+                    model.itemRole.isVisible = !isVisible
+                }
             }
         }
 
@@ -316,11 +237,18 @@ Item {
                 id: expandButton
                 anchors.left: parent.left
 
+                visible: root.isExpandable
+
                 objectName: "ExpandBtnInstrument"
                 enabled: expandButton.visible
-                navigation.panel: root.navigationPanel
-                navigation.row: root.navigationRow
+                navigation.panel: root.navigation.panel
+                navigation.row: root.navigation.row
                 navigation.column: 2
+                navigation.accessible.name: styleData.isExpanded
+                                            //: Collapse a tree item
+                                            ? qsTrc("global", "Collapse")
+                                            //: Expand a tree item
+                                            : qsTrc("global", "Expand")
 
                 transparent: true
                 icon: styleData.isExpanded ? IconCode.SMALL_ARROW_DOWN : IconCode.SMALL_ARROW_RIGHT
@@ -335,6 +263,8 @@ Item {
             }
 
             StyledTextLabel {
+                id: titleLabel
+
                 anchors.left: expandButton.right
                 anchors.leftMargin: 4
                 anchors.right: parent.right
@@ -361,39 +291,38 @@ Item {
             Layout.alignment: Qt.AlignRight
             Layout.preferredWidth: width
 
+            visible: root.isEditable
+
             objectName: "SettingsBtnInstrument"
             enabled: root.visible
-            navigation.panel: root.navigationPanel
-            navigation.row: root.navigationRow
+            navigation.panel: root.navigation.panel
+            navigation.row: root.navigation.row
             navigation.column: 3
+            navigation.accessible.name: qsTrc("instruments", "Settings")
 
             icon: IconCode.SETTINGS_COG
 
             onClicked: {
-                if (prv.isPopupOpened) {
-                    prv.closeOpenedPopup()
+                if (popupLoader.isPopupOpened) {
+                    popupLoader.closeOpenedPopup()
                     return
                 }
 
-                var popup = null
-                var item = {}
+                let comp = null
+                let item = {}
 
                 if (root.type === InstrumentsTreeItemType.PART) {
-
-                    popup = popupLoader.createPopup(instrumentSettingsComp, this)
+                    comp = instrumentSettingsComp
 
                     item["partId"] = model.itemRole.id
-                    item["partName"] = model.itemRole.title
                     item["instrumentId"] = model.itemRole.instrumentId()
-
                 } else if (root.type === InstrumentsTreeItemType.STAFF) {
-
-                    popup = popupLoader.createPopup(staffSettingsComp, this)
+                    comp = staffSettingsComp
 
                     item["id"] = model.itemRole.id
                 }
 
-                prv.openPopup(popup, item)
+                popupLoader.openPopup(comp, this, item)
             }
 
             Behavior on opacity {
@@ -415,9 +344,94 @@ Item {
         NumberAnimation { duration: 150 }
     }
 
+    focusBorder.drawOutsideParent: false
+
+    background.states: [
+        State {
+            name: "HOVERED"
+            when: root.mouseArea.containsMouse && !root.mouseArea.pressed && !root.isSelected && !prv.dragged
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.buttonColor
+                opacity: ui.theme.buttonOpacityHover
+            }
+        },
+
+        State {
+            name: "PRESSED"
+            when: root.mouseArea.pressed && !root.isSelected && !prv.dragged
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.buttonColor
+                opacity: ui.theme.buttonOpacityHit
+            }
+        },
+
+        State {
+            name: "SELECTED"
+            when: root.isSelected && !root.mouseArea.containsMouse && !root.mouseArea.pressed
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.accentColor
+                opacity: ui.theme.accentOpacityNormal
+            }
+        },
+
+        State {
+            name: "SELECTED_HOVERED"
+            when: root.isSelected && root.mouseArea.containsMouse && !root.mouseArea.pressed
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.accentColor
+                opacity: ui.theme.accentOpacityHover
+            }
+        },
+
+        State {
+            name: "SELECTED_PRESSED"
+            when: root.isSelected && root.mouseArea.pressed
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.accentColor
+                opacity: ui.theme.accentOpacityHit
+            }
+        },
+
+        State {
+            name: "PART_EXPANDED"
+            when: styleData.isExpanded && !root.isSelected &&
+                  root.type === InstrumentsTreeItemType.PART
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.textFieldColor
+                opacity: 1
+            }
+        },
+
+        State {
+            name: "PARENT_EXPANDED"
+            when: root.visible && !root.isSelected &&
+                  (root.type === InstrumentsTreeItemType.INSTRUMENT ||
+                   root.type === InstrumentsTreeItemType.STAFF)
+
+            PropertyChanges {
+                target: root.background
+                color: ui.theme.textFieldColor
+                opacity: 1
+            }
+        }
+    ]
+
     states: [
         State {
             when: prv.dragged
+            name: "DRAGGED"
 
             ParentChange {
                 target: root
@@ -442,6 +456,19 @@ Item {
                     horizontalCenter: undefined
                 }
             }
+        },
+
+        //! NOTE: Workaround for a bug in Qt 6.2.4 - see PR #24106 comment
+        // https://bugreports.qt.io/browse/QTBUG-99436
+        State {
+            when: !prv.dragged
+            name: "DROPPED"
+
+            ParentChange {
+                target: root
+                parent: root.originalParent
+            }
         }
+
     ]
 }

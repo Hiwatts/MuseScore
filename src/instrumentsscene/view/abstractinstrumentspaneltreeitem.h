@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,6 +32,12 @@
 #include "notation/iexcerptnotation.h"
 
 namespace mu::instrumentsscene {
+struct MoveParams {
+    muse::IDList childIdListToMove;
+    muse::ID destinationParentId;
+    notation::INotationParts::InsertMode insertMode = notation::INotationParts::InsertMode::Before;
+};
+
 class AbstractInstrumentsPanelTreeItem : public QObject
 {
     Q_OBJECT
@@ -44,13 +50,14 @@ class AbstractInstrumentsPanelTreeItem : public QObject
     Q_PROPERTY(bool isEditable READ isEditable NOTIFY isEditableChanged)
     Q_PROPERTY(bool isRemovable READ isRemovable NOTIFY isRemovableChanged)
     Q_PROPERTY(bool isSelectable READ isSelectable CONSTANT)
+    Q_PROPERTY(bool isSelected READ isSelected NOTIFY isSelectedChanged)
 
 public:
     AbstractInstrumentsPanelTreeItem(const InstrumentsTreeItemType::ItemType& type, notation::IMasterNotationPtr masterNotation,
                                      notation::INotationPtr notation, QObject* parent);
     virtual ~AbstractInstrumentsPanelTreeItem();
 
-    ID id() const;
+    muse::ID id() const;
     QString idStr() const;
     QString title() const;
     int type() const;
@@ -60,18 +67,25 @@ public:
     bool isRemovable() const;
 
     virtual bool isSelectable() const;
+    bool isSelected() const;
 
-    Q_INVOKABLE virtual bool canAcceptDrop(int type) const;
+    Q_INVOKABLE virtual bool canAcceptDrop(const QVariant& item) const;
     Q_INVOKABLE virtual void appendNewItem();
 
-    virtual void moveChildren(int sourceRow, int count, AbstractInstrumentsPanelTreeItem* destinationParent, int destinationRow);
+    virtual MoveParams buildMoveParams(int sourceRow, int count, AbstractInstrumentsPanelTreeItem* destinationParent,
+                                       int destinationRow) const;
+
+    virtual void moveChildren(int sourceRow, int count, AbstractInstrumentsPanelTreeItem* destinationParent, int destinationRow,
+                              bool updateNotation);
+
     virtual void removeChildren(int row, int count = 1, bool deleteChild = false);
 
     AbstractInstrumentsPanelTreeItem* parentItem() const;
     void setParentItem(AbstractInstrumentsPanelTreeItem* parent);
 
-    AbstractInstrumentsPanelTreeItem* childAtId(const ID& id) const;
+    AbstractInstrumentsPanelTreeItem* childAtId(const muse::ID& id) const;
     AbstractInstrumentsPanelTreeItem* childAtRow(int row) const;
+    const QList<AbstractInstrumentsPanelTreeItem*>& childItems() const;
 
     void appendChild(AbstractInstrumentsPanelTreeItem* child);
     void insertChild(AbstractInstrumentsPanelTreeItem* child, int beforeRow);
@@ -83,11 +97,12 @@ public:
 public slots:
     void setType(InstrumentsTreeItemType::ItemType type);
     void setTitle(QString title);
-    void setIsVisible(bool isVisible);
-    void setId(const ID& id);
+    void setIsVisible(bool isVisible, bool setChildren = true);
+    void setId(const muse::ID& id);
     void setIsExpandable(bool expandable);
     void setIsEditable(bool editable);
     void setIsRemovable(bool removable);
+    void setIsSelected(bool selected);
 
 signals:
     void typeChanged(InstrumentsTreeItemType::ItemType type);
@@ -96,6 +111,7 @@ signals:
     void isExpandableChanged(bool isExpandable);
     void isEditableChanged(bool isEditable);
     void isRemovableChanged(bool isRemovable);
+    void isSelectedChanged(bool isSelected);
 
 protected:
     notation::IMasterNotationPtr masterNotation() const;
@@ -107,13 +123,14 @@ private:
     QList<AbstractInstrumentsPanelTreeItem*> m_children;
     AbstractInstrumentsPanelTreeItem* m_parent = nullptr;
 
-    ID m_id;
+    muse::ID m_id;
     QString m_title;
     InstrumentsTreeItemType::ItemType m_type = InstrumentsTreeItemType::ItemType::UNDEFINED;
     bool m_isVisible = false;
     bool m_isExpandable = false;
     bool m_isEditable = false;
     bool m_isRemovable = false;
+    bool m_isSelected = false;
 
     notation::IMasterNotationPtr m_masterNotation = nullptr;
     notation::INotationPtr m_notation = nullptr;

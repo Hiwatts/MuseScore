@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,12 +25,12 @@
 
 #include "ui_symboldialog.h"
 
+#include "modularity/ioc.h"
+#include "engraving/iengravingfontsprovider.h"
+#include "context/iglobalcontext.h"
+
 namespace mu::palette {
 class PaletteWidget;
-}
-
-namespace Ms {
-class EngravingItem;
 
 //---------------------------------------------------------
 //   SymbolDialog
@@ -39,11 +39,11 @@ class EngravingItem;
 class SymbolDialog : public QWidget, Ui::SymbolDialogBase
 {
     Q_OBJECT
+    INJECT(mu::context::IGlobalContext, globalContext)
+    INJECT(engraving::IEngravingFontsProvider, engravingFonts)
 
-    QString range;
-    mu::palette::PaletteWidget* sp;
-    void createSymbolPalette();
-    void createSymbols();
+public:
+    SymbolDialog(const QString&, QWidget* parent = 0);
 
 private slots:
     void systemFlagChanged(int);
@@ -55,8 +55,12 @@ protected:
     virtual void changeEvent(QEvent* event);
     void retranslate() { retranslateUi(this); }
 
-public:
-    SymbolDialog(const QString&, QWidget* parent = 0);
+private:
+    void createSymbolPalette();
+    void createSymbols();
+
+    QString range;
+    PaletteWidget* m_symbolsWidget = nullptr;
 };
 }
 

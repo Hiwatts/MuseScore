@@ -1,13 +1,41 @@
 #include "gpbeat.h"
 
-namespace Ms {
-std::pair<int, GPRhytm::RhytmType> GPBeat::lenth() const
+namespace mu::iex::guitarpro {
+std::pair<int, GPRhythm::RhytmType> GPBeat::lenth() const
 {
-    return _rhytm->length();
+    return _rhythm->length();
 }
 
-GPRhytm::Tuplet GPBeat::tuplet() const
+GPRhythm::Tuplet GPBeat::tuplet() const
 {
-    return _rhytm->tuplet();
+    return _rhythm->tuplet();
 }
+
+void GPBeat::addHarmonicMarkType(GPBeat::HarmonicMarkType type)
+{
+    switch (type) {
+    case GPBeat::HarmonicMarkType::Artificial:
+        _harmonicMarkInfo.artificial = true;
+        break;
+    case GPBeat::HarmonicMarkType::Pinch:
+        _harmonicMarkInfo.pinch = true;
+        break;
+    case GPBeat::HarmonicMarkType::Tap:
+        _harmonicMarkInfo.tap = true;
+        break;
+    case GPBeat::HarmonicMarkType::Semi:
+        _harmonicMarkInfo.semi = true;
+        break;
+    case GPBeat::HarmonicMarkType::FeedBack:
+        _harmonicMarkInfo.feedback = true;
+        break;
+    case GPBeat::HarmonicMarkType::None:
+        break;
+    }
 }
+
+void GPBeat::sortGPNotes()
+{
+    std::sort(_notes.begin(), _notes.end(), comparePitch);
+}
+} // namespace mu::iex::guitarpro

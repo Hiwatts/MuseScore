@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,14 +22,14 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.AppShell 1.0
 
 StyledDialogView {
     id: root
 
-    title: qsTrc("appshell", "About MusicXML")
+    title: qsTrc("appshell/about", "About MusicXML")
 
     contentHeight: 312
     contentWidth: 456
@@ -56,7 +56,7 @@ StyledDialogView {
             StyledTextLabel {
                 Layout.fillWidth: true
 
-                text: qsTrc("appshell", "MusicXML is an open file format for exchanging digital sheet music, supported by many applications.")
+                text: qsTrc("appshell/about", "MusicXML is an open file format for exchanging digital sheet music, supported by many applications.")
                 font: ui.theme.bodyBoldFont
                 wrapMode: Text.WordWrap
             }
@@ -68,7 +68,7 @@ StyledDialogView {
                 StyledTextLabel {
                     width: parent.width
 
-                    text: qsTrc("appshell", "Copyright 2004 - 2017 the Contributors to the MusicXML Specification, published by the W3C Music Notation Community Group under the W3C Community Final Specification Agreement:")
+                    text: qsTrc("appshell/about", "Copyright © 2004-2021 the Contributors to the MusicXML Specification, published by the Music Notation Community Group under the W3C Community Final Specification Agreement (FSA):")
                     wrapMode: Text.WordWrap
                     maximumLineCount: 3
                 }
@@ -92,7 +92,7 @@ StyledDialogView {
 
                 StyledTextLabel {
                     width: parent.width
-                    text: qsTrc("appshell", "A human-readable summary is available:")
+                    text: qsTrc("appshell/about", "A human-readable summary is available:")
                     wrapMode: Text.WordWrap
                     maximumLineCount: 3
                 }
@@ -111,17 +111,17 @@ StyledDialogView {
             }
         }
 
-        RowLayout {
-            Layout.alignment: Qt.AlignRight
+        ButtonBox {
+            Layout.fillWidth: true
             Layout.rightMargin: 16
             Layout.bottomMargin: 16
 
-            spacing: 12
+            buttons: [ ButtonBoxModel.Ok ]
 
-            FlatButton {
-                text: qsTrc("global", "OK")
+            navigationPanel.section: root.navigationSection
 
-                onClicked: {
+            onStandardButtonClicked: function(buttonId) {
+                if (buttonId === ButtonBoxModel.Ok) {
                     root.hide()
                 }
             }

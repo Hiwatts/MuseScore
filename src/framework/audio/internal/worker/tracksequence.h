@@ -20,33 +20,37 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_TRACKSEQUENCE_H
-#define MU_AUDIO_TRACKSEQUENCE_H
+#ifndef MUSE_AUDIO_TRACKSEQUENCE_H
+#define MUSE_AUDIO_TRACKSEQUENCE_H
 
+#include "global/async/asyncable.h"
 #include "modularity/ioc.h"
-#include "async/asyncable.h"
+#include "iaudioengine.h"
 
 #include "itracksequence.h"
 #include "igettracks.h"
-#include "iaudiosource.h"
 #include "iclock.h"
 #include "track.h"
 #include "audiotypes.h"
 
-namespace mu::audio {
+namespace muse::audio {
 class Mixer;
-class TrackSequence : public ITrackSequence, public IGetTracks, public async::Asyncable
+class TrackSequence : public ITrackSequence, public IGetTracks, public muse::Injectable, public async::Asyncable
 {
+    Inject<IAudioEngine> audioEngine = { this };
+
 public:
-    TrackSequence(const TrackSequenceId id);
+    TrackSequence(const TrackSequenceId id, const muse::modularity::ContextPtr& iocCtx);
     ~TrackSequence();
 
     // ITrackSequence
     TrackSequenceId id() const override;
 
-    RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, const midi::MidiData& midiData,
+    RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, const mpe::PlaybackData& playbackData,
                                            const AudioParams& requiredParams) override;
-    RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, io::Device* device, const AudioParams& requiredParams) override;
+    RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, io::IODevice* device, const AudioParams& requiredParams) override;
+
+    RetVal2<TrackId, AudioOutputParams> addAuxTrack(const std::string& trackName, const AudioOutputParams& requiredOutputParams) override;
 
     TrackName trackName(const TrackId id) const override;
     TrackIdList trackIdList() const override;
@@ -62,12 +66,14 @@ public:
 
     // IGetTracks
     TrackPtr track(const TrackId id) const override;
-    TracksMap allTracks() const override;
+    const TracksMap& allTracks() const override;
 
     async::Channel<TrackPtr> trackAboutToBeAdded() const override;
     async::Channel<TrackPtr> trackAboutToBeRemoved() const override;
 
 private:
+    TrackId newTrackId() const;
+
     std::shared_ptr<Mixer> mixer() const;
 
     TrackSequenceId m_id = -1;
@@ -84,7 +90,9 @@ private:
 
     async::Channel<TrackPtr> m_trackAboutToBeAdded;
     async::Channel<TrackPtr> m_trackAboutToBeRemoved;
+
+    TrackId m_prevActiveTrackId = INVALID_TRACK_ID;
 };
 }
 
-#endif // MU_AUDIO_TRACKSEQUENCE_H
+#endif // MUSE_AUDIO_TRACKSEQUENCE_H

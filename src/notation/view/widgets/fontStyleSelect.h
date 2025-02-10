@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,21 +22,22 @@
 #ifndef MU_NOTATION_FONTSTYLESELECT_H
 #define MU_NOTATION_FONTSTYLESELECT_H
 
+#include "modularity/ioc.h"
 #include "ui_font_style_select.h"
-#include "libmscore/types.h"
+#include "engraving/dom/types.h"
 
 namespace mu::notation {
-class FontStyleSelect : public QWidget, public Ui::FontStyleSelect
+class FontStyleSelect : public QWidget, public Ui::FontStyleSelect, public muse::Injectable
 {
     Q_OBJECT
 
 public:
     FontStyleSelect(QWidget* parent);
-    Ms::FontStyle fontStyle() const;
-    void setFontStyle(Ms::FontStyle);
+    mu::engraving::FontStyle fontStyle() const;
+    void setFontStyle(mu::engraving::FontStyle);
 
 signals:
-    void fontStyleChanged(Ms::FontStyle);
+    void fontStyleChanged(mu::engraving::FontStyle);
 
 private slots:
     void _fontStyleChanged();

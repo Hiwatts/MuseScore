@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,6 +22,10 @@
 
 #include "winframelesswindowcontroller.h"
 
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x600)
+#undef _WIN32_WINNT // like defined to `0x502` in _mingw.h for Qt 5.15
+#define _WIN32_WINNT 0x0600 // Vista or later, needed for `iPaddedBorderWidth`
+#endif
 #include <Windows.h>
 #include <windowsx.h>
 #include <dwmapi.h>
@@ -34,9 +38,18 @@ using namespace mu::appshell;
 
 static HWND s_hwnd = 0;
 
+static void updateWindowPosition()
+{
+    SetWindowPos(s_hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
+}
+
 WinFramelessWindowController::WinFramelessWindowController()
     : FramelessWindowController()
 {
+    memset(&m_monitorInfo, 0, sizeof(MONITORINFO));
+    m_monitorInfo.cbSize = sizeof(MONITORINFO);
+
+    qApp->installEventFilter(this);
     qApp->installNativeEventFilter(this);
 }
 
@@ -56,11 +69,35 @@ void WinFramelessWindowController::init()
     const MARGINS shadow_on = { 1, 1, 1, 1 };
     DwmExtendFrameIntoClientArea(s_hwnd, &shadow_on);
 
-    SetWindowPos(s_hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
-    ShowWindow(s_hwnd, SW_SHOW);
+    updateWindowPosition();
 }
 
-bool WinFramelessWindowController::nativeEventFilter(const QByteArray& eventType, void* message, long* result)
+bool WinFramelessWindowController::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() != QEvent::Move || !watched->isWindowType()) {
+        return false;
+    }
+
+    QWindow* window = dynamic_cast<QWindow*>(watched);
+    if (!window) {
+        return false;
+    }
+
+    if (!m_screen) {
+        m_screen = window->screen();
+        return false;
+    }
+
+    if (m_screen != window->screen()) {
+        m_screen = window->screen();
+        //! Redrawing a window by updating a position
+        updateWindowPosition();
+    }
+
+    return false;
+}
+
+bool WinFramelessWindowController::nativeEventFilter(const QByteArray& eventType, void* message, qintptr* result)
 {
     if (eventType != "windows_generic_MSG") {
         return false;
@@ -95,11 +132,36 @@ bool WinFramelessWindowController::nativeEventFilter(const QByteArray& eventType
     return false;
 }
 
-bool WinFramelessWindowController::removeWindowFrame(MSG* message, long* result) const
+bool WinFramelessWindowController::removeWindowFrame(MSG* message, qintptr* result)
 {
     NCCALCSIZE_PARAMS& params = *reinterpret_cast<NCCALCSIZE_PARAMS*>(message->lParam);
-    if (params.rgrc[0].top != 0) {
-        params.rgrc[0].top -= 1;
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(WINDOWPLACEMENT);
+    GetWindowPlacement(s_hwnd, &placement);
+
+    if (placement.showCmd == SW_SHOWMAXIMIZED) {
+        HMONITOR hMonitor = MonitorFromWindow(message->hwnd, MONITOR_DEFAULTTONULL);
+        if (hMonitor != NULL) {
+            GetMonitorInfoW(hMonitor, &m_monitorInfo);
+        }
+
+        params.rgrc[0] = m_monitorInfo.rcWork;
+
+        if (isTaskbarInAutohideState()) {
+            std::optional<UINT> edge = taskbarEdge();
+            if (edge.has_value()) {
+                if (ABE_LEFT == edge.value()) {
+                    params.rgrc[0].left += 1;
+                } else if (ABE_RIGHT == edge.value()) {
+                    params.rgrc[0].right -= 1;
+                } else if (ABE_TOP == edge.value()) {
+                    params.rgrc[0].top += 1;
+                } else if (ABE_BOTTOM == edge.value()) {
+                    params.rgrc[0].bottom -= 1;
+                }
+            }
+        }
     }
 
     /// NOTE: remove window frame
@@ -107,49 +169,46 @@ bool WinFramelessWindowController::removeWindowFrame(MSG* message, long* result)
     return true;
 }
 
-bool WinFramelessWindowController::calculateWindowSize(MSG* message, long* result) const
+bool WinFramelessWindowController::calculateWindowSize(MSG* message, qintptr* result)
 {
-    QWindow* window = mainWindow()->qWindow();
-    if (!window) {
+    if (!isWindowMaximized(message->hwnd)) {
         return false;
     }
 
-    QScreen* windowScreen = window->screen();
-    if (!windowScreen) {
+    RECT windowRect;
+    if (!GetWindowRect(message->hwnd, &windowRect)) {
         return false;
     }
 
-    const QRect availableGeometry = windowScreen->availableGeometry();
-    int scaleFactor = uiConfiguration()->guiScaling();
+    HMONITOR hMonitor = MonitorFromRect(&windowRect, MONITOR_DEFAULTTONULL);
+    if (!hMonitor) {
+        return false;
+    }
+
+    GetMonitorInfoW(hMonitor, &m_monitorInfo);
+    RECT monitorRect = m_monitorInfo.rcMonitor;
+    RECT monitorWorkAreaRect = m_monitorInfo.rcWork;
 
     auto minMaxInfo = reinterpret_cast<MINMAXINFO*>(message->lParam);
 
-    minMaxInfo->ptMaxSize.x = availableGeometry.width() * scaleFactor;
-
-    // NOTE: Qt doesn't work well with windows that don't have title bar but have native frames.
-    // When maximized they go out of bounds and the title bar is clipped,
-    // so decreasing the height by 1 fixes the window size
-    minMaxInfo->ptMaxSize.y = availableGeometry.height() * scaleFactor - 1;
-
-    if (windowScreen == QGuiApplication::primaryScreen()) {
-        minMaxInfo->ptMaxPosition.x = availableGeometry.x();
-        minMaxInfo->ptMaxPosition.y = availableGeometry.y();
-    }
-
-    minMaxInfo->ptMinTrackSize.x = window->minimumWidth() * scaleFactor;
-    minMaxInfo->ptMinTrackSize.y = window->minimumHeight() * scaleFactor;
-
-    minMaxInfo->ptMaxTrackSize = minMaxInfo->ptMaxSize;
+    minMaxInfo->ptMaxSize.x = monitorWorkAreaRect.right - monitorWorkAreaRect.left;
+    minMaxInfo->ptMaxSize.y =  monitorWorkAreaRect.bottom - monitorWorkAreaRect.top;
+    minMaxInfo->ptMaxPosition.x = std::abs(windowRect.left - monitorRect.left);
+    minMaxInfo->ptMaxPosition.y = std::abs(windowRect.top - monitorRect.top);
+    minMaxInfo->ptMinTrackSize.x =  minMaxInfo->ptMaxSize.x;
+    minMaxInfo->ptMinTrackSize.y =  minMaxInfo->ptMaxSize.y;
 
     *result = 0;
     return true;
 }
 
-bool WinFramelessWindowController::processMouseMove(MSG* message, long* result) const
+bool WinFramelessWindowController::processMouseMove(MSG* message, qintptr* result) const
 {
     const LONG borderWidth = this->borderWidth();
-    RECT winrect;
-    GetWindowRect(message->hwnd, &winrect);
+    RECT windowRect;
+    if (!GetWindowRect(message->hwnd, &windowRect)) {
+        return false;
+    }
 
     long x = GET_X_LPARAM(message->lParam);
     long y = GET_Y_LPARAM(message->lParam);
@@ -158,8 +217,8 @@ bool WinFramelessWindowController::processMouseMove(MSG* message, long* result) 
     QRect moveAreaRect = windowTitleBarMoveArea();
     int moveAreaHeight = static_cast<int>(moveAreaRect.height() * scaleFactor);
     int moveAreaWidth = static_cast<int>(moveAreaRect.width() * scaleFactor);
-    int moveAreaX = winrect.left + static_cast<int>(moveAreaRect.x() * scaleFactor);
-    int moveAreaY = winrect.top + borderWidth + static_cast<int>(moveAreaRect.y() * scaleFactor);
+    int moveAreaX = windowRect.left + static_cast<int>(moveAreaRect.x() * scaleFactor);
+    int moveAreaY = windowRect.top + borderWidth + static_cast<int>(moveAreaRect.y() * scaleFactor);
 
     /// NOTE: titlebar`s move area
     if (x >= moveAreaX && x < moveAreaX + moveAreaWidth
@@ -169,53 +228,53 @@ bool WinFramelessWindowController::processMouseMove(MSG* message, long* result) 
     }
 
     /// NOTE: bottom left corner
-    if (x >= winrect.left && x < winrect.left + borderWidth
-        && y < winrect.bottom && y >= winrect.bottom - borderWidth) {
+    if (x >= windowRect.left && x < windowRect.left + borderWidth
+        && y < windowRect.bottom && y >= windowRect.bottom - borderWidth) {
         *result = HTBOTTOMLEFT;
         return true;
     }
 
     /// NOTE: bottom right corner
-    if (x < winrect.right && x >= winrect.right - borderWidth
-        && y < winrect.bottom && y >= winrect.bottom - borderWidth) {
+    if (x < windowRect.right && x >= windowRect.right - borderWidth
+        && y < windowRect.bottom && y >= windowRect.bottom - borderWidth) {
         *result = HTBOTTOMRIGHT;
         return true;
     }
 
     /// NOTE: top left corner
-    if (x >= winrect.left && x < winrect.left + borderWidth
-        && y >= winrect.top && y < winrect.top + borderWidth) {
+    if (x >= windowRect.left && x < windowRect.left + borderWidth
+        && y >= windowRect.top && y < windowRect.top + borderWidth) {
         *result = HTTOPLEFT;
         return true;
     }
 
     /// NOTE: top right corner
-    if (x < winrect.right && x >= winrect.right - borderWidth
-        && y >= winrect.top && y < winrect.top + borderWidth) {
+    if (x < windowRect.right && x >= windowRect.right - borderWidth
+        && y >= windowRect.top && y < windowRect.top + borderWidth) {
         *result = HTTOPRIGHT;
         return true;
     }
 
     /// NOTE: left border
-    if (x >= winrect.left && x < winrect.left + borderWidth) {
+    if (x >= windowRect.left && x < windowRect.left + borderWidth) {
         *result = HTLEFT;
         return true;
     }
 
     /// NOTE: right border
-    if (x < winrect.right && x >= winrect.right - borderWidth) {
+    if (x < windowRect.right && x >= windowRect.right - borderWidth) {
         *result = HTRIGHT;
         return true;
     }
 
     /// NOTE: bottom border
-    if (y < winrect.bottom && y >= winrect.bottom - borderWidth) {
+    if (y < windowRect.bottom && y >= windowRect.bottom - borderWidth) {
         *result = HTBOTTOM;
         return true;
     }
 
     /// NOTE: top border
-    if (y >= winrect.top && y < winrect.top + borderWidth) {
+    if (y >= windowRect.top && y < windowRect.top + borderWidth) {
         *result = HTTOP;
         return true;
     }
@@ -284,6 +343,41 @@ bool WinFramelessWindowController::showSystemMenuIfNeed(MSG* message) const
 
     PostMessage(message->hwnd, WM_SYSCOMMAND, command, 0);
     return true;
+}
+
+bool WinFramelessWindowController::isWindowMaximized(HWND hWnd) const
+{
+    WINDOWPLACEMENT wp;
+    wp.length = sizeof(WINDOWPLACEMENT);
+    if (!GetWindowPlacement(hWnd, &wp)) {
+        return false;
+    }
+
+    return wp.showCmd == SW_MAXIMIZE;
+}
+
+bool WinFramelessWindowController::isTaskbarInAutohideState() const
+{
+    APPBARDATA appBarData;
+    appBarData.cbSize = sizeof(appBarData);
+
+    UINT taskbarState = SHAppBarMessage(ABM_GETSTATE, &appBarData);
+
+    return ABS_AUTOHIDE & taskbarState;
+}
+
+std::optional<UINT> WinFramelessWindowController::taskbarEdge() const
+{
+    APPBARDATA appBarData;
+    appBarData.cbSize = sizeof(appBarData);
+
+    appBarData.hWnd = FindWindow(L"Shell_TrayWnd", nullptr);
+    if (!appBarData.hWnd) {
+        return std::nullopt;
+    }
+
+    SHAppBarMessage(ABM_GETTASKBARPOS, &appBarData);
+    return appBarData.uEdge;
 }
 
 int WinFramelessWindowController::borderWidth() const

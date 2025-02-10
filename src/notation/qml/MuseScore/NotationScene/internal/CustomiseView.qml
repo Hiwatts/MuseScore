@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,20 +22,19 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.NotationScene 1.0
 
-ListView {
+StyledListView {
     id: root
 
     spacing: 0
-
-    boundsBehavior: Flickable.StopAtBounds
-    clip: true
+    scrollBarPolicy: ScrollBar.AlwaysOn
 
     signal selectRowRequested(int index)
     signal clearSelectionRequested()
+    signal removeSelectionRequested()
 
     function positionViewAtSelectedItems() {
         var selectedIndexes = root.model.selectionModel.selectedIndexes
@@ -45,14 +44,10 @@ ListView {
     }
 
     function focusOnFirst() {
-        var selectedIndexes = root.model.selectionModel.selectedIndexes
-        if (selectedIndexes.lenght > 0) {
-            root.selectRowRequested(selectedIndexes[0])
-        } else {
-            root.selectRowRequested(0)
+        var firstItem = root.itemAtIndex(0)
+        if (Boolean(firstItem)) {
+            firstItem.navigation.requestActive()
         }
-
-        root.positionViewAtSelectedItems()
     }
 
     function clearFocus() {
@@ -60,36 +55,26 @@ ListView {
     }
 
     property NavigationPanel navigationPanel: NavigationPanel {
-        name: "CostomiseView"
+        name: "CustomiseView"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Both
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
         }
 
-        onNavigationEvent: {
+        onNavigationEvent: function(event) {
             if (event.type === NavigationEvent.AboutActive) {
                 event.setData("controlName", prv.currentItemNavigationName)
             }
         }
     }
 
-
     QtObject {
         id: prv
 
         property var currentItemNavigationName: []
-    }
-
-    ScrollBar.vertical: StyledScrollBar {
-
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-
-        visible: root.contentHeight > root.height
-        z: 1
     }
 
     delegate: ListItemBlank {
@@ -105,6 +90,10 @@ ListView {
             root.selectRowRequested(index)
         }
 
+        onRemoveSelectionRequested: {
+            root.removeSelectionRequested()
+        }
+
         navigation.name: item.title
         navigation.panel: root.navigationPanel
         navigation.row: model.index
@@ -117,14 +106,8 @@ ListView {
             }
         }
 
-        onIsSelectedChanged: {
-            if (isSelected && !navigation.active) {
-                navigation.requestActive()
-            }
-        }
-
         Loader {
-            property var delegateType: Boolean(itemDelegate.item) ? itemDelegate.item.type : NoteInputBarCustomiseItem.UNDEFINED
+            property int delegateType: Boolean(itemDelegate.item) ? itemDelegate.item.type : NoteInputBarCustomiseItem.UNDEFINED
 
             anchors.fill: parent
             sourceComponent: delegateType === NoteInputBarCustomiseItem.ACTION ? actionComponent : separatorLineComponent

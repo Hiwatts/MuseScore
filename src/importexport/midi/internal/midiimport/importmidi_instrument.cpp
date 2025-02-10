@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,21 +20,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "importmidi_instrument.h"
-#include "importmidi_chord.h"
-#include "importmidi_inner.h"
-#include "libmscore/instrtemplate.h"
-#include "libmscore/drumset.h"
-#include "libmscore/part.h"
-#include "libmscore/staff.h"
-#include "libmscore/masterscore.h"
-#include "importmidi_operations.h"
-#include "engraving/compat/midi/midiinstrument.h"
 
 #include <set>
 
-namespace Ms {
-extern QList<InstrumentGroup*> instrumentGroups;
+#include "importmidi_chord.h"
+#include "importmidi_inner.h"
+#include "importmidi_instrument_names.h"
+#include "importmidi_operations.h"
 
+#include "engraving/dom/drumset.h"
+#include "engraving/dom/instrtemplate.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/score.h"
+#include "engraving/dom/staff.h"
+
+using namespace mu::engraving;
+
+namespace mu::engraving {
+extern std::vector<const InstrumentGroup*> instrumentGroups;
+}
+
+namespace mu::iex::midi {
 namespace MidiInstr {
 QString instrumentName(MidiType type, int program, bool isDrumTrack)
 {
@@ -144,7 +150,7 @@ std::set<int> findAllPitches(const MTrack& track)
 void findNotEmptyDrumPitches(std::set<int>& drumPitches, const InstrumentTemplate* templ)
 {
     for (int i = 0; i != DRUM_INSTRUMENTS; ++i) {
-        if (!templ->drumset->name(i).isEmpty()) {
+        if (!templ->drumset->name(i).empty()) {
             drumPitches.insert(i);
         }
     }
@@ -163,11 +169,11 @@ bool hasNotDefinedDrumPitch(const std::set<int>& trackPitches, const std::set<in
     return hasNotDefinedPitch;
 }
 
-const InstrumentTemplate* findInstrument(const QString& groupId, const QString& instrId)
+static const InstrumentTemplate* findInstrument(const String& groupId, const String& instrId)
 {
     const InstrumentTemplate* instr = nullptr;
 
-    for (const InstrumentGroup* group: qAsConst(instrumentGroups)) {
+    for (const InstrumentGroup* group: instrumentGroups) {
         if (group->id == groupId) {
             for (const InstrumentTemplate* templ: group->instrumentTemplates) {
                 if (templ->id == instrId) {
@@ -188,7 +194,7 @@ const InstrumentTemplate* findClosestInstrument(const MTrack& track)
     int maxLessProgram = -1;
     const InstrumentTemplate* closestTemplate = nullptr;
 
-    for (const InstrumentGroup* group: qAsConst(instrumentGroups)) {
+    for (const InstrumentGroup* group: instrumentGroups) {
         for (const InstrumentTemplate* templ: group->instrumentTemplates) {
             if (templ->staffGroup == StaffGroup::TAB) {
                 continue;
@@ -220,7 +226,7 @@ std::vector<const InstrumentTemplate*> findInstrumentsForProgram(const MTrack& t
         trackPitches = findAllPitches(track);
     }
 
-    for (const InstrumentGroup* group: qAsConst(instrumentGroups)) {
+    for (const InstrumentGroup* group: instrumentGroups) {
         for (const InstrumentTemplate* templ: group->instrumentTemplates) {
             if (templ->staffGroup == StaffGroup::TAB) {
                 continue;
@@ -254,27 +260,27 @@ std::vector<const InstrumentTemplate*> findInstrumentsForProgram(const MTrack& t
         // so we will find the most matching instrument
 
         if (program == 55) {             // GM "Orchestra Hit" sound
-            auto instr = findInstrument("electronic-instruments", "brass-synthesizer");
+            auto instr = findInstrument(u"electronic-instruments", u"brass-synthesizer");
             if (instr) {
                 suitableTemplates.push_back(instr);
             }
         } else if (program == 110) {          // GM "Fiddle" sound
-            auto instr = findInstrument("strings", "violin");
+            auto instr = findInstrument(u"strings", u"violin");
             if (instr) {
                 suitableTemplates.push_back(instr);
             }
         } else if (program >= 80 && program <= 103) {
             const InstrumentTemplate* instr = nullptr;
             if (track.mtrack->drumTrack()) {
-                instr = findInstrument("electronic-instruments", "percussion-synthesizer");
+                instr = findInstrument(u"electronic-instruments", u"percussion-synthesizer");
             } else {
-                instr = findInstrument("electronic-instruments", "effect-synth");
+                instr = findInstrument(u"electronic-instruments", u"effect-synth");
             }
             if (instr) {
                 suitableTemplates.push_back(instr);               // generic synth
             }
         } else if (program >= 112 && program <= 127) {
-            auto instr = findInstrument("unpitched-percussion", "snare-drum");
+            auto instr = findInstrument(u"unpitched-percussion", u"snare-drum");
             if (instr) {
                 suitableTemplates.push_back(instr);               // 1-line percussion staff
             }
@@ -282,11 +288,11 @@ std::vector<const InstrumentTemplate*> findInstrumentsForProgram(const MTrack& t
             // slightly improve slap bass match:
             // match to the instruments with program 33
             // instead of 35 according to the algorithm below
-            auto instr = findInstrument("plucked-strings", "electric-bass");
+            auto instr = findInstrument(u"plucked-strings", u"electric-bass");
             if (instr) {
                 suitableTemplates.push_back(instr);
             }
-            instr = findInstrument("plucked-strings", "5-string-electric-bass");
+            instr = findInstrument(u"plucked-strings", u"5-string-electric-bass");
             if (instr) {
                 suitableTemplates.push_back(instr);
             }
@@ -335,9 +341,9 @@ int findMaxPitchDiff(const std::pair<int, int>& minMaxPitch, const InstrumentTem
     return diff;
 }
 
-bool hasCommonGenre(QList<InstrumentGenre*> genres)
+static bool hasCommonGenre(const std::list<const InstrumentGenre*>& genres)
 {
-    for (InstrumentGenre* genre: genres) {
+    for (const InstrumentGenre* genre : genres) {
         if (genre->id == "common") {
             return true;
         }
@@ -422,7 +428,7 @@ void findInstrumentsForAllTracks(const QList<MTrack>& tracks, bool forceReload)
 void instrumentTemplatesChanged()
 {
     QStringList files(midiImportOperations.allMidiFiles());
-    for (const QString& file : qAsConst(files)) {
+    for (const QString& file : std::as_const(files)) {
         MidiOperations::CurrentMidiFileSetter s(midiImportOperations, file);
         MidiOperations::FileData* data = midiImportOperations.data();
         if (data) {
@@ -479,9 +485,9 @@ void createInstruments(Score* score, QList<MTrack>& tracks)
         }
 
         if (instr) {
-            for (int i = 0; i != part->nstaves(); ++i) {
+            for (size_t i = 0; i != part->nstaves(); ++i) {
                 if (instr->staffTypePreset) {
-                    part->staff(i)->init(instr, nullptr, i);
+                    part->staff(i)->init(instr, nullptr, static_cast<int>(i));
                     part->staff(i)->setStaffType(Fraction(0, 1), *(instr->staffTypePreset));
                 }
 //                        part->staff(i)->setLines(0, instr->staffLines[i]);
@@ -490,7 +496,7 @@ void createInstruments(Score* score, QList<MTrack>& tracks)
             }
         }
 
-        for (int i = 0; i != part->nstaves(); ++i) {
+        for (size_t i = 0; i != part->nstaves(); ++i) {
             if (i > 0) {
                 ++idx;
             }
@@ -525,10 +531,10 @@ QString msInstrName(int trackIndex)
     if (!instr->trackName.isEmpty()) {
         return instr->trackName;
     }
-    if (!instr->longNames.isEmpty()) {
+    if (!instr->longNames.empty()) {
         return instr->longNames.front().name();
     }
     return "";
 }
 } // namespace MidiInstr
-} // namespace Ms
+} // namespace mu::iex::midi

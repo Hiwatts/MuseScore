@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,191 +22,24 @@
 #ifndef MU_NOTATION_NOTATIONPAINTVIEW_H
 #define MU_NOTATION_NOTATIONPAINTVIEW_H
 
-#include <QQuickPaintedItem>
-
-#include "modularity/ioc.h"
-
-#include "notation/inotationconfiguration.h"
-
-#include "actions/iactionsdispatcher.h"
-#include "ui/iuiconfiguration.h"
-#include "actions/actionable.h"
-#include "context/iglobalcontext.h"
-#include "async/asyncable.h"
-#include "playback/iplaybackcontroller.h"
-#include "shortcuts/ishortcutsregister.h"
-#include "ui/iuiactionsregister.h"
-#include "ui/view/abstractmenumodel.h"
-
-#include "notationviewinputcontroller.h"
-#include "noteinputcursor.h"
-#include "playbackcursor.h"
-#include "loopmarker.h"
+#include "abstractnotationpaintview.h"
 
 namespace mu::notation {
-class NotationPaintView : public QQuickPaintedItem, public IControlledView, public async::Asyncable, public actions::Actionable
+class NotationPaintView : public AbstractNotationPaintView
 {
-    Q_OBJECT
-
-    INJECT(notation, INotationConfiguration, configuration)
-    INJECT(notation, engraving::IEngravingConfiguration, engravingConfiguration)
-    INJECT(notation, ui::IUiConfiguration, uiConfiguration)
-    INJECT(notation, actions::IActionsDispatcher, dispatcher)
-    INJECT(notation, context::IGlobalContext, globalContext)
-    INJECT(notation, playback::IPlaybackController, playbackController)
-    INJECT(notation, mu::shortcuts::IShortcutsRegister, shortcutsRegister)
-    INJECT(notation, ui::IUiActionsRegister, actionsRegister)
-
-    Q_PROPERTY(qreal startHorizontalScrollPosition READ startHorizontalScrollPosition NOTIFY horizontalScrollChanged)
-    Q_PROPERTY(qreal horizontalScrollSize READ horizontalScrollSize NOTIFY horizontalScrollChanged)
-    Q_PROPERTY(qreal startVerticalScrollPosition READ startVerticalScrollPosition NOTIFY verticalScrollChanged)
-    Q_PROPERTY(qreal verticalScrollSize READ verticalScrollSize NOTIFY verticalScrollChanged)
-
-    Q_PROPERTY(QColor backgroundColor READ backgroundColor NOTIFY backgroundColorChanged)
-    Q_PROPERTY(QRect viewport READ viewport NOTIFY viewportChanged)
-
 public:
     explicit NotationPaintView(QQuickItem* parent = nullptr);
 
-    Q_INVOKABLE void load();
-
-    Q_INVOKABLE void scrollHorizontal(qreal position);
-    Q_INVOKABLE void scrollVertical(qreal position);
-
-    Q_INVOKABLE void zoomIn();
-    Q_INVOKABLE void zoomOut();
-
-    Q_INVOKABLE void selectOnNavigationActive();
-
-    qreal width() const override;
-    qreal height() const override;
-
-    PointF toLogical(const QPoint& point) const override;
-
-    Q_INVOKABLE void moveCanvas(int dx, int dy) override;
-    void moveCanvasVertical(int dy) override;
-    void moveCanvasHorizontal(int dx) override;
-
-    qreal currentScaling() const override;
-    void setScaling(qreal scaling, const QPoint& pos) override;
-    Q_INVOKABLE void scale(qreal factor, const QPoint& pos);
-
-    bool isNoteEnterMode() const override;
-    void showShadowNote(const PointF& pos) override;
-
-    void showContextMenu(const ElementType& elementType, const QPoint& pos) override;
-    void hideContextMenu() override;
-
-    INotationInteractionPtr notationInteraction() const override;
-    INotationPlaybackPtr notationPlayback() const override;
-
-    qreal startHorizontalScrollPosition() const;
-    qreal horizontalScrollSize() const;
-    qreal startVerticalScrollPosition() const;
-    qreal verticalScrollSize() const;
-
-    QColor backgroundColor() const;
-    QRect viewport() const;
-
-signals:
-    void showContextMenuRequested(int elementType, const QPoint& pos);
-    void hideContextMenuRequested();
-
-    void textEdittingStarted();
-
-    void horizontalScrollChanged();
-    void verticalScrollChanged();
-
-    void backgroundColorChanged(QColor color);
-    void viewportChanged(QRect viewport);
-
-    void activeFocusRequested();
-
-protected:
-    void setNotation(INotationPtr notation);
-    void setReadonly(bool readonly);
-
-    void moveCanvasToCenter();
-    void moveCanvasToPosition(const QPoint& logicPos);
-    double guiScaling() const;
-
-    QRectF notationContentRect() const;
-
-    RectF toLogical(const QRect& rect) const;
-
-    // Draw
-    void paint(QPainter* painter) override;
-
-    virtual void onNotationSetup();
-
-protected slots:
-    virtual void onViewSizeChanged();
-
 private:
-    INotationPtr notation() const;
-    INotationNoteInputPtr notationNoteInput() const;
-    INotationElementsPtr notationElements() const;
-    INotationStylePtr notationStyle() const;
-    INotationSelectionPtr notationSelection() const;
+    void onLoadNotation(INotationPtr notation) override;
+    void onUnloadNotation(INotationPtr notation) override;
 
-    void clear();
-    void initBackground();
-    void initNavigatorOrientation();
+    void initZoomAndPosition() override;
 
-    bool canReceiveAction(const actions::ActionCode& actionCode) const override;
-    void onCurrentNotationChanged();
-    bool isInited() const;
+    void onMatrixChanged(const muse::draw::Transform& oldMatrix, const muse::draw::Transform& newMatrix,
+                         bool overrideZoomType = true) override;
 
-    // Input
-    void wheelEvent(QWheelEvent* event) override;
-    void mousePressEvent(QMouseEvent* event) override;
-    void mouseMoveEvent(QMouseEvent* event) override;
-    void mouseDoubleClickEvent(QMouseEvent* event) override;
-    void mouseReleaseEvent(QMouseEvent* event) override;
-    void hoverMoveEvent(QHoverEvent* event) override;
-    bool event(QEvent*) override;
-    void shortcutOverride(QKeyEvent* event);
-    void dragEnterEvent(QDragEnterEvent* event) override;
-    void dragLeaveEvent(QDragLeaveEvent* event) override;
-    void dragMoveEvent(QDragMoveEvent* event) override;
-    void dropEvent(QDropEvent* event) override;
-    bool eventFilter(QObject* obj, QEvent* event) override;
-
-    QRectF canvasRect() const;
-
-    qreal horizontalScrollableAreaSize() const;
-    qreal horizontalScrollableSize() const;
-    qreal verticalScrollableAreaSize() const;
-    qreal verticalScrollableSize() const;
-
-    void adjustCanvasPosition(const QRectF& logicRect);
-
-    void onNoteInputChanged();
-    void onSelectionChanged();
-
-    void onPlayingChanged();
-    void movePlaybackCursor(uint32_t tick);
-
-    void updateLoopMarkers(const LoopBoundaries& boundaries);
-
-    const Page* pointToPage(const PointF& point) const;
-    QPointF alignToCurrentPageBorder(const QRectF& showRect, const QPointF& pos) const;
-
-    void paintBackground(const RectF& rect, draw::Painter* painter);
-
-    PointF canvasCenter() const;
-    std::pair<int, int> constraintCanvas(int dx, int dy) const;
-
-    notation::INotationPtr m_notation;
-    QTransform m_matrix;
-    std::unique_ptr<NotationViewInputController> m_inputController;
-    std::unique_ptr<PlaybackCursor> m_playbackCursor;
-    std::unique_ptr<NoteInputCursor> m_noteInputCursor;
-    std::unique_ptr<LoopMarker> m_loopInMarker;
-    std::unique_ptr<LoopMarker> m_loopOutMarker;
-
-    qreal m_previousVerticalScrollPosition = 0;
-    qreal m_previousHorizontalScrollPosition = 0;
+    bool m_isLocalMatrixUpdate = false;
 };
 }
 

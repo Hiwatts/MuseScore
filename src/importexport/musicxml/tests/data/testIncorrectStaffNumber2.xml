@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <identification>
     <encoding>
       <software>MuseScore 0.7.0</software>
@@ -16,7 +16,7 @@
         Cubase 9.5.10 exports multi-staff parts without including a staves element
         and uses voice 1 in both staves.
         Furthermore, many empty notations elements are present.
-        MuseScore will still corrctly interpret this as a two staff part.
+        MuseScore will still correctly interpret this as a two staff part.
         </miscellaneous-field>
       </miscellaneous>
     </identification>

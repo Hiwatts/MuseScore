@@ -19,8 +19,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UICOMPONENTS_SORTFILTERPROXYMODEL_H
-#define MU_UICOMPONENTS_SORTFILTERPROXYMODEL_H
+#ifndef MUSE_UICOMPONENTS_SORTFILTERPROXYMODEL_H
+#define MUSE_UICOMPONENTS_SORTFILTERPROXYMODEL_H
 
 #include <QSortFilterProxyModel>
 
@@ -28,13 +28,17 @@
 #include "sortervalue.h"
 #include "qmllistproperty.h"
 
-namespace mu::uicomponents {
+namespace muse::uicomponents {
 class SortFilterProxyModel : public QSortFilterProxyModel
 {
     Q_OBJECT
 
-    Q_PROPERTY(QQmlListProperty<mu::uicomponents::FilterValue> filters READ filters)
-    Q_PROPERTY(QQmlListProperty<mu::uicomponents::SorterValue> sorters READ sorters)
+    Q_PROPERTY(int rowCount READ rowCount NOTIFY rowCountChanged)
+
+    Q_PROPERTY(QQmlListProperty<muse::uicomponents::FilterValue> filters READ filters CONSTANT)
+    Q_PROPERTY(QQmlListProperty<muse::uicomponents::SorterValue> sorters READ sorters CONSTANT)
+    Q_PROPERTY(QList<int> alwaysIncludeIndices READ alwaysIncludeIndices WRITE setAlwaysIncludeIndices NOTIFY alwaysIncludeIndicesChanged)
+    Q_PROPERTY(QList<int> alwaysExcludeIndices READ alwaysExcludeIndices WRITE setAlwaysExcludeIndices NOTIFY alwaysExcludeIndicesChanged)
 
 public:
     explicit SortFilterProxyModel(QObject* parent = nullptr);
@@ -42,14 +46,31 @@ public:
     QQmlListProperty<FilterValue> filters();
     QQmlListProperty<SorterValue> sorters();
 
+    QList<int> alwaysIncludeIndices() const;
+    void setAlwaysIncludeIndices(const QList<int>& indices);
+
+    QList<int> alwaysExcludeIndices() const;
+    void setAlwaysExcludeIndices(const QList<int>& indices);
+
+    QHash<int, QByteArray> roleNames() const override;
+
+    void setSourceModel(QAbstractItemModel* sourceModel) override;
+
     Q_INVOKABLE void refresh();
 
 signals:
-    void filtersChanged(QQmlListProperty<FilterValue> filters);
+    void rowCountChanged();
+
+    void filtersChanged(QQmlListProperty<muse::uicomponents::FilterValue> filters);
+
+    void alwaysIncludeIndicesChanged();
+    void alwaysExcludeIndicesChanged();
+
+    void sourceModelRoleNamesChanged();
 
 protected:
-    bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const;
-    bool lessThan(const QModelIndex& left, const QModelIndex& right) const;
+    bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
+    bool lessThan(const QModelIndex& left, const QModelIndex& right) const override;
 
 private:
     void reset();
@@ -62,7 +83,12 @@ private:
     QHash<int, FilterValue*> m_roleIdToFilterValueHash;
 
     QmlListProperty<SorterValue> m_sorters;
+
+    QList<int> m_alwaysIncludeIndices;
+    QList<int> m_alwaysExcludeIndices;
+
+    QMetaObject::Connection m_subSourceModelConnection;
 };
 }
 
-#endif // MU_UICOMPONENTS_SORTFILTERPROXYMODEL_H
+#endif // MUSE_UICOMPONENTS_SORTFILTERPROXYMODEL_H

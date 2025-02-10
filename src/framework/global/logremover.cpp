@@ -21,74 +21,88 @@
  */
 #include "logremover.h"
 
-#include <QDirIterator>
-#include <QFile>
+#include "io/file.h"
+#include "io/dir.h"
 
-using namespace mu;
+#include "log.h"
 
-void LogRemover::removeLogs(const io::path& logsDir, int olderThanDays, const QString& pattern)
+using namespace muse;
+
+void LogRemover::removeLogs(const io::path_t& logsDir, int olderThanDays, const String& pattern)
 {
     //! NOTE If the pattern changes,
     //! then we need to change the implementation of `scanDir` and `parseDate` functions.
-    Q_ASSERT(pattern == "MuseScore_yyMMdd_HHmmss.log");
-    if (pattern != "MuseScore_yyMMdd_HHmmss.log") {
+    IF_ASSERT_FAILED(pattern.endsWith(u"_yyMMdd.log") || pattern.endsWith(u"_yyMMdd_HHmmss.log")) {
         return;
     }
 
-    QStringList files;
+    io::paths_t files;
     scanDir(logsDir, files);
 
-    QDate currentDate = QDate::currentDate();
+    Date currentDate = Date::currentDate();
 
-    QStringList toRemoveFiles;
-    for (const QString& file : files) {
-        QDate date = parseDate(file);
-        if (!date.isValid()) {
+    io::paths_t toRemoveFiles;
+    for (const io::path_t& file : files) {
+        Date date = parseDate(io::filename(file).toString());
+        if (date.isNull()) {
             continue;
         }
 
         int days = date.daysTo(currentDate);
         if (days >= olderThanDays) {
-            toRemoveFiles << file;
+            toRemoveFiles.push_back(file);
         }
     }
 
     removeFiles(toRemoveFiles);
 }
 
-QDate LogRemover::parseDate(const QString& fileName)
+muse::Date LogRemover::parseDate(const String& fileName)
 {
-    int endIdx = fileName.lastIndexOf('_');
-    if (endIdx == -1) {
-        return QDate();
+    size_t dateStartIdx = fileName.indexOf(u'_');
+    if (dateStartIdx == muse::nidx) {
+        return Date();
     }
 
-    int startIdx = fileName.lastIndexOf('_', endIdx - 1);
-    if (startIdx == -1) {
-        return QDate();
+    String dateStr = fileName.mid(dateStartIdx + 1, fileName.size() - 1);
+
+    // "yyMMdd"
+    String yy = dateStr.mid(0, 2);
+    bool ok = false;
+    int y = yy.toInt(&ok);
+    if (!ok || !(y > 0)) {
+        return Date();
     }
 
-    QString dateStr = fileName.mid(startIdx + 1, (endIdx - startIdx - 1));
-    QDate date = QDate::fromString(dateStr, "yyMMdd");
-
-    //! NOTE We get `1921`, but it should be `2021`
-    if (date.year() < 2000) {
-        date = date.addYears(100);
+    String mm = dateStr.mid(2, 2);
+    int m = mm.toInt(&ok);
+    if (!ok || !(m > 0 && m <= 12)) {
+        return Date();
     }
+
+    String dd = dateStr.mid(4, 2);
+    int d = dd.toInt(&ok);
+    if (!ok || !(d > 0 && d <= 31)) {
+        return Date();
+    }
+
+    Date date(2000 + y, m, d);
     return date;
 }
 
-void LogRemover::removeFiles(const QStringList& files)
+void LogRemover::removeFiles(const io::paths_t& files)
 {
-    for (const QString& file : files) {
-        QFile::remove(file);
+    for (const io::path_t& file : files) {
+        io::File::remove(file);
     }
 }
 
-void LogRemover::scanDir(const io::path& logsDir, QStringList& files)
+void LogRemover::scanDir(const io::path_t& logsDir, io::paths_t& files)
 {
-    QDirIterator it(logsDir.toQString(), { "*.log" }, QDir::NoDotAndDotDot | QDir::NoSymLinks | QDir::Readable | QDir::Files);
-    while (it.hasNext()) {
-        files.push_back(it.next());
+    RetVal<io::paths_t> rv = io::Dir::scanFiles(logsDir, { "*.log" }, io::ScanMode::FilesInCurrentDir);
+    if (!rv.ret) {
+        LOGE() << "failed scan dir: " << logsDir;
     }
+
+    files = rv.val;
 }

@@ -81,7 +81,6 @@
     <metaTag name="lyricist"></metaTag>
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -126,11 +125,11 @@
         <height>10</height>
         <bottomGap>0</bottomGap>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Titel</text>
           </Text>
         <Text>
-          <style>Composer</style>
+          <style>composer</style>
           <text>Composer</text>
           </Text>
         <Text>
@@ -138,7 +137,7 @@
           <text>Lyricist</text>
           </Text>
         <Text>
-          <style>Subtitle</style>
+          <style>subtitle</style>
           <text>Subtitle</text>
           </Text>
         <Text>

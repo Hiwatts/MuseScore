@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,6 +23,7 @@
 
 #include "log.h"
 
+using namespace muse;
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
@@ -38,13 +39,13 @@ bool AbstractImageWriter::supportsUnitType(UnitType unitType) const
     return std::find(unitTypes.cbegin(), unitTypes.cend(), unitType) != unitTypes.cend();
 }
 
-mu::Ret AbstractImageWriter::write(INotationPtr, io::Device&, const Options& options)
+Ret AbstractImageWriter::write(INotationPtr, io::IODevice&, const Options& options)
 {
     IF_ASSERT_FAILED(unitTypeFromOptions(options) != UnitType::MULTI_PART) {
         return Ret(Ret::Code::NotSupported);
     }
 
-    if (supportsUnitType(static_cast<UnitType>(options.value(OptionKey::UNIT_TYPE, Val(0)).toInt()))) {
+    if (supportsUnitType(muse::value(options, OptionKey::UNIT_TYPE, Val(UnitType::PER_PAGE)).toEnum<UnitType>())) {
         NOT_IMPLEMENTED;
         return Ret(Ret::Code::NotImplemented);
     }
@@ -53,29 +54,19 @@ mu::Ret AbstractImageWriter::write(INotationPtr, io::Device&, const Options& opt
     return Ret(Ret::Code::NotSupported);
 }
 
-mu::Ret AbstractImageWriter::writeList(const INotationPtrList&, io::Device&, const Options& options)
+Ret AbstractImageWriter::writeList(const INotationPtrList&, io::IODevice&, const Options& options)
 {
     IF_ASSERT_FAILED(unitTypeFromOptions(options) == UnitType::MULTI_PART) {
         return Ret(Ret::Code::NotSupported);
     }
 
-    if (supportsUnitType(static_cast<UnitType>(options.value(OptionKey::UNIT_TYPE, Val(0)).toInt()))) {
+    if (supportsUnitType(muse::value(options, OptionKey::UNIT_TYPE, Val(UnitType::PER_PAGE)).toEnum<UnitType>())) {
         NOT_IMPLEMENTED;
         return Ret(Ret::Code::NotImplemented);
     }
 
     NOT_SUPPORTED;
     return Ret(Ret::Code::NotSupported);
-}
-
-void AbstractImageWriter::abort()
-{
-    NOT_IMPLEMENTED;
-}
-
-mu::framework::ProgressChannel AbstractImageWriter::progress() const
-{
-    return m_progress;
 }
 
 INotationWriter::UnitType AbstractImageWriter::unitTypeFromOptions(const Options& options) const
@@ -86,7 +77,7 @@ INotationWriter::UnitType AbstractImageWriter::unitTypeFromOptions(const Options
     }
 
     UnitType defaultUnitType = supported.front();
-    UnitType unitType = static_cast<UnitType>(options.value(OptionKey::UNIT_TYPE, Val(static_cast<int>(defaultUnitType))).toInt());
+    UnitType unitType = muse::value(options, OptionKey::UNIT_TYPE, Val(defaultUnitType)).toEnum<UnitType>();
     if (!supportsUnitType(unitType)) {
         return defaultUnitType;
     }

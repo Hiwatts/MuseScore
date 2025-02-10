@@ -24,11 +24,12 @@
 #include "settings.h"
 #include "io/path.h"
 
-using namespace mu::shortcuts;
-using namespace mu::framework;
+#include "global/configreader.h"
 
-static const mu::io::path SHORTCUTS_FILE_NAME("/shortcuts.xml");
-static const mu::io::path SHORTCUTS_DEFAULT_FILE_PATH(":/data" + SHORTCUTS_FILE_NAME);
+#include "log.h"
+
+using namespace muse;
+using namespace muse::shortcuts;
 
 static const std::string MIDIMAPPINGS_FILE_NAME("/midi_mappings.xml");
 
@@ -36,20 +37,42 @@ static const Settings::Key ADVANCE_TO_NEXT_NOTE_ON_KEY_RELEASE("shortcuts", "io/
 
 void ShortcutsConfiguration::init()
 {
+    m_config = ConfigReader::read(":/configs/shortcuts.cfg");
+
     settings()->setDefaultValue(ADVANCE_TO_NEXT_NOTE_ON_KEY_RELEASE, Val(true));
+    settings()->valueChanged(ADVANCE_TO_NEXT_NOTE_ON_KEY_RELEASE).onReceive(this, [this](const Val& val) {
+        m_advanceToNextNoteOnKeyReleaseChanged.send(val.toBool());
+    });
 }
 
-mu::io::path ShortcutsConfiguration::shortcutsUserAppDataPath() const
+QString ShortcutsConfiguration::currentKeyboardLayout() const
 {
-    return globalConfiguration()->userAppDataPath() + SHORTCUTS_FILE_NAME;
+    NOT_IMPLEMENTED;
+    return "US-QWERTY";
 }
 
-mu::io::path ShortcutsConfiguration::shortcutsAppDataPath() const
+void ShortcutsConfiguration::setCurrentKeyboardLayout(const QString& layout)
 {
-    return SHORTCUTS_DEFAULT_FILE_PATH;
+    UNUSED(layout);
+    NOT_IMPLEMENTED;
+    return;
 }
 
-mu::io::path ShortcutsConfiguration::midiMappingUserAppDataPath() const
+io::path_t ShortcutsConfiguration::shortcutsUserAppDataPath() const
+{
+    return globalConfiguration()->userAppDataPath() + "/shortcuts.xml";
+}
+
+io::path_t ShortcutsConfiguration::shortcutsAppDataPath() const
+{
+#if defined(Q_OS_MACOS)
+    return m_config.value("shortcuts_mac").toPath();
+#endif
+
+    return m_config.value("shortcuts").toPath();
+}
+
+io::path_t ShortcutsConfiguration::midiMappingUserAppDataPath() const
 {
     return globalConfiguration()->userAppDataPath() + MIDIMAPPINGS_FILE_NAME;
 }
@@ -62,4 +85,9 @@ bool ShortcutsConfiguration::advanceToNextNoteOnKeyRelease() const
 void ShortcutsConfiguration::setAdvanceToNextNoteOnKeyRelease(bool value)
 {
     settings()->setSharedValue(ADVANCE_TO_NEXT_NOTE_ON_KEY_RELEASE, Val(value));
+}
+
+muse::async::Channel<bool> ShortcutsConfiguration::advanceToNextNoteOnKeyReleaseChanged() const
+{
+    return m_advanceToNextNoteOnKeyReleaseChanged;
 }

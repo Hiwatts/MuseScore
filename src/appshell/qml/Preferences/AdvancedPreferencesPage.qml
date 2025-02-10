@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,17 +20,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Preferences 1.0
 
 import "internal"
 
 PreferencesPage {
     id: root
+
+    contentFillsAvailableHeight: true
 
     Component.onCompleted: {
         preferencesModel.load()
@@ -62,11 +63,13 @@ PreferencesPage {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            keyRoleName: "keyRole"
-            keyTitle: qsTrc("appshell", "Preference")
+            keyRoleName: "descriptionRole"
+            keyTitle: qsTrc("appshell/preferences", "Preference")
             valueRoleName: "valueRole"
-            valueTitle: qsTrc("appshell", "Value")
+            valueTitle: qsTrc("appshell/preferences", "Value")
             valueTypeRole: "typeRole"
+            minValueRoleName: "minValueRole"
+            maxValueRoleName: "maxValueRole"
 
             navigationSection: root.navigationSection
             navigationOrderStart: root.navigationOrderStart + 2
@@ -76,7 +79,7 @@ PreferencesPage {
 
                 filters: [
                     FilterValue {
-                        roleName: "keyRole"
+                        roleName: "descriptionRole"
                         roleValue: topSection.searchText
                         compareType: CompareType.Contains
                     }

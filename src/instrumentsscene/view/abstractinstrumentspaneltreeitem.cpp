@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,6 +25,7 @@
 
 using namespace mu::instrumentsscene;
 using namespace mu::notation;
+using namespace muse;
 
 AbstractInstrumentsPanelTreeItem::AbstractInstrumentsPanelTreeItem(const InstrumentsTreeItemType::ItemType& type,
                                                                    IMasterNotationPtr masterNotation,
@@ -42,7 +43,7 @@ AbstractInstrumentsPanelTreeItem::~AbstractInstrumentsPanelTreeItem()
     }
 }
 
-mu::ID AbstractInstrumentsPanelTreeItem::id() const
+muse::ID AbstractInstrumentsPanelTreeItem::id() const
 {
     return m_id;
 }
@@ -72,6 +73,11 @@ bool AbstractInstrumentsPanelTreeItem::isSelectable() const
     return false;
 }
 
+bool AbstractInstrumentsPanelTreeItem::isSelected() const
+{
+    return m_isSelected;
+}
+
 bool AbstractInstrumentsPanelTreeItem::isExpandable() const
 {
     return m_isExpandable;
@@ -87,18 +93,29 @@ bool AbstractInstrumentsPanelTreeItem::isRemovable() const
     return m_isRemovable;
 }
 
-bool AbstractInstrumentsPanelTreeItem::canAcceptDrop(int type) const
+bool AbstractInstrumentsPanelTreeItem::canAcceptDrop(const QVariant& obj) const
 {
-    return static_cast<InstrumentsTreeItemType::ItemType>(type) == m_type;
+    auto item = dynamic_cast<const AbstractInstrumentsPanelTreeItem*>(obj.value<QObject*>());
+    if (!item) {
+        return false;
+    }
+
+    return item->m_parent == m_parent && item->m_type == m_type;
 }
 
 void AbstractInstrumentsPanelTreeItem::appendNewItem()
 {
 }
 
+MoveParams AbstractInstrumentsPanelTreeItem::buildMoveParams(int, int, AbstractInstrumentsPanelTreeItem*, int) const
+{
+    UNREACHABLE;
+    return MoveParams();
+}
+
 void AbstractInstrumentsPanelTreeItem::moveChildren(int sourceRow, int count,
                                                     AbstractInstrumentsPanelTreeItem* destinationParent,
-                                                    int destinationRow)
+                                                    int destinationRow, bool)
 {
     QList<AbstractInstrumentsPanelTreeItem*> childrenToMove;
     for (int i = sourceRow; i < sourceRow + count; ++i) {
@@ -156,11 +173,16 @@ AbstractInstrumentsPanelTreeItem* AbstractInstrumentsPanelTreeItem::childAtId(co
 
 AbstractInstrumentsPanelTreeItem* AbstractInstrumentsPanelTreeItem::childAtRow(int row) const
 {
-    if (row < 0 || row >= childCount()) {
+    if (row < 0 || row >= m_children.size()) {
         return nullptr;
     }
 
     return m_children.at(row);
+}
+
+const QList<AbstractInstrumentsPanelTreeItem*>& AbstractInstrumentsPanelTreeItem::childItems() const
+{
+    return m_children;
 }
 
 int AbstractInstrumentsPanelTreeItem::indexOf(const AbstractInstrumentsPanelTreeItem* item) const
@@ -181,6 +203,10 @@ void AbstractInstrumentsPanelTreeItem::appendChild(AbstractInstrumentsPanelTreeI
     child->setParentItem(this);
 
     m_children.append(child);
+
+    if (isSelected()) {
+        child->setIsSelected(true);
+    }
 }
 
 void AbstractInstrumentsPanelTreeItem::insertChild(AbstractInstrumentsPanelTreeItem* child, int beforeRow)
@@ -192,6 +218,10 @@ void AbstractInstrumentsPanelTreeItem::insertChild(AbstractInstrumentsPanelTreeI
     child->setParentItem(this);
 
     m_children.insert(beforeRow, child);
+
+    if (isSelected()) {
+        child->setIsSelected(true);
+    }
 }
 
 bool AbstractInstrumentsPanelTreeItem::isEmpty() const
@@ -229,7 +259,7 @@ void AbstractInstrumentsPanelTreeItem::setTitle(QString title)
     emit titleChanged(m_title);
 }
 
-void AbstractInstrumentsPanelTreeItem::setIsVisible(bool isVisible)
+void AbstractInstrumentsPanelTreeItem::setIsVisible(bool isVisible, bool setChildren)
 {
     if (m_isVisible == isVisible) {
         return;
@@ -238,8 +268,10 @@ void AbstractInstrumentsPanelTreeItem::setIsVisible(bool isVisible)
     m_isVisible = isVisible;
     emit isVisibleChanged(isVisible);
 
-    for (auto child : m_children) {
-        child->setIsVisible(isVisible);
+    if (setChildren) {
+        for (auto child : m_children) {
+            child->setIsVisible(isVisible);
+        }
     }
 }
 
@@ -276,6 +308,20 @@ void AbstractInstrumentsPanelTreeItem::setIsRemovable(bool removable)
 
     m_isRemovable = removable;
     emit isRemovableChanged(removable);
+}
+
+void AbstractInstrumentsPanelTreeItem::setIsSelected(bool selected)
+{
+    if (m_isSelected == selected) {
+        return;
+    }
+
+    for (AbstractInstrumentsPanelTreeItem* child: m_children) {
+        child->setIsSelected(selected);
+    }
+
+    m_isSelected = selected;
+    emit isSelectedChanged(selected);
 }
 
 IMasterNotationPtr AbstractInstrumentsPanelTreeItem::masterNotation() const

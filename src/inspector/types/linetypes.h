@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,13 +31,9 @@ class LineTypes
 
 public:
     enum class LineStyle {
-        LINE_STYLE_NONE = 0,
         LINE_STYLE_SOLID,
         LINE_STYLE_DASHED,
-        LINE_STYLE_DOTTED,
-        LINE_STYLE_DASH_DOT,
-        LINE_STYLE_DASH_DOT_DOT,
-        LINE_STYLE_CUSTOM
+        LINE_STYLE_DOTTED
     };
 
     Q_ENUM(LineStyle)

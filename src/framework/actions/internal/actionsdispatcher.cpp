@@ -20,10 +20,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "actionsdispatcher.h"
-#include "log.h"
+
+#include <sstream>
+
 #include "actionable.h"
 
-using namespace mu::actions;
+#include "log.h"
+
+using namespace muse::actions;
 
 ActionsDispatcher::~ActionsDispatcher()
 {
@@ -44,14 +48,61 @@ void ActionsDispatcher::dispatch(const ActionCode& actionCode)
 
 void ActionsDispatcher::dispatch(const ActionCode& actionCode, const ActionData& data)
 {
-    auto it = m_clients.find(actionCode);
-    if (it == m_clients.end()) {
-        LOGW() << "not registred action: " << actionCode;
+    // is query?
+    ActionQuery query = ActionQuery(actionCode);
+    if (query.isValid()) {
+        IF_ASSERT_FAILED(data.empty()) {
+            LOGE() << "not supported action data with query";
+        }
+        dispatch(query);
         return;
     }
 
+    // code
+    auto it = m_clients.find(actionCode);
+    if (it == m_clients.end()) {
+        LOGW() << "not a registered action: " << actionCode;
+        return;
+    }
+
+    doDispatch(it->second, actionCode, data);
+}
+
+void ActionsDispatcher::dispatch(const ActionQuery& actionQuery)
+{
+    //! NOTE Try find full query
+    const std::string full = actionQuery.toString();
+    ActionCode code = full;
+    auto it = m_clients.find(code);
+    if (it == m_clients.end()) {
+        //! Try find just uri
+        code = actionQuery.uri().toString();
+        it = m_clients.find(code);
+        if (it == m_clients.end()) {
+            LOGW() << "not a registered action: '" << code << "'";
+            //dump();
+            return;
+        }
+    }
+
+    ActionData data;
+    data.setArg<std::string>(0, full);
+    doDispatch(it->second, code, data);
+}
+
+void ActionsDispatcher::dump() const
+{
+    std::stringstream s;
+    for (const auto& p : m_clients) {
+        s << "'" << p.first << "'\n";
+    }
+
+    LOGDA() << "\n" << s.str();
+}
+
+void ActionsDispatcher::doDispatch(const Clients& clients, const ActionCode& actionCode, const ActionData& data)
+{
     int canReceiveCount = 0;
-    const Clients& clients = it->second;
     for (auto cit = clients.cbegin(); cit != clients.cend(); ++cit) {
         const Actionable* client = cit->first;
         if (client->canReceiveAction(actionCode)) {
@@ -91,4 +142,26 @@ void ActionsDispatcher::reg(Actionable* client, const ActionCode& actionCode, co
     Clients& clients = m_clients[actionCode];
     CallBacks& callbacks = clients[client];
     callbacks.insert({ actionCode, call });
+}
+
+void ActionsDispatcher::reg(Actionable* client, const ActionQuery& actionQuery, const ActionCallBackWithQuery& call)
+{
+    reg(client, actionQuery.toString(), [call](const ActionCode&, const ActionData& data) {
+        call(ActionQuery(data.arg<std::string>(0)));
+    });
+}
+
+bool ActionsDispatcher::isReg(Actionable* client) const
+{
+    return client->isDispatcher(this);
+}
+
+ActionCodeList ActionsDispatcher::actionList() const
+{
+    ActionCodeList list;
+    list.reserve(m_clients.size());
+    for (const auto& p : m_clients) {
+        list.push_back(p.first);
+    }
+    return list;
 }

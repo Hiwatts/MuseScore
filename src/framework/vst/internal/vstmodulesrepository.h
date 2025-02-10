@@ -20,51 +20,50 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_VST_VSTMODULESREPOSITORY_H
-#define MU_VST_VSTMODULESREPOSITORY_H
+#ifndef MUSE_VST_VSTMODULESREPOSITORY_H
+#define MUSE_VST_VSTMODULESREPOSITORY_H
 
 #include <unordered_map>
 #include <mutex>
 
+#include "ivstmodulesrepository.h"
+
 #include "modularity/ioc.h"
-#include "system/ifilesystem.h"
-#include "audio/audiotypes.h"
+#include "audioplugins/iknownaudiopluginsregister.h"
 #include "audio/iaudiothreadsecurer.h"
 
-#include "ivstmodulesrepository.h"
-#include "ivstconfiguration.h"
+#include "audioplugins/audiopluginstypes.h"
 #include "vsttypes.h"
 
-namespace mu::vst {
+namespace muse::vst {
 class VstModulesRepository : public IVstModulesRepository
 {
-    INJECT(vst, IVstConfiguration, configuration)
-    INJECT(vst, system::IFileSystem, fileSystem)
-    INJECT_STATIC(vst, audio::IAudioThreadSecurer, threadSecurer)
+    INJECT(audioplugins::IKnownAudioPluginsRegister, knownPlugins)
+    INJECT_STATIC(muse::audio::IAudioThreadSecurer, threadSecurer)
 
 public:
     VstModulesRepository() = default;
 
     void init();
+    void deInit();
 
-    PluginModulePtr pluginModule(const audio::AudioResourceId& resourceId) const override;
+    bool exists(const muse::audio::AudioResourceId& resourceId) const override;
+    PluginModulePtr pluginModule(const muse::audio::AudioResourceId& resourceId) const override;
+    void addPluginModule(const muse::audio::AudioResourceId& resourceId) override;
+    void removePluginModule(const muse::audio::AudioResourceId& resourceId) override;
 
     audio::AudioResourceMetaList instrumentModulesMeta() const override;
     audio::AudioResourceMetaList fxModulesMeta() const override;
     void refresh() override;
 
 private:
-    void addModule(const io::path& path);
-    audio::AudioResourceMetaList modulesMetaList(const VstPluginType& type) const;
-
-    RetVal<io::paths> pluginPathsFromCustomLocation(const io::path& customPath) const;
-    PluginModule::PathList pluginPathsFromDefaultLocation() const;
+    audio::AudioResourceMetaList modulesMetaList(const audioplugins::AudioPluginType& type) const;
 
     PluginContext m_pluginContext;
 
     mutable std::mutex m_mutex;
-    std::unordered_map<audio::AudioResourceId, PluginModulePtr> m_modules;
+    mutable std::unordered_map<audio::AudioResourceId, PluginModulePtr> m_modules;
 };
 }
 
-#endif // MU_VST_VSTMODULESREPOSITORY_H
+#endif // MUSE_VST_VSTMODULESREPOSITORY_H

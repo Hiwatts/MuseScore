@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<museScore version="4.00">
+<museScore version="4.50">
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
       <minSystemDistance>8</minSystemDistance>
       <maxSystemDistance>12</maxSystemDistance>
       <measureSpacing>1</measureSpacing>
       <smallStaffMag>0.666667</smallStaffMag>
-      <Spatium>1.8</Spatium>
+      <spatium>1.8</spatium>
       </Style>
     <showInvisible>1</showInvisible>
     <showUnprintable>1</showUnprintable>
@@ -22,12 +20,11 @@
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
     <metaTag name="originalFormat">cap</metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle"></metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -48,20 +45,16 @@
         </VBox>
       <Measure>
         <voice>
-          <Clef>
-            <concertClefType>G</concertClefType>
-            <transposingClefType>G</transposingClefType>
-            </Clef>
           <KeySig>
-            <accidental>3</accidental>
+            <concertKey>3</concertKey>
             </KeySig>
           <TimeSig>
             <sigN>4</sigN>
             <sigD>4</sigD>
             </TimeSig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -92,8 +85,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-7</l2>
+            <l1>-4</l1>
+            <l2>-10</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -131,11 +124,11 @@
           </LayoutBreak>
         <voice>
           <KeySig>
-            <accidental>4</accidental>
+            <concertKey>4</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -166,8 +159,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -201,16 +194,12 @@
         </Measure>
       <Measure>
         <voice>
-          <Clef>
-            <concertClefType>G</concertClefType>
-            <transposingClefType>G</transposingClefType>
-            </Clef>
           <KeySig>
-            <accidental>5</accidental>
+            <concertKey>5</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -241,8 +230,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -280,11 +269,11 @@
           </LayoutBreak>
         <voice>
           <KeySig>
-            <accidental>6</accidental>
+            <concertKey>6</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -315,8 +304,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -350,16 +339,12 @@
         </Measure>
       <Measure>
         <voice>
-          <Clef>
-            <concertClefType>G</concertClefType>
-            <transposingClefType>G</transposingClefType>
-            </Clef>
           <KeySig>
-            <accidental>7</accidental>
+            <concertKey>7</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -390,8 +375,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -429,11 +414,11 @@
           </LayoutBreak>
         <voice>
           <KeySig>
-            <accidental>-2</accidental>
+            <concertKey>-2</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -464,8 +449,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -499,16 +484,12 @@
         </Measure>
       <Measure>
         <voice>
-          <Clef>
-            <concertClefType>G</concertClefType>
-            <transposingClefType>G</transposingClefType>
-            </Clef>
           <KeySig>
-            <accidental>-3</accidental>
+            <concertKey>-3</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -539,8 +520,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -578,11 +559,11 @@
           </LayoutBreak>
         <voice>
           <KeySig>
-            <accidental>-4</accidental>
+            <concertKey>-4</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -613,8 +594,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -648,16 +629,12 @@
         </Measure>
       <Measure>
         <voice>
-          <Clef>
-            <concertClefType>G</concertClefType>
-            <transposingClefType>G</transposingClefType>
-            </Clef>
           <KeySig>
-            <accidental>-5</accidental>
+            <concertKey>-5</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -688,8 +665,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -727,11 +704,11 @@
           </LayoutBreak>
         <voice>
           <KeySig>
-            <accidental>-6</accidental>
+            <concertKey>-6</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -762,8 +739,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -800,16 +777,12 @@
           <subtype>line</subtype>
           </LayoutBreak>
         <voice>
-          <Clef>
-            <concertClefType>G</concertClefType>
-            <transposingClefType>G</transposingClefType>
-            </Clef>
           <KeySig>
-            <accidental>-7</accidental>
+            <concertKey>-7</concertKey>
             </KeySig>
           <Beam>
-            <l1>8</l1>
-            <l2>3</l2>
+            <l1>10</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -840,8 +813,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-3</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>

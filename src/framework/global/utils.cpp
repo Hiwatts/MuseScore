@@ -23,24 +23,9 @@
 
 #include "translation.h"
 
-using namespace mu;
+using namespace muse;
 
-static const char* noteHeadNamesLower[] = {
-    QT_TRANSLATE_NOOP("global", "c"),
-    QT_TRANSLATE_NOOP("global", "c♯"),
-    QT_TRANSLATE_NOOP("global", "d"),
-    QT_TRANSLATE_NOOP("global", "d♯"),
-    QT_TRANSLATE_NOOP("global", "e"),
-    QT_TRANSLATE_NOOP("global", "f"),
-    QT_TRANSLATE_NOOP("global", "f♯"),
-    QT_TRANSLATE_NOOP("global", "g"),
-    QT_TRANSLATE_NOOP("global", "g♯"),
-    QT_TRANSLATE_NOOP("global", "a"),
-    QT_TRANSLATE_NOOP("global", "a♯"),
-    QT_TRANSLATE_NOOP("global", "b")
-};
-
-static const char* noteHeadNamesUpper[] = {
+static constexpr const char* sharpNotes[] = {
     QT_TRANSLATE_NOOP("global", "C"),
     QT_TRANSLATE_NOOP("global", "C♯"),
     QT_TRANSLATE_NOOP("global", "D"),
@@ -55,21 +40,33 @@ static const char* noteHeadNamesUpper[] = {
     QT_TRANSLATE_NOOP("global", "B")
 };
 
-std::string mu::pitchToString(int pitch)
+static constexpr const char* flatNotes[] = {
+    QT_TRANSLATE_NOOP("global", "C"),
+    QT_TRANSLATE_NOOP("global", "D♭"),
+    QT_TRANSLATE_NOOP("global", "D"),
+    QT_TRANSLATE_NOOP("global", "E♭"),
+    QT_TRANSLATE_NOOP("global", "E"),
+    QT_TRANSLATE_NOOP("global", "F"),
+    QT_TRANSLATE_NOOP("global", "G♭"),
+    QT_TRANSLATE_NOOP("global", "G"),
+    QT_TRANSLATE_NOOP("global", "A♭"),
+    QT_TRANSLATE_NOOP("global", "A"),
+    QT_TRANSLATE_NOOP("global", "B♭"),
+    QT_TRANSLATE_NOOP("global", "B")
+};
+
+std::string muse::pitchToString(int pitch, bool addoctave, bool useFlats /* = false */)
 {
     if (pitch < 0 || pitch > 127) {
         return std::string();
     }
 
-    int octave = (pitch / 12) - 1;
+    auto source = useFlats ? flatNotes : sharpNotes;
+
     int i = pitch % 12;
-
-    std::string result;
-    if (octave < 0) {
-        result = trc("global", noteHeadNamesUpper[i]);
-    } else {
-        result = trc("global", noteHeadNamesLower[i]) + std::to_string(octave);
+    if (addoctave) {
+        int octave = (pitch / 12) - 1;
+        return muse::trc("global", source[i]) + std::to_string(octave);
     }
-
-    return result;
+    return muse::trc("global", source[i]);
 }

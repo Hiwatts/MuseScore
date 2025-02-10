@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,8 +24,8 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
 import MuseScore.Project 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 Column {
     id: root
@@ -35,9 +35,13 @@ Column {
 
     spacing: 12
 
+    Component.onCompleted: {
+        pageLoader.refresh()
+    }
+
     NavigationPanel {
         id: navPanel
-        name: "ExportOptionsView"
+        name: "ExportOptions"
         enabled: root.visible && root.enabled
         direction: NavigationPanel.Vertical
     }
@@ -45,10 +49,10 @@ Column {
     ExportOptionItem {
         id: typeLabel
         width: parent.width
-        text: qsTrc("project", "Format:")
+        text: qsTrc("project/export", "Format:")
 
-        Dropdown {
-            id: typeComboBox
+        StyledDropdown {
+            id: typeDropdown
             Layout.fillWidth: true
 
             navigation.name: "ExportTypeDropdown"
@@ -57,7 +61,7 @@ Column {
             navigation.accessible.name: typeLabel.text + " " + currentText
 
             model: exportModel.exportTypeList()
-            popupItemsCount: typeComboBox.count
+            popupItemsCount: typeDropdown.count
 
             textRole: "name"
             valueRole: "id"
@@ -75,11 +79,11 @@ Column {
                 }
 
                 // Otherwise, it must be a toplevel type
-                return typeComboBox.indexOfValue(exportModel.selectedExportType.id)
+                return typeDropdown.indexOfValue(exportModel.selectedExportType.id)
             }
 
-            onCurrentValueChanged: {
-                exportModel.selectExportTypeById(typeComboBox.currentValue)
+            onActivated: function(index, value) {
+                exportModel.selectExportTypeById(value)
             }
         }
     }
@@ -88,9 +92,9 @@ Column {
         id: subtypeLabel
         width: parent.width
         visible: subtypeComboBox.count > 0
-        text: qsTrc("project", "File type:")
+        text: qsTrc("project/export", "File type:")
 
-        Dropdown {
+        StyledDropdown {
             id: subtypeComboBox
             Layout.fillWidth: true
 
@@ -100,8 +104,8 @@ Column {
             navigation.accessible.name: subtypeLabel.text + " " + currentText
 
             model: {
-                if (typeComboBox.currentIndex > -1) {
-                    return typeComboBox.model[typeComboBox.currentIndex].subtypes
+                if (typeDropdown.currentIndex > -1) {
+                    return typeDropdown.model[typeDropdown.currentIndex].subtypes
                 }
 
                 return []
@@ -111,8 +115,9 @@ Column {
             valueRole: "id"
 
             currentIndex: subtypeComboBox.indexOfValue(exportModel.selectedExportType.id)
-            onCurrentValueChanged: {
-                exportModel.selectExportTypeById(subtypeComboBox.currentValue)
+
+            onActivated: function(index, value) {
+                exportModel.selectExportTypeById(value)
             }
         }
     }
@@ -120,23 +125,34 @@ Column {
     Loader {
         id: pageLoader
         width: parent.width
+        visible: status === Loader.Ready
+
+        function refresh() {
+            if (!root.exportModel.selectedExportType.settingsPagePath) {
+                setSource("")
+            }
+
+            var properties = {
+                model: Qt.binding(() => root.exportModel),
+                navigationPanel: navPanel,
+                navigationOrder: 3
+            }
+
+            setSource(root.exportModel.selectedExportType.settingsPagePath, properties)
+        }
 
         Connections {
             target: root.exportModel
 
             function onSelectedExportTypeChanged() {
-                var properties = {
-                    model: Qt.binding(() => root.exportModel),
-                    navigationPanel: navPanel,
-                    navigationOrder: 3
-                }
-
-                pageLoader.setSource(root.exportModel.selectedExportType.settingsPagePath, properties)
+                pageLoader.refresh()
             }
         }
     }
 
     RadioButtonGroup {
+        id: exportType
+
         width: parent.width
         visible: count > 1
         spacing: 12
@@ -145,9 +161,11 @@ Column {
         model: exportModel.availableUnitTypes
 
         delegate: RoundedRadioButton {
+            width: ListView.view.width
+
             text: modelData["text"]
 
-            navigation.name: "ExportUnitType " + text
+            navigation.name: "ExportType_" + text
             navigation.panel: navPanel
             navigation.row: 100000 + model.index
 
@@ -155,6 +173,25 @@ Column {
             onToggled: {
                 exportModel.selectedUnitType = modelData["value"]
             }
+        }
+    }
+
+    SeparatorLine {
+        anchors.topMargin: 24
+        anchors.bottomMargin: 24
+    }
+
+    CheckBox {
+        width: parent.width
+        text: qsTrc("project/export", "Open destination folder on export")
+
+        navigation.name: "OpenDestinationFolderOnExportCheckbox"
+        navigation.panel: navPanel
+        navigation.row: 100000 + exportType.count
+
+        checked: exportModel.shouldDestinationFolderBeOpenedOnExport
+        onClicked: {
+            exportModel.shouldDestinationFolderBeOpenedOnExport = !checked
         }
     }
 }

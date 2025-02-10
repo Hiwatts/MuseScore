@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 RowLayout {
     id: root
@@ -32,6 +32,7 @@ RowLayout {
     property bool isMovingDownAvailable: false
     property bool isRemovingAvailable: false
     property bool isAddingAvailable: value
+    property bool isInstrumentSelected: false
 
     property alias navigation: keynavSub
 
@@ -44,7 +45,7 @@ RowLayout {
 
     focus: true
 
-    Keys.onShortcutOverride: {
+    Keys.onShortcutOverride: function(event) {
         if (event.key === Qt.Key_Delete) {
             root.removingRequested()
         }
@@ -53,14 +54,18 @@ RowLayout {
     NavigationPanel {
         id: keynavSub
         name: "InstrumentsHeader"
+        enabled: root.enabled && root.visible
     }
 
     FlatButton {
         Layout.fillWidth: true
 
+        navigation.name: "Add"
         navigation.panel: keynavSub
         navigation.order: 1
+        accessible.name: qsTrc("instruments", "Add instruments")
 
+        //: Keep in sync with the message that appears if there are no instruments in the score (InstrumentsPanel.qml)
         text: qsTrc("instruments", "Add")
 
         enabled: root.isAddingAvailable
@@ -73,8 +78,11 @@ RowLayout {
     FlatButton {
         Layout.preferredWidth: width
 
+        navigation.name: "Up"
         navigation.panel: keynavSub
         navigation.order: 2
+
+        toolTipTitle: root.isInstrumentSelected ? qsTrc("instruments", "Move selected instruments up") : qsTrc("instruments", "Move selected staves up")
 
         enabled: root.isMovingUpAvailable
 
@@ -88,8 +96,11 @@ RowLayout {
     FlatButton {
         Layout.preferredWidth: width
 
+        navigation.name: "Down"
         navigation.panel: keynavSub
         navigation.order: 3
+
+        toolTipTitle: root.isInstrumentSelected ? qsTrc("instruments", "Move selected instruments down") : qsTrc("instruments", "Move selected staves down")
 
         enabled: root.isMovingDownAvailable
 
@@ -103,8 +114,11 @@ RowLayout {
     FlatButton {
         Layout.preferredWidth: width
 
+        navigation.name: "Remove"
         navigation.panel: keynavSub
         navigation.order: 4
+
+        toolTipTitle: root.isInstrumentSelected ? qsTrc("instruments", "Remove selected instruments") : qsTrc("instruments", "Remove selected staves")
 
         enabled: root.isRemovingAvailable
 

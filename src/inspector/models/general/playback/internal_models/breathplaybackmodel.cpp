@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,7 +30,7 @@ using namespace mu::inspector;
 BreathPlaybackModel::BreathPlaybackModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
-    setTitle(qtrc("inspector", "Breaths & pauses"));
+    setTitle(muse::qtrc("inspector", "Breaths & pauses"));
     setModelType(InspectorModelType::TYPE_BREATH);
 
     createProperties();
@@ -38,19 +38,17 @@ BreathPlaybackModel::BreathPlaybackModel(QObject* parent, IElementRepositoryServ
 
 void BreathPlaybackModel::createProperties()
 {
-    m_pauseTime = buildPropertyItem(Ms::Pid::PAUSE);
+    m_pauseTime = buildPropertyItem(mu::engraving::Pid::PAUSE);
 }
 
 void BreathPlaybackModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::BREATH);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::BREATH);
 }
 
 void BreathPlaybackModel::loadProperties()
 {
-    loadPropertyItem(m_pauseTime, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
+    loadPropertyItem(m_pauseTime, formatDoubleFunc);
 }
 
 void BreathPlaybackModel::resetProperties()

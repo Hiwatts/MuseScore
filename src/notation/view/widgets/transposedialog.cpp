@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,16 +22,17 @@
 
 #include "transposedialog.h"
 
-#include "framework/global/widgetstatestore.h"
+#include "ui/view/widgetstatestore.h"
 
 using namespace mu::notation;
+using namespace muse::ui;
 
 //---------------------------------------------------------
 //   TransposeDialog
 //---------------------------------------------------------
 
 TransposeDialog::TransposeDialog(QWidget* parent)
-    : QDialog(parent)
+    : QDialog(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setObjectName("TransposeDialog");
     setupUi(this);
@@ -51,17 +52,21 @@ TransposeDialog::TransposeDialog(QWidget* parent)
     bool rangeSelection = selection()->isRange();
     setEnableTransposeKeys(rangeSelection);
     setEnableTransposeToKey(rangeSelection);
-    setEnableTransposeChordNames(rangeSelection);
+
+    const std::vector<EngravingItem*>& elements = selection()->elements();
+    bool hasChordNames = std::any_of(elements.cbegin(), elements.cend(), [](const EngravingItem* item) {
+        return item->isHarmony();
+    });
+    setEnableTransposeChordNames(hasChordNames);
+
     setKey(firstPitchedStaffKey());
 
     connect(this, &TransposeDialog::accepted, this, &TransposeDialog::apply);
 
     WidgetStateStore::restoreGeometry(this);
-}
 
-TransposeDialog::TransposeDialog(const TransposeDialog& dialog)
-    : TransposeDialog(dialog.parentWidget())
-{
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 //---------------------------------------------------------
@@ -188,8 +193,8 @@ void TransposeDialog::apply()
 
 Key TransposeDialog::firstPitchedStaffKey() const
 {
-    int startStaffIdx = 0;
-    int endStaffIdx   = 0;
+    mu::engraving::staff_idx_t startStaffIdx = 0;
+    mu::engraving::staff_idx_t endStaffIdx   = 0;
     Fraction startTick = Fraction(0, 1);
     INotationSelectionRangePtr range = selection()->range();
 
@@ -202,22 +207,13 @@ Key TransposeDialog::firstPitchedStaffKey() const
     Key key = Key::C;
 
     for (const Part* part : notation()->parts()->partList()) {
-        for (const Staff* staff : *part->staves()) {
+        for (const Staff* staff : part->staves()) {
             if (staff->idx() < startStaffIdx || staff->idx() > endStaffIdx) {
                 continue;
             }
 
             if (staff->isPitchedStaff(startTick)) {
-                key = staff->key(startTick);
-                bool concertPitchEnabled = notation()->style()->styleValue(StyleId::concertPitch).toBool();
-
-                if (!concertPitchEnabled) {
-                    int diff = staff->part()->instrument(startTick)->transpose().chromatic;
-
-                    if (diff) {
-                        key = Ms::transposeKey(key, diff, staff->part()->preferSharpFlat());
-                    }
-                }
+                key = staff->concertKey(startTick);
 
                 break;
             }

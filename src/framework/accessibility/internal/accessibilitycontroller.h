@@ -19,75 +19,120 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_ACCESSIBILITY_ACCESSIBILITYCONTROLLER_H
-#define MU_ACCESSIBILITY_ACCESSIBILITYCONTROLLER_H
+#ifndef MUSE_ACCESSIBILITY_ACCESSIBILITYCONTROLLER_H
+#define MUSE_ACCESSIBILITY_ACCESSIBILITYCONTROLLER_H
 
 #include <memory>
 #include <QObject>
 #include <QList>
 #include <QHash>
 
-#include "../iaccessibilitycontroller.h"
-#include "accessibleobject.h"
-#include "async/asyncable.h"
+#include "global/async/asyncable.h"
+#include "global/async/channel.h"
+#include "global/iapplication.h"
 
 #include "modularity/ioc.h"
 #include "ui/imainwindow.h"
-#include "accessibility/iaccessibilityconfiguration.h"
+#include "ui/iinteractiveprovider.h"
+#include "../iaccessibilityconfiguration.h"
+#include "../iqaccessibleinterfaceregister.h"
+#include "../iaccessibilitycontroller.h"
+#include "accessibleobject.h"
 
 class QAccessibleInterface;
 class QAccessibleEvent;
 
-namespace mu::diagnostics {
+namespace muse::diagnostics {
 class DiagnosticAccessibleModel;
 }
 
-namespace mu::accessibility {
-class AccessibilityController : public IAccessibilityController, public IAccessible, public async::Asyncable,
+namespace muse::accessibility {
+class AccessibilityController : public IAccessibilityController, public IAccessible, public muse::Injectable, public async::Asyncable,
     public std::enable_shared_from_this<AccessibilityController>
 {
-    INJECT(accessibility, IAccessibilityConfiguration, configuration)
-    INJECT(accessibility, ui::IMainWindow, mainWindow)
+public:
+    Inject<IApplication> application = { this };
+    Inject<ui::IMainWindow> mainWindow = { this };
+    Inject<ui::IInteractiveProvider> interactiveProvider = { this };
+    Inject<IAccessibilityConfiguration> configuration = { this };
 
 public:
-    AccessibilityController() = default;
-    ~AccessibilityController();
+    AccessibilityController(const muse::modularity::ContextPtr& iocCtx)
+        : muse::Injectable(iocCtx) {}
+    ~AccessibilityController() override;
 
-    void init();
+    static QAccessibleInterface* accessibleInterface(QObject* object);
+
+    void setAccesibilityEnabled(bool enabled);
 
     // IAccessibilityController
-    const IAccessible* accessibleRoot() const override;
-
     void reg(IAccessible* item) override;
     void unreg(IAccessible* item) override;
+
+    const IAccessible* accessibleRoot() const override;
+    const IAccessible* lastFocused() const override;
+
+    bool needToVoicePanelInfo() const override;
+    QString currentPanelAccessibleName() const override;
+
+    void setIgnoreQtAccessibilityEvents(bool ignore) override;
+
     // -----
 
-    // IAccessibility
+    // IAccessibility (root)
     IAccessible* accessibleParent() const override;
 
     size_t accessibleChildCount() const override;
     IAccessible* accessibleChild(size_t i) const override;
+
+    QWindow* accessibleWindow() const override;
+    muse::modularity::ContextPtr iocContext() const override;
 
     Role accessibleRole() const override;
     QString accessibleName() const override;
     QString accessibleDescription() const override;
     bool accessibleState(State st) const override;
     QRect accessibleRect() const override;
+    bool accessibleIgnored() const override;
 
-    async::Channel<Property> accessiblePropertyChanged() const override;
+    // Value Interface
+    QVariant accessibleValue() const override;
+    QVariant accessibleMaximumValue() const override;
+    QVariant accessibleMinimumValue() const override;
+    QVariant accessibleValueStepSize() const override;
+
+    // Text Interface
+    void accessibleSelection(int selectionIndex, int* startOffset, int* endOffset) const override;
+    int accessibleSelectionCount() const override;
+
+    int accessibleCursorPosition() const override;
+
+    QString accessibleText(int startOffset, int endOffset) const override;
+    QString accessibleTextBeforeOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    QString accessibleTextAfterOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    QString accessibleTextAtOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    int accessibleCharacterCount() const override;
+
+    // ListView item Interface
+    int accessibleRowIndex() const override;
+
+    async::Channel<Property, Val> accessiblePropertyChanged() const override;
     async::Channel<State, bool> accessibleStateChanged() const override;
+
+    void setState(State state, bool arg) override;
     // -----
 
     QAccessibleInterface* parentIface(const IAccessible* item) const;
     int childCount(const IAccessible* item) const;
     QAccessibleInterface* child(const IAccessible* item, int i) const;
     int indexOfChild(const IAccessible* item, const QAccessibleInterface* iface) const;
+    QAccessibleInterface* focusedChild(const IAccessible* item) const;
 
     async::Channel<QAccessibleEvent*> eventSent() const;
 
 private:
 
-    friend class mu::diagnostics::DiagnosticAccessibleModel;
+    friend class muse::diagnostics::DiagnosticAccessibleModel;
 
     struct Item
     {
@@ -98,18 +143,36 @@ private:
         bool isValid() const { return item != nullptr; }
     };
 
+    void init();
+
     const Item& findItem(const IAccessible* aitem) const;
 
-    void propertyChanged(IAccessible* item, IAccessible::Property p);
+    void propertyChanged(IAccessible* item, IAccessible::Property property, const Val& value);
     void stateChanged(IAccessible* item, IAccessible::State state, bool arg);
 
     void sendEvent(QAccessibleEvent* ev);
+
+    void cancelPreviousReading();
+    void savePanelAccessibleName(const IAccessible* oldItem, const IAccessible* newItem);
+    void triggerRevoicingOfChangedName(IAccessible* item);
+
+    const IAccessible* panel(const IAccessible* item) const;
+
+    IAccessible* findSiblingItem(const IAccessible* item, const IAccessible* currentItem) const;
 
     QHash<const IAccessible*, Item> m_allItems;
 
     QList<IAccessible*> m_children;
     async::Channel<QAccessibleEvent*> m_eventSent;
+    IAccessible* m_lastFocused = nullptr;
+    IAccessible* m_itemForRestoreFocus = nullptr;
+
+    bool m_inited = false;
+    bool m_enabled = false;
+
+    bool m_ignorePanelChangingVoice = false;
+    bool m_needToVoicePanelInfo = false;
 };
 }
 
-#endif // MU_ACCESSIBILITY_ACCESSIBILITYCONTROLLER_H
+#endif // MUSE_ACCESSIBILITY_ACCESSIBILITYCONTROLLER_H

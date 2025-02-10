@@ -19,31 +19,27 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_TESTDIALOG_H
-#define MU_UI_TESTDIALOG_H
+#ifndef MUSE_UI_TESTDIALOG_H
+#define MUSE_UI_TESTDIALOG_H
 
-#include "view/widgetdialog.h"
+#include <QDialog>
 
 namespace Ui {
 class TestDialog;
 }
 
-namespace mu::ui {
-class TestDialog : public WidgetDialog
+namespace muse::ui {
+class TestDialog : public QDialog
 {
     Q_OBJECT
 
     Q_PROPERTY(QString title READ title WRITE setTitle NOTIFY titleChanged)
 
 public:
-    TestDialog(const TestDialog& dialog);
     explicit TestDialog(QWidget* parent = nullptr);
-    ~TestDialog();
+    ~TestDialog() override;
 
     QString title() const;
-
-    static int static_metaTypeId();
-    int metaTypeId() const override;
 
 public slots:
     void setTitle(QString title);
@@ -52,9 +48,9 @@ signals:
     void titleChanged(QString title);
 
 private:
-    Ui::TestDialog* ui;
+    Ui::TestDialog* ui = nullptr;
     QString m_title;
 };
 }
 
-#endif // MU_UI_TESTDIALOG_H
+#endif // MUSE_UI_TESTDIALOG_H

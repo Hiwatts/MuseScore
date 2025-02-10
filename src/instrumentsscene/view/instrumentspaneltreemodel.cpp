@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,14 +28,19 @@
 #include "parttreeitem.h"
 #include "stafftreeitem.h"
 #include "staffcontroltreeitem.h"
-#include "log.h"
 
 #include "uicomponents/view/itemmultiselectionmodel.h"
 
+#include "log.h"
+
 using namespace mu::instrumentsscene;
 using namespace mu::notation;
-using namespace mu::uicomponents;
+using namespace muse;
+using namespace muse::uicomponents;
+
 using ItemType = InstrumentsTreeItemType::ItemType;
+
+static const muse::actions::ActionCode ADD_INSTRUMENTS_ACTIONCODE("instruments");
 
 namespace mu::instrumentsscene {
 static QString notationToKey(const INotationPtr notation)
@@ -50,37 +55,65 @@ static QString notationToKey(const INotationPtr notation)
 InstrumentsPanelTreeModel::InstrumentsPanelTreeModel(QObject* parent)
     : QAbstractItemModel(parent)
 {
-    m_partsNotifyReceiver = std::make_shared<async::Asyncable>();
-
-    context()->currentMasterNotationChanged().onNotify(this, [this]() {
-        m_masterNotation = context()->currentMasterNotation();
-        initPartOrders();
-    });
-
-    context()->currentNotationChanged().onNotify(this, [this]() {
-        m_partsNotifyReceiver->disconnectAll();
-
-        onBeforeChangeNotation();
-        m_notation = context()->currentNotation();
-
-        if (m_notation) {
-            load();
-        } else {
-            clear();
-        }
-    });
+    m_partsNotifyReceiver = std::make_shared<muse::async::Asyncable>();
 
     m_selectionModel = new ItemMultiSelectionModel(this);
     m_selectionModel->setAllowedModifiers(Qt::ShiftModifier);
 
-    connect(m_selectionModel, &ItemMultiSelectionModel::selectionChanged, [this](const QItemSelection&, const QItemSelection&) {
+    connect(m_selectionModel, &ItemMultiSelectionModel::selectionChanged,
+            [this](const QItemSelection& selected, const QItemSelection& deselected) {
+        setItemsSelected(deselected.indexes(), false);
+        setItemsSelected(selected.indexes(), true);
+
         updateRearrangementAvailability();
         updateRemovingAvailability();
-
-        emit selectionChanged();
+        updateIsInstrumentSelected();
     });
 
-    dispatcher()->reg(this, "instruments", this, &InstrumentsPanelTreeModel::addInstruments);
+    connect(this, &InstrumentsPanelTreeModel::rowsInserted, this, [this]() {
+        updateRemovingAvailability();
+    });
+
+    onMasterNotationChanged();
+    context()->currentMasterNotationChanged().onNotify(this, [this]() {
+        onMasterNotationChanged();
+    });
+
+    onNotationChanged();
+    context()->currentNotationChanged().onNotify(this, [this]() {
+        onNotationChanged();
+    });
+
+    shortcutsRegister()->shortcutsChanged().onNotify(this, [this]() {
+        emit addInstrumentsKeyboardShortcutChanged();
+    });
+}
+
+void InstrumentsPanelTreeModel::onMasterNotationChanged()
+{
+    m_masterNotation = context()->currentMasterNotation();
+    initPartOrders();
+}
+
+void InstrumentsPanelTreeModel::onNotationChanged()
+{
+    m_partsNotifyReceiver->disconnectAll();
+
+    if (m_isLoadingBlocked) {
+        m_notationChangedWhileLoadingWasBlocked = true;
+        return;
+    }
+
+    onBeforeChangeNotation();
+    m_notation = context()->currentNotation();
+
+    if (m_notation) {
+        load();
+    } else {
+        clear();
+    }
+
+    m_notationChangedWhileLoadingWasBlocked = false;
 }
 
 InstrumentsPanelTreeModel::~InstrumentsPanelTreeModel()
@@ -88,26 +121,32 @@ InstrumentsPanelTreeModel::~InstrumentsPanelTreeModel()
     deleteItems();
 }
 
-bool InstrumentsPanelTreeModel::canReceiveAction(const actions::ActionCode&) const
-{
-    return m_masterNotation != nullptr && m_notation != nullptr;
-}
-
 bool InstrumentsPanelTreeModel::removeRows(int row, int count, const QModelIndex& parent)
 {
+    if (!m_isRemovingAvailable) {
+        return false;
+    }
+
     AbstractInstrumentsPanelTreeItem* parentItem = modelIndexToItem(parent);
 
     if (!parentItem) {
         parentItem = m_rootItem;
     }
 
-    m_isLoadingBlocked = true;
+    if (parentItem == m_rootItem) {
+        // When removing instruments, the user needs to be warned in some cases
+        if (!warnAboutRemovingInstrumentsIfNecessary(count)) {
+            return false;
+        }
+    }
+
+    setLoadingBlocked(true);
     beginRemoveRows(parent, row, row + count - 1);
 
     parentItem->removeChildren(row, count, true);
 
     endRemoveRows();
-    m_isLoadingBlocked = false;
+    setLoadingBlocked(false);
 
     emit isEmptyChanged();
 
@@ -122,7 +161,7 @@ void InstrumentsPanelTreeModel::initPartOrders()
         return;
     }
 
-    for (IExcerptNotationPtr excerpt : m_masterNotation->excerpts().val) {
+    for (IExcerptNotationPtr excerpt : m_masterNotation->excerpts()) {
         NotationKey key = notationToKey(excerpt->notation());
 
         for (const Part* part : excerpt->notation()->parts()->partList()) {
@@ -137,13 +176,22 @@ void InstrumentsPanelTreeModel::onBeforeChangeNotation()
         return;
     }
 
-    QList<ID> partIdList;
+    QList<muse::ID> partIdList;
 
-    for (int i = 0; i < m_rootItem->childCount(); ++i) {
-        partIdList << m_rootItem->childAtRow(i)->id();
+    for (const AbstractInstrumentsPanelTreeItem* item : m_rootItem->childItems()) {
+        partIdList << item->id();
     }
 
     m_sortedPartIdList[notationToKey(m_notation)] = partIdList;
+}
+
+void InstrumentsPanelTreeModel::setLoadingBlocked(bool blocked)
+{
+    m_isLoadingBlocked = blocked;
+
+    if (!m_isLoadingBlocked && m_notationChangedWhileLoadingWasBlocked) {
+        onNotationChanged();
+    }
 }
 
 void InstrumentsPanelTreeModel::setupPartsConnections()
@@ -154,7 +202,7 @@ void InstrumentsPanelTreeModel::setupPartsConnections()
         load();
     });
 
-    auto updateMasterPartItem = [this](const ID& partId) {
+    auto updateMasterPartItem = [this](const muse::ID& partId) {
         auto partItem = dynamic_cast<PartTreeItem*>(m_rootItem->childAtId(partId));
         if (!partItem) {
             return;
@@ -173,7 +221,7 @@ void InstrumentsPanelTreeModel::setupPartsConnections()
     });
 }
 
-void InstrumentsPanelTreeModel::setupStavesConnections(const ID& stavesPartId)
+void InstrumentsPanelTreeModel::setupStavesConnections(const muse::ID& stavesPartId)
 {
     async::NotifyList<const Staff*> notationStaves = m_notation->parts()->staffList(stavesPartId);
 
@@ -208,33 +256,42 @@ void InstrumentsPanelTreeModel::setupStavesConnections(const ID& stavesPartId)
     });
 }
 
-void InstrumentsPanelTreeModel::listenSelectionChanged()
+void InstrumentsPanelTreeModel::listenNotationSelectionChanged()
 {
     m_notation->interaction()->selectionChanged().onNotify(this, [this]() {
-        std::vector<EngravingItem*> selectedElements = m_notation->interaction()->selection()->elements();
-
-        if (selectedElements.empty()) {
-            m_selectionModel->clear();
-            return;
-        }
-
-        QSet<ID> selectedPartIdSet;
-        for (const EngravingItem* element : selectedElements) {
-            if (!element->part()) {
-                continue;
-            }
-
-            selectedPartIdSet << element->part()->id();
-        }
-
-        for (const ID& selectedPartId : selectedPartIdSet) {
-            AbstractInstrumentsPanelTreeItem* item = m_rootItem->childAtId(selectedPartId);
-
-            if (item) {
-                m_selectionModel->select(createIndex(item->row(), 0, item));
-            }
-        }
+        updateSelectedRows();
     });
+}
+
+void InstrumentsPanelTreeModel::updateSelectedRows()
+{
+    if (!m_instrumentsPanelVisible || !m_notation) {
+        return;
+    }
+
+    m_selectionModel->clear();
+
+    const std::vector<EngravingItem*>& selectedElements = m_notation->interaction()->selection()->elements();
+    if (selectedElements.empty()) {
+        return;
+    }
+
+    std::vector<muse::ID> selectedPartIds;
+    for (const EngravingItem* element : selectedElements) {
+        if (!element->part()) {
+            continue;
+        }
+
+        selectedPartIds.push_back(element->part()->id());
+    }
+
+    for (const muse::ID& selectedPartId : selectedPartIds) {
+        AbstractInstrumentsPanelTreeItem* item = m_rootItem->childAtId(selectedPartId);
+
+        if (item) {
+            m_selectionModel->select(createIndex(item->row(), 0, item), QItemSelectionModel::Select);
+        }
+    }
 }
 
 void InstrumentsPanelTreeModel::clear()
@@ -267,7 +324,7 @@ void InstrumentsPanelTreeModel::load()
     beginResetModel();
     deleteItems();
 
-    m_rootItem = new RootTreeItem(m_masterNotation, m_notation);
+    m_rootItem = new RootTreeItem(m_masterNotation, m_notation, this);
 
     async::NotifyList<const Part*> masterParts = m_masterNotation->parts()->partList();
     sortParts(masterParts);
@@ -279,7 +336,7 @@ void InstrumentsPanelTreeModel::load()
     endResetModel();
 
     setupPartsConnections();
-    listenSelectionChanged();
+    listenNotationSelectionChanged();
 
     emit isEmptyChanged();
     emit isAddingAvailableChanged(true);
@@ -293,7 +350,7 @@ void InstrumentsPanelTreeModel::sortParts(notation::PartList& parts)
         return;
     }
 
-    const QList<ID>& sortedPartIdList = m_sortedPartIdList[key];
+    const QList<muse::ID>& sortedPartIdList = m_sortedPartIdList[key];
 
     std::sort(parts.begin(), parts.end(), [&sortedPartIdList](const Part* part1, const Part* part2) {
         int index1 = sortedPartIdList.indexOf(part1->id());
@@ -311,32 +368,41 @@ void InstrumentsPanelTreeModel::sortParts(notation::PartList& parts)
     });
 }
 
+void InstrumentsPanelTreeModel::setInstrumentsPanelVisible(bool visible)
+{
+    if (m_instrumentsPanelVisible == visible) {
+        return;
+    }
+
+    m_instrumentsPanelVisible = visible;
+
+    if (visible) {
+        updateSelectedRows();
+    }
+}
+
 void InstrumentsPanelTreeModel::selectRow(const QModelIndex& rowIndex)
 {
     m_selectionModel->select(rowIndex);
 }
 
+void InstrumentsPanelTreeModel::clearSelection()
+{
+    m_selectionModel->clear();
+}
+
 void InstrumentsPanelTreeModel::addInstruments()
 {
-    if (!m_masterNotation) {
-        return;
-    }
-
-    RetVal<PartInstrumentListScoreOrder> selectedInstruments = selectInstrumentsScenario()->selectInstruments();
-    if (!selectedInstruments.ret) {
-        LOGE() << selectedInstruments.ret.toString();
-        return;
-    }
-
-    m_masterNotation->parts()->setParts(selectedInstruments.val.instruments, selectedInstruments.val.scoreOrder);
-
-    emit isEmptyChanged();
+    dispatcher()->dispatch(ADD_INSTRUMENTS_ACTIONCODE);
 }
 
 void InstrumentsPanelTreeModel::moveSelectedRowsUp()
 {
-    QModelIndexList selectedIndexList = m_selectionModel->selectedIndexes();
+    if (!m_isMovingUpAvailable) {
+        return;
+    }
 
+    QModelIndexList selectedIndexList = m_selectionModel->selectedIndexes();
     if (selectedIndexList.isEmpty()) {
         return;
     }
@@ -345,47 +411,55 @@ void InstrumentsPanelTreeModel::moveSelectedRowsUp()
         return f.row() < s.row();
     });
 
-    QModelIndex sourceRowFirst = selectedIndexList.first();
+    const QModelIndex& sourceRowFirst = selectedIndexList.first();
 
     moveRows(sourceRowFirst.parent(), sourceRowFirst.row(), selectedIndexList.count(), sourceRowFirst.parent(), sourceRowFirst.row() - 1);
 }
 
 void InstrumentsPanelTreeModel::moveSelectedRowsDown()
 {
-    QModelIndexList selectedIndexList = m_selectionModel->selectedIndexes();
+    if (!m_isMovingDownAvailable) {
+        return;
+    }
 
+    QModelIndexList selectedIndexList = m_selectionModel->selectedIndexes();
     if (selectedIndexList.isEmpty()) {
         return;
     }
 
-    std::sort(selectedIndexList.begin(), selectedIndexList.end(), [](QModelIndex f, QModelIndex s) -> bool {
+    std::sort(selectedIndexList.begin(), selectedIndexList.end(), [](const QModelIndex& f, const QModelIndex& s) -> bool {
         return f.row() < s.row();
     });
 
-    QModelIndex sourceRowFirst = selectedIndexList.first();
-    QModelIndex sourceRowLast = selectedIndexList.last();
+    const QModelIndex& sourceRowFirst = selectedIndexList.first();
+    const QModelIndex& sourceRowLast = selectedIndexList.last();
 
     moveRows(sourceRowFirst.parent(), sourceRowFirst.row(), selectedIndexList.count(), sourceRowFirst.parent(), sourceRowLast.row() + 1);
 }
 
 void InstrumentsPanelTreeModel::removeSelectedRows()
 {
-    if (!m_selectionModel || !m_selectionModel->hasSelection()) {
+    if (!m_isRemovingAvailable) {
         return;
     }
 
     QModelIndexList selectedIndexList = m_selectionModel->selectedIndexes();
-
-    for (const QModelIndex& selectedIndex : selectedIndexList) {
-        AbstractInstrumentsPanelTreeItem* item = modelIndexToItem(selectedIndex);
-        removeRows(item->row(), 1, selectedIndex.parent());
+    if (selectedIndexList.empty()) {
+        return;
     }
+
+    QModelIndex firstIndex = *std::min_element(selectedIndexList.cbegin(), selectedIndexList.cend(),
+                                               [](const QModelIndex& f, const QModelIndex& s) {
+        return f.row() < s.row();
+    });
+
+    removeRows(firstIndex.row(), selectedIndexList.size(), firstIndex.parent());
 }
 
 bool InstrumentsPanelTreeModel::moveRows(const QModelIndex& sourceParent, int sourceRow, int count, const QModelIndex& destinationParent,
                                          int destinationChild)
 {
-    m_isLoadingBlocked = true;
+    setLoadingBlocked(true);
 
     AbstractInstrumentsPanelTreeItem* sourceParentItem = modelIndexToItem(sourceParent);
     AbstractInstrumentsPanelTreeItem* destinationParentItem = modelIndexToItem(destinationParent);
@@ -400,36 +474,63 @@ bool InstrumentsPanelTreeModel::moveRows(const QModelIndex& sourceParent, int so
 
     int sourceFirstRow = sourceRow;
     int sourceLastRow = sourceRow + count - 1;
-    int destinationRow = (sourceLastRow > destinationChild
-                          || sourceParentItem != destinationParentItem) ? destinationChild : destinationChild + 1;
+    int destinationRow = (sourceLastRow > destinationChild || sourceParentItem != destinationParentItem)
+                         ? destinationChild : destinationChild + 1;
+
+    m_activeDragIsStave = destinationParentItem != m_rootItem;
+
+    if (m_dragInProgress) {
+        m_activeDragMoveParams = sourceParentItem->buildMoveParams(sourceRow, count, destinationParentItem, destinationRow);
+    }
 
     beginMoveRows(sourceParent, sourceFirstRow, sourceLastRow, destinationParent, destinationRow);
-    sourceParentItem->moveChildren(sourceFirstRow, count, destinationParentItem, destinationRow);
+    sourceParentItem->moveChildren(sourceFirstRow, count, destinationParentItem, destinationRow, !m_dragInProgress);
     endMoveRows();
 
     updateRearrangementAvailability();
 
-    m_isLoadingBlocked = false;
+    setLoadingBlocked(false);
 
     return true;
 }
 
-bool InstrumentsPanelTreeModel::isSelected(const QModelIndex& rowIndex) const
+void InstrumentsPanelTreeModel::startActiveDrag()
 {
-    if (!m_selectionModel->hasSelection()) {
-        return false;
+    m_dragInProgress = true;
+}
+
+void InstrumentsPanelTreeModel::endActiveDrag()
+{
+    setLoadingBlocked(true);
+
+    if (m_activeDragIsStave) {
+        m_notation->parts()->moveStaves(m_activeDragMoveParams.childIdListToMove,
+                                        m_activeDragMoveParams.destinationParentId,
+                                        m_activeDragMoveParams.insertMode);
+    } else {
+        m_notation->parts()->moveParts(m_activeDragMoveParams.childIdListToMove,
+                                       m_activeDragMoveParams.destinationParentId,
+                                       m_activeDragMoveParams.insertMode);
     }
 
-    if (m_selectionModel->isSelected(rowIndex)) {
-        return true;
-    }
+    m_activeDragMoveParams = MoveParams();
+    m_dragInProgress = false;
 
-    QModelIndex parentIndex = parent(rowIndex);
-    if (m_selectionModel->isSelected(parentIndex)) {
-        return true;
-    }
+    setLoadingBlocked(false);
+}
 
-    return false;
+void InstrumentsPanelTreeModel::toggleVisibilityOfSelectedRows(bool visible)
+{
+    for (const QModelIndex& index : m_selectionModel->selectedIndexes()) {
+        AbstractInstrumentsPanelTreeItem* item = modelIndexToItem(index);
+
+        item->setIsVisible(visible);
+    }
+}
+
+QItemSelectionModel* InstrumentsPanelTreeModel::selectionModel() const
+{
+    return m_selectionModel;
 }
 
 QModelIndex InstrumentsPanelTreeModel::index(int row, int column, const QModelIndex& parent) const
@@ -438,7 +539,7 @@ QModelIndex InstrumentsPanelTreeModel::index(int row, int column, const QModelIn
         return QModelIndex();
     }
 
-    AbstractInstrumentsPanelTreeItem* parentItem = nullptr;
+    const AbstractInstrumentsPanelTreeItem* parentItem = nullptr;
 
     if (!parent.isValid()) {
         parentItem = m_rootItem;
@@ -465,8 +566,8 @@ QModelIndex InstrumentsPanelTreeModel::parent(const QModelIndex& child) const
         return QModelIndex();
     }
 
-    AbstractInstrumentsPanelTreeItem* childItem = modelIndexToItem(child);
-    AbstractInstrumentsPanelTreeItem* parentItem = qobject_cast<AbstractInstrumentsPanelTreeItem*>(childItem->parentItem());
+    const AbstractInstrumentsPanelTreeItem* childItem = modelIndexToItem(child);
+    AbstractInstrumentsPanelTreeItem* parentItem = childItem->parentItem();
 
     if (parentItem == m_rootItem) {
         return QModelIndex();
@@ -506,11 +607,6 @@ QHash<int, QByteArray> InstrumentsPanelTreeModel::roleNames() const
     return { { ItemRole, "itemRole" } };
 }
 
-QItemSelectionModel* InstrumentsPanelTreeModel::selectionModel() const
-{
-    return m_selectionModel;
-}
-
 void InstrumentsPanelTreeModel::setIsMovingUpAvailable(bool isMovingUpAvailable)
 {
     if (m_isMovingUpAvailable == isMovingUpAvailable) {
@@ -521,13 +617,13 @@ void InstrumentsPanelTreeModel::setIsMovingUpAvailable(bool isMovingUpAvailable)
     emit isMovingUpAvailableChanged(m_isMovingUpAvailable);
 }
 
-void InstrumentsPanelTreeModel::setIsMovingDownAvailable(bool isMoveingDownAvailable)
+void InstrumentsPanelTreeModel::setIsMovingDownAvailable(bool isMovingDownAvailable)
 {
-    if (m_isMovingDownAvailable == isMoveingDownAvailable) {
+    if (m_isMovingDownAvailable == isMovingDownAvailable) {
         return;
     }
 
-    m_isMovingDownAvailable = isMoveingDownAvailable;
+    m_isMovingDownAvailable = isMovingDownAvailable;
     emit isMovingDownAvailableChanged(m_isMovingDownAvailable);
 }
 
@@ -556,6 +652,22 @@ bool InstrumentsPanelTreeModel::isEmpty() const
     return m_rootItem ? m_rootItem->isEmpty() : true;
 }
 
+bool InstrumentsPanelTreeModel::isInstrumentSelected() const
+{
+    return m_isInstrumentSelected;
+}
+
+QString InstrumentsPanelTreeModel::addInstrumentsKeyboardShortcut() const
+{
+    const muse::shortcuts::Shortcut& shortcut = shortcutsRegister()->shortcut(ADD_INSTRUMENTS_ACTIONCODE);
+
+    if (shortcut.sequences.empty()) {
+        return {};
+    }
+
+    return muse::shortcuts::sequencesToNativeText({ shortcut.sequences[0] });
+}
+
 void InstrumentsPanelTreeModel::setIsRemovingAvailable(bool isRemovingAvailable)
 {
     if (m_isRemovingAvailable == isRemovingAvailable) {
@@ -564,6 +676,16 @@ void InstrumentsPanelTreeModel::setIsRemovingAvailable(bool isRemovingAvailable)
 
     m_isRemovingAvailable = isRemovingAvailable;
     emit isRemovingAvailableChanged(m_isRemovingAvailable);
+}
+
+void InstrumentsPanelTreeModel::setIsInstrumentSelected(bool isInstrumentSelected)
+{
+    if (m_isInstrumentSelected == isInstrumentSelected) {
+        return;
+    }
+
+    m_isInstrumentSelected = isInstrumentSelected;
+    emit isInstrumentSelectedChanged(m_isInstrumentSelected);
 }
 
 void InstrumentsPanelTreeModel::updateRearrangementAvailability()
@@ -576,7 +698,7 @@ void InstrumentsPanelTreeModel::updateRearrangementAvailability()
         return;
     }
 
-    std::sort(selectedIndexList.begin(), selectedIndexList.end(), [](QModelIndex f, QModelIndex s) -> bool {
+    std::sort(selectedIndexList.begin(), selectedIndexList.end(), [](const QModelIndex& f, const QModelIndex& s) -> bool {
         return f.row() < s.row();
     });
 
@@ -626,14 +748,90 @@ void InstrumentsPanelTreeModel::updateMovingDownAvailability(bool isSelectionMov
 
 void InstrumentsPanelTreeModel::updateRemovingAvailability()
 {
-    bool isRemovingAvailable = m_selectionModel->hasSelection();
+    QModelIndexList selectedIndexes = m_selectionModel->selectedIndexes();
+    bool isRemovingAvailable = !selectedIndexes.empty();
+    const AbstractInstrumentsPanelTreeItem* parent = nullptr;
 
-    for (const QModelIndex& index : m_selectionModel->selectedIndexes()) {
+    for (const QModelIndex& index : selectedIndexes) {
         const AbstractInstrumentsPanelTreeItem* item = modelIndexToItem(index);
-        isRemovingAvailable &= (item && item->isRemovable());
+        isRemovingAvailable = item && item->isRemovable();
+
+        //! NOTE: all selected items must have the same parent
+        if (isRemovingAvailable && parent) {
+            if (parent != item->parentItem()) {
+                isRemovingAvailable = false;
+            }
+        }
+
+        if (!isRemovingAvailable) {
+            break;
+        }
+
+        parent = item->parentItem();
+    }
+
+    //! NOTE: the user is allowed to remove all children only for the root item
+    if (isRemovingAvailable && parent != m_rootItem) {
+        int removableChildCount = 0;
+
+        for (const AbstractInstrumentsPanelTreeItem* item : parent->childItems()) {
+            if (item->isRemovable()) {
+                removableChildCount++;
+            }
+        }
+
+        isRemovingAvailable = selectedIndexes.size() < removableChildCount;
     }
 
     setIsRemovingAvailable(isRemovingAvailable);
+}
+
+void InstrumentsPanelTreeModel::updateIsInstrumentSelected()
+{
+    QModelIndexList selectedIndexes = m_selectionModel->selectedIndexes();
+    bool isInstrumentSelected = true;
+
+    for (const QModelIndex& index : selectedIndexes) {
+        const AbstractInstrumentsPanelTreeItem* item = modelIndexToItem(index);
+
+        if (item && static_cast<ItemType>(item->type()) == ItemType::STAFF) {
+            isInstrumentSelected = false;
+            break;
+        }
+    }
+
+    setIsInstrumentSelected(isInstrumentSelected);
+}
+
+void InstrumentsPanelTreeModel::setItemsSelected(const QModelIndexList& indexes, bool selected)
+{
+    for (const QModelIndex& index : indexes) {
+        if (AbstractInstrumentsPanelTreeItem* item = modelIndexToItem(index)) {
+            item->setIsSelected(selected);
+        }
+    }
+}
+
+bool InstrumentsPanelTreeModel::warnAboutRemovingInstrumentsIfNecessary(int count)
+{
+    // Only warn if excerpts are existent
+    if (m_masterNotation->excerpts().empty()) {
+        return true;
+    }
+
+    return interactive()->warning(
+        //: Please omit `%n` in the translation in this case; it's only there so that you
+        //: have the possibility to provide translations with the correct numerus form,
+        //: i.e. to show "instrument" or "instruments" as appropriate.
+        muse::trc("instruments", "Are you sure you want to delete the selected %n instrument(s)?", nullptr, count),
+
+        //: Please omit `%n` in the translation in this case; it's only there so that you
+        //: have the possibility to provide translations with the correct numerus form,
+        //: i.e. to show "instrument" or "instruments" as appropriate.
+        muse::trc("instruments", "This will remove the %n instrument(s) from the full score and all part scores.", nullptr, count),
+
+        { IInteractive::Button::No, IInteractive::Button::Yes })
+           .standardButton() == IInteractive::Button::Yes;
 }
 
 AbstractInstrumentsPanelTreeItem* InstrumentsPanelTreeModel::loadMasterPart(const Part* masterPart)
@@ -671,7 +869,7 @@ AbstractInstrumentsPanelTreeItem* InstrumentsPanelTreeModel::buildMasterStaffIte
     return result;
 }
 
-AbstractInstrumentsPanelTreeItem* InstrumentsPanelTreeModel::buildAddStaffControlItem(const ID& partId, QObject* parent)
+AbstractInstrumentsPanelTreeItem* InstrumentsPanelTreeModel::buildAddStaffControlItem(const muse::ID& partId, QObject* parent)
 {
     auto result = new StaffControlTreeItem(m_masterNotation, m_notation, parent);
     result->init(partId);

@@ -3,7 +3,12 @@
 using namespace mu;
 using namespace mu::draw;
 
-int FontProviderStub::addApplicationFont(const QString&, const QString&)
+int FontProviderStub::addSymbolFont(const QString&, const io::path_t &)
+{
+    return -1;
+}
+
+int FontProviderStub::addTextFont(const io::path_t& path)
 {
     return -1;
 }
@@ -23,6 +28,11 @@ qreal FontProviderStub::xHeight(const Font&) const
 }
 
 qreal FontProviderStub::height(const Font&) const
+{
+    return 0.0;
+}
+
+qreal FontProviderStub::capHeight(const Font&) const
 {
     return 0.0;
 }

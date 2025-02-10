@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <work>
     <work-number>MuseScore testfile</work-number>
     <work-title>Grace after 1: implied grace after</work-title>
     </work>
   <identification>
-  <creator type="composer">Leon Vinken</creator>
+    <creator type="composer">Leon Vinken</creator>
     <encoding>
       <software>MuseScore 0.7.0</software>
       <encoding-date>2007-09-10</encoding-date>

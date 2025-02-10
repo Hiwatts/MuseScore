@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,15 +21,14 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.AppShell 1.0
-import MuseScore.Dock 1.0
+import Muse.Dock 1.0
 
 import MuseScore.NotationScene 1.0
 import MuseScore.Playback 1.0
 
-import "../dockwindow"
 import "../NotationPage"
 
 DockPage {
@@ -38,11 +37,11 @@ DockPage {
     objectName: "Publish"
     uri: "musescore://publish"
 
-    property var topToolKeyNavSec
+    required property NavigationSection topToolbarKeyNavSec
 
     property NavigationSection publishToolBarKeyNavSec: NavigationSection {
         id: keynavSec
-        name: "PublushToolBarSection"
+        name: "PublishToolBarSection"
         order: 2
     }
 
@@ -55,17 +54,19 @@ DockPage {
             objectName: root.objectName + "_notationToolBar"
             title: qsTrc("appshell", "Notation toolbar")
 
-            minimumWidth: 198
+            floatable: false
+            closable: false
+            resizable: false
+            separatorsVisible: false
 
-            contentComponent: NotationToolBar {
-                navigation.section: root.topToolKeyNavSec
-                navigation.order: 2
+            alignment: DockToolBarAlignment.Center
+            contentBottomPadding: 2
 
-                onActiveFocusRequested: {
-                    if (navigation.active) {
-                        notationToolBar.forceActiveFocus()
-                    }
-                }
+            navigationSection: root.topToolbarKeyNavSec
+
+            NotationToolBar {
+                navigationPanel.section: notationToolBar.navigationSection
+                navigationPanel.order: 2
             }
         },
 
@@ -75,13 +76,15 @@ DockPage {
             objectName: root.objectName + "_playbackToolBar"
             title: qsTrc("appshell", "Playback controls")
 
-            width: root.width / 3
-            minimumWidth: floating ? 526 : 476
-            minimumHeight: floating ? 56 : 48
+            separatorsVisible: false
+            alignment: DockToolBarAlignment.Right
+            contentBottomPadding: 2
 
-            contentComponent: PlaybackToolBar {
-                navigation.section: root.topToolKeyNavSec
-                navigation.order: 3
+            navigationSection: root.topToolbarKeyNavSec
+
+            PlaybackToolBar {
+                navigationPanelSection: playbackToolBar.navigationSection
+                navigationPanelOrder: 3
 
                 floating: playbackToolBar.floating
             }
@@ -93,34 +96,53 @@ DockPage {
             objectName: root.objectName + "_undoRedoToolBar"
             title: qsTrc("appshell", "Undo/redo toolbar")
 
-            minimumWidth: 74
-            maximumWidth: 74
+            floatable: false
+            closable: false
+            resizable: false
+            separatorsVisible: false
 
-            movable: false
+            alignment: DockToolBarAlignment.Right
+            contentBottomPadding: 2
 
-            contentComponent: UndoRedoToolBar {
-                navigation.section: root.topToolKeyNavSec
-                navigation.order: 4
+            navigationSection: root.topToolbarKeyNavSec
+
+            UndoRedoToolBar {
+                navigationPanel.section: undoRedoToolBar.navigationSection
+                navigationPanel.order: 4
             }
         }
     ]
 
     toolBars: [
         DockToolBar {
-            objectName: "publishToolBar"
+            id: publishToolBar
 
-            contentComponent: PublishToolBar {
-                navigation.section: root.publishToolBarKeyNavSec
-                navigation.order: 1
+            objectName: "publishToolBar"
+            title: qsTrc("appshell", "Publish toolbar")
+
+            floatable: false
+
+            navigationSection: root.publishToolBarKeyNavSec
+
+            PublishToolBar {
+                navigationPanel.section: publishToolBar.navigationSection
+                navigationPanel.order: 1
             }
         }
     ]
 
-    central: NotationView {}
+    central: NotationView {
+        name: "PublishNotationView"
+        publishMode: true
+    }
 
     statusBar: DockStatusBar {
         objectName: "publishStatusBar"
 
-        NotationStatusBar {}
+        navigationSection: content.navigationSection
+
+        NotationStatusBar {
+            id: content
+        }
     }
 }

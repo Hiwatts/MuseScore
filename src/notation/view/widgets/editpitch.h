@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -33,17 +33,21 @@ class EditPitch : public QDialog, private Ui::EditPitchBase
 {
     Q_OBJECT
 
-    virtual void hideEvent(QHideEvent*);
-
-private slots:
-    void on_tableWidget_cellDoubleClicked(int row, int column);
-    void accept();
-    void reject() { done(-1); }                               // return an invalid pitch MIDI code
-
 public:
     EditPitch(QWidget* parent);
     EditPitch(QWidget* parent, int midiCode);
     ~EditPitch() {}
+
+private slots:
+    void on_tableWidget_cellDoubleClicked(int row, int column);
+    void accept() override;
+    void reject() override { done(-1); }                               // return an invalid pitch MIDI code
+
+private:
+    virtual void hideEvent(QHideEvent*) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+    void setup();
 };
 }
 

@@ -19,19 +19,32 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_MIDI_MIDIEVENT_H
-#define MU_MIDI_MIDIEVENT_H
+#ifndef MUSE_MIDI_MIDIEVENT_H
+#define MUSE_MIDI_MIDIEVENT_H
 
 #include <cstdint>
 #include <array>
 #include <set>
+#include <cassert>
+#include <string>
+
+#include "containers.h"
 
 #ifndef UNUSED
 #define UNUSED(x) (void)x;
 #endif
 
-namespace mu::midi {
+#ifndef MU_FALLTHROUGH
+#if __has_cpp_attribute(fallthrough)
+#define MU_FALLTHROUGH() [[fallthrough]]
+#else
+#define MU_FALLTHROUGH() (void)0
+#endif
+#endif
+
+namespace muse::midi {
 using channel_t = uint8_t;
+using tuning_t = float;
 
 /*!
  * MIDI Event stored in Universal MIDI Packet Format Message
@@ -103,14 +116,8 @@ struct Event {
             uint32_t full;
         } u;
         u.full = data;
-        if (
-            (u.byte[0] & 0x80)
-            || (u.byte[0] & 0x90)
-            || (u.byte[0] & 0xA0)
-            || (u.byte[0] & 0xB0)
-            || (u.byte[0] & 0xC0)
-            || (u.byte[0] & 0xD0)
-            || (u.byte[0] & 0xE0)
+        if ((u.byte[0] >= 0x80)
+            && (u.byte[0] < 0xF0)
             ) {
             e.m_data[0] = (u.byte[0] << 16) | (u.byte[1] << 8) | u.byte[2];
             e.setMessageType(MessageType::ChannelVoice10);
@@ -133,10 +140,23 @@ struct Event {
         return 0;
     }
 
+    static Event fromRawData(const uint32_t* data, size_t count)
+    {
+        Event e;
+        size_t numBytes = std::min(count, e.m_data.size()) * sizeof(uint32_t);
+        memcpy(e.m_data.data(), data, numBytes);
+        return e;
+    }
+
     bool operator ==(const Event& other) const { return m_data == other.m_data; }
     bool operator !=(const Event& other) const { return !operator==(other); }
     operator bool() const {
         return operator!=(NOOP()) && isValid();
+    }
+
+    bool operator <(const Event& other) const
+    {
+        return m_data < other.m_data;
     }
 
     bool isChannelVoice() const { return messageType() == MessageType::ChannelVoice10 || messageType() == MessageType::ChannelVoice20; }
@@ -271,29 +291,29 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return attribute() >> 9;
+            return static_cast<uint8_t>(attribute() >> 9);
         }
         return note();
     }
 
     //! return tuning in semitones from Pitch attribute (for NoteOn & NoteOff) events) if exists else return 0.f
-    float pitchTuning() const
+    tuning_t pitchTuning() const
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return (attribute() & 0x1FF) / static_cast<float>(0x200);
+            return static_cast<tuning_t>((attribute() & 0x1FF) / static_cast<tuning_t>(0x200));
         }
         return 0.f;
     }
 
     //! return tuning in cents
-    float pitchTuningCents() const
+    tuning_t pitchTuningCents() const
     {
         return pitchTuning() * 100;
     }
 
     //! 4.2.14.3 @see pitchNote(), pitchTuning()
-    void setPitchNote(uint8_t note, float tuning)
+    void setPitchNote(uint8_t note, tuning_t tuning)
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         assertMessageType({ MessageType::ChannelVoice20 });
@@ -309,7 +329,7 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (messageType() == MessageType::ChannelVoice20) {
-            return m_data[1] >> 16;
+            return static_cast<uint16_t>(m_data[1] >> 16);
         }
         return m_data[0] & 0x7F;
     }
@@ -367,7 +387,7 @@ struct Event {
                 return ((m_data[0] & 0x7F) << 7) | ((m_data[0] & 0x7F00) >> 8);
             default: assert(false);
             }
-            Q_FALLTHROUGH();
+            MU_FALLTHROUGH();
         case MessageType::ChannelVoice20:
             switch (opcode()) {
             case Opcode::PolyPressure:
@@ -384,7 +404,7 @@ struct Event {
                 return m_data[1];
             default: assert(false);
             }
-            Q_FALLTHROUGH();
+            MU_FALLTHROUGH();
         default:;     //TODO
         }
 
@@ -442,6 +462,11 @@ struct Event {
             break;
         default: assert(false);
         }
+    }
+
+    const uint32_t* rawData() const
+    {
+        return m_data.data();
     }
 
     /*! return signed value:
@@ -629,9 +654,9 @@ struct Event {
     }
 
     //!convert ChannelVoice from MIDI2.0 to MIDI1.0
-    std::list<Event> toMIDI10() const
+    std::vector<Event> toMIDI10() const
     {
-        std::list<Event> events;
+        std::vector<Event> events;
         switch (messageType()) {
         case MessageType::ChannelVoice10: events.push_back(*this);
             break;
@@ -647,7 +672,7 @@ struct Event {
                 auto v = scaleDown(velocity(), 16, 7);
                 e.setNote(note());
                 if (v != 0) {
-                    e.setVelocity(v);
+                    e.setVelocity(static_cast<uint16_t>(v));
                 } else {
                     //4.2.2 velocity comment
                     e.setVelocity(1);
@@ -667,7 +692,7 @@ struct Event {
             //D2.3
             case Opcode::AssignableController:
             case Opcode::RegisteredController: {
-                std::list<std::pair<uint8_t, uint8_t> > controlChanges = {
+                std::vector<std::pair<uint8_t, uint8_t> > controlChanges = {
                     { (opcode() == Opcode::RegisteredController ? 101 : 99), bank() },
                     { (opcode() == Opcode::RegisteredController ? 100 : 98), index() },
                     { 6,  (data() & 0x7FFFFFFF) >> 24 },
@@ -736,7 +761,7 @@ struct Event {
             case Opcode::NoteOn:
             case Opcode::NoteOff:
                 event.setNote(note());
-                event.setVelocity(scaleUp(velocity(), 7, 16));
+                event.setVelocity(static_cast<uint16_t>(scaleUp(velocity(), 7, 16)));
                 if (velocity() == 0) {
                     event.setOpcode(Opcode::NoteOff);
                 }
@@ -748,22 +773,24 @@ struct Event {
                 break;
             //D3.3
             case Opcode::ControlChange: {
-                std::set<uint8_t> skip = { 6, 38, 98, 99, 100, 101 };
-                if (skip.find(index()) == skip.end()) {
-                    break;
-                }
                 switch (index()) {
+                default:
+                    event.setIndex(index());
+                    event.setData(scaleUp(data(), 7, 32));
+                    break;
+                // RPN and NPRN controller messages are no ordenary conrollers
+                // and need special handling in MIDI 2.0
                 case 99:
                     event.setOpcode(Opcode::AssignableController);
-                    event.setBank(data());
+                    event.setBank(static_cast<uint16_t>(data()));
                     break;
                 case 101:
                     event.setOpcode(Opcode::RegisteredController);
-                    event.setBank(data());
+                    event.setBank(static_cast<uint16_t>(data()));
                     break;
                 case 98:
                 case 100:
-                    event.setIndex(data());
+                    event.setIndex(static_cast<uint8_t>(data()));
                     break;
                 case 6:
                     event.m_data[0] &= 0x1FFFFFF;
@@ -773,9 +800,6 @@ struct Event {
                     event.m_data[0] &= 0xFE03FFFF;
                     event.m_data[0] |= (data() & 0x7F) << 18;
                     break;
-                default:
-                    event.setIndex(index());
-                    event.setData(scaleUp(data(), 7, 32));
                 }
                 break;
             }
@@ -809,7 +833,7 @@ struct Event {
     #define opcodeValueMap(o) { o, std::string(#o) \
 }
 
-        static std::map<Opcode, std::string> m = {
+        static const std::map<Opcode, std::string> m = {
             opcodeValueMap(Opcode::RegisteredPerNoteController),
             opcodeValueMap(Opcode::AssignablePerNoteController),
             opcodeValueMap(Opcode::RegisteredController),
@@ -827,7 +851,7 @@ struct Event {
             opcodeValueMap(Opcode::PerNoteManagement)
         };
     #undef opcodeValueMap
-        return m[opcode()];
+        return muse::value(m, opcode());
     }
 
     std::string to_string() const
@@ -943,7 +967,7 @@ struct Event {
             dataToStr();
             break;
         case MessageType::SystemExclusiveData:
-            str += "MIDI System Exlusive";
+            str += "MIDI System Exclusive";
             dataToStr();
             break;
         case MessageType::Data:
@@ -1009,4 +1033,4 @@ private:
 };
 }
 
-#endif // MU_MIDI_MIDIEVENT_H
+#endif // MUSE_MIDI_MIDIEVENT_H

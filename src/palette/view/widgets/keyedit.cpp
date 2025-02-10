@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,24 +31,28 @@
 #include "commonscene/commonscenetypes.h"
 #include "translation.h"
 
-#include "engraving/infrastructure/io/xml.h"
-#include "engraving/libmscore/accidental.h"
-#include "engraving/libmscore/clef.h"
-#include "engraving/libmscore/keysig.h"
-#include "engraving/libmscore/masterscore.h"
-#include "engraving/libmscore/mscore.h"
-#include "engraving/libmscore/factory.h"
+#include "engraving/rw/rwregister.h"
+#include "engraving/dom/accidental.h"
+#include "engraving/dom/clef.h"
+#include "engraving/dom/keysig.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/factory.h"
 #include "engraving/style/defaultstyle.h"
 #include "engraving/compat/dummyelement.h"
+
+#include "types/symnames.h"
 
 #include "keycanvas.h"
 #include "palettewidget.h"
 #include "internal/palettecreator.h"
 
+#include "log.h"
+
 using namespace mu;
+using namespace muse::draw;
 using namespace mu::engraving;
 using namespace mu::palette;
-using namespace Ms;
 
 //---------------------------------------------------------
 //   KeyCanvas
@@ -58,7 +62,7 @@ KeyCanvas::KeyCanvas(QWidget* parent)
     : QFrame(parent)
 {
     setAcceptDrops(true);
-    qreal mag = configuration()->paletteSpatium() * configuration()->paletteScaling() / gpaletteScore->spatium();
+    qreal mag = configuration()->paletteSpatium() * configuration()->paletteScaling() / gpaletteScore->style().spatium();
     _matrix = QTransform(mag, 0.0, 0.0, mag, 0.0, 0.0);
     imatrix = _matrix.inverted();
     dragElement = 0;
@@ -106,50 +110,52 @@ void KeyCanvas::clear()
 
 void KeyCanvas::paintEvent(QPaintEvent*)
 {
-    mu::draw::Painter painter(this, "keycanvas");
+    muse::draw::Painter painter(this, "keycanvas");
     painter.setAntialiasing(true);
     qreal wh = double(height());
     qreal ww = double(width());
     double y = wh * .5 - 2 * configuration()->paletteSpatium() * extraMag;
 
-    qreal mag  = configuration()->paletteSpatium() * extraMag / gpaletteScore->spatium();
+    qreal mag  = configuration()->paletteSpatium() * extraMag / gpaletteScore->style().spatium();
     _matrix    = QTransform(mag, 0.0, 0.0, mag, 0.0, y);
     imatrix    = _matrix.inverted();
 
     qreal x = 3;
     qreal w = ww - 6;
 
-    painter.setWorldTransform(mu::Transform::fromQTransform(_matrix));
+    painter.setWorldTransform(Transform::fromQTransform(_matrix));
 
     QRectF r = imatrix.mapRect(QRectF(x, y, w, wh));
 
     RectF background = RectF::fromQRectF(imatrix.mapRect(QRectF(0, 0, ww, wh)));
-    painter.fillRect(background, mu::draw::Color::white);
+    painter.fillRect(background, muse::draw::Color::WHITE);
 
-    draw::Pen pen(engravingConfiguration()->defaultColor());
-    pen.setWidthF(engraving::DefaultStyle::defaultStyle().value(Sid::staffLineWidth).toDouble() * gpaletteScore->spatium());
+    muse::draw::Pen pen(engravingConfiguration()->defaultColor());
+    pen.setWidthF(engraving::DefaultStyle::defaultStyle().styleS(Sid::staffLineWidth).val() * gpaletteScore->style().spatium());
     painter.setPen(pen);
 
     for (int i = 0; i < 5; ++i) {
-        qreal yy = r.y() + i * gpaletteScore->spatium();
+        qreal yy = r.y() + i * gpaletteScore->style().spatium();
         painter.drawLine(LineF(r.x(), yy, r.x() + r.width(), yy));
     }
     if (dragElement) {
         painter.save();
         painter.translate(dragElement->pagePos());
-        dragElement->draw(&painter);
+        gpaletteScore->renderer()->drawItem(dragElement, &painter);
         painter.restore();
     }
     foreach (Accidental* a, accidentals) {
         painter.save();
         painter.translate(a->pagePos());
-        a->draw(&painter);
+        gpaletteScore->renderer()->drawItem(a, &painter);
         painter.restore();
     }
     clef->setPos(0.0, 0.0);
-    clef->layout();
+
+    engravingRender()->layoutItem(clef);
+
     painter.translate(clef->pagePos());
-    clef->draw(&painter);
+    gpaletteScore->renderer()->drawItem(clef, &painter);
 }
 
 //---------------------------------------------------------
@@ -161,7 +167,7 @@ void KeyCanvas::mousePressEvent(QMouseEvent* event)
     startMove = imatrix.map(QPointF(event->pos() - base));
     moveElement = 0;
     foreach (Accidental* a, accidentals) {
-        QRectF r = a->abbox().toQRectF();
+        QRectF r = a->pageBoundingRect().toQRectF();
         if (r.contains(startMove)) {
             a->setSelected(true);
             moveElement = a;
@@ -210,7 +216,6 @@ void KeyCanvas::dragEnterEvent(QDragEnterEvent* event)
     const QMimeData* dta = event->mimeData();
     if (dta->hasFormat(mu::commonscene::MIME_SYMBOL_FORMAT)) {
         QByteArray a = dta->data(mu::commonscene::MIME_SYMBOL_FORMAT);
-
         XmlReader e(a);
 
         PointF dragOffset;
@@ -222,14 +227,15 @@ void KeyCanvas::dragEnterEvent(QDragEnterEvent* event)
 
         event->acceptProposedAction();
         dragElement = static_cast<Accidental*>(Factory::createItem(type, gpaletteScore->dummy()));
-        dragElement->moveToDummy();
-        dragElement->read(e);
-        dragElement->layout();
+        dragElement->resetExplicitParent();
+
+        rw::RWRegister::reader()->readItem(dragElement, e);
+        engravingRender()->layoutItem(dragElement);
     } else {
         if (MScore::debugMode) {
-            qDebug("KeyCanvas::dragEnterEvent: formats:");
+            LOGD("KeyCanvas::dragEnterEvent: formats:");
             foreach (const QString& s, event->mimeData()->formats()) {
-                qDebug("   %s", qPrintable(s));
+                LOGD("   %s", qPrintable(s));
             }
         }
     }
@@ -243,7 +249,7 @@ void KeyCanvas::dragMoveEvent(QDragMoveEvent* event)
 {
     if (dragElement) {
         event->acceptProposedAction();
-        PointF pos = PointF::fromQPointF(imatrix.map(QPointF(event->pos())));
+        PointF pos = PointF::fromQPointF(imatrix.map(event->position()));
         dragElement->setPos(pos);
         update();
     }
@@ -271,11 +277,25 @@ void KeyCanvas::dropEvent(QDropEvent*)
 
 void KeyCanvas::snap(Accidental* a)
 {
-    double y        = a->ipos().y();
-    double spatium2 = gpaletteScore->spatium() * .5;
-    int line        = int((y + spatium2 * .5) / spatium2);
-    y               = line * spatium2;
-    a->rypos()      = y;
+    double _spatium = gpaletteScore->style().spatium();
+    double spatium2 = _spatium * .5;
+    double y = a->ldata()->pos().y();
+    double x = KEYEDIT_ACC_ZERO_POINT * _spatium;
+    int line = round(y / spatium2);
+    y = line * spatium2;
+    a->mutldata()->setPosY(y);
+    // take default xposition unless Control is pressed
+    int i = accidentals.indexOf(a);
+    if (i > 0) {
+        qreal accidentalGap = DefaultStyle::baseStyle().styleS(Sid::keysigAccidentalDistance).val() * _spatium;
+        Accidental* prev = accidentals[i - 1];
+        double prevX = prev->ldata()->pos().x();
+        qreal prevWidth = prev->symWidth(prev->symId());
+        x = prevX + prevWidth + accidentalGap;
+    }
+    if (!QGuiApplication::keyboardModifiers().testFlag(Qt::ControlModifier)) {
+        a->mutldata()->setPosX(x);
+    }
 }
 
 //---------------------------------------------------------
@@ -286,55 +306,68 @@ KeyEditor::KeyEditor(QWidget* parent)
     : QWidget(parent, Qt::WindowFlags(Qt::Dialog | Qt::Window))
 {
     setupUi(this);
-    setWindowTitle(mu::qtrc("palette", "Key signatures"));
+    setWindowTitle(muse::qtrc("palette", "Key signatures"));
+
+    setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     // create key signature palette
 
-    QLayout* l = new QVBoxLayout();
-    l->setContentsMargins(0, 0, 0, 0);
-    frame->setLayout(l);
+    QLayout* layout = new QVBoxLayout();
+    layout->setContentsMargins(0, 0, 0, 0);
+    keySigframe->setLayout(layout);
 
-    sp = new PaletteWidget(PaletteCreator::newKeySigPalette(), this);
-    sp->setReadOnly(false);
+    m_keySigPaletteWidget = new PaletteWidget(this);
+    m_keySigPaletteWidget->setPalette(PaletteCreator::newKeySigPalette());
+    m_keySigPaletteWidget->setReadOnly(false);
 
-    _keyPalette = new PaletteScrollArea(sp);
-    QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    _keyPalette->setSizePolicy(policy);
-    _keyPalette->setRestrictHeight(false);
+    m_keySigArea = new PaletteScrollArea(m_keySigPaletteWidget);
+    m_keySigArea->setSizePolicy(policy);
+    m_keySigArea->setRestrictHeight(false);
+    m_keySigArea->setFocusProxy(m_keySigPaletteWidget);
+    m_keySigArea->setFocusPolicy(Qt::TabFocus);
 
-    l->addWidget(_keyPalette);
+    layout->addWidget(m_keySigArea);
 
     // create accidental palette
 
-    l = new QVBoxLayout();
-    l->setContentsMargins(0, 0, 0, 0);
-    frame_3->setLayout(l);
-    sp1 = new PaletteWidget(PaletteCreator::newAccidentalsPalette(), this);
-    qreal adj = sp1->mag();
-    sp1->setGridSize(sp1->gridWidth() / adj, sp1->gridHeight() / adj);
-    sp1->setMag(1.0);
-    PaletteScrollArea* accPalette = new PaletteScrollArea(sp1);
-    QSizePolicy policy1(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    accPalette->setSizePolicy(policy1);
-    accPalette->setRestrictHeight(false);
+    layout = new QVBoxLayout();
+    layout->setContentsMargins(0, 0, 0, 0);
+    accidentalsFrame->setLayout(layout);
 
-    l->addWidget(accPalette);
+    m_accidentalsPaletteWidget = new PaletteWidget(this);
+    m_accidentalsPaletteWidget->setPalette(PaletteCreator::newAccidentalsPalette());
+    qreal adj = m_accidentalsPaletteWidget->mag();
+    m_accidentalsPaletteWidget->setGridSize(m_accidentalsPaletteWidget->gridWidth() / adj, m_accidentalsPaletteWidget->gridHeight() / adj);
+    m_accidentalsPaletteWidget->setMag(1.0);
+
+    PaletteScrollArea* accidentalsPaletteArea = new PaletteScrollArea(m_accidentalsPaletteWidget);
+    accidentalsPaletteArea->setSizePolicy(policy);
+    accidentalsPaletteArea->setRestrictHeight(false);
+    accidentalsPaletteArea->setFocusProxy(m_accidentalsPaletteWidget);
+    accidentalsPaletteArea->setFocusPolicy(Qt::TabFocus);
+
+    layout->addWidget(accidentalsPaletteArea);
 
     connect(addButton, &QPushButton::clicked, this, &KeyEditor::addClicked);
     connect(clearButton, &QPushButton::clicked, this, &KeyEditor::clearClicked);
-    connect(sp, &PaletteWidget::changed, this, &KeyEditor::setDirty);
+    connect(m_keySigPaletteWidget, &PaletteWidget::changed, this, &KeyEditor::setDirty);
 
     //
-    // set all "buildin" key signatures to read only
+    // set all "builtin" key signatures to read only
     //
-    int n = sp->actualCellCount();
+    int n = m_keySigPaletteWidget->actualCellCount();
     for (int i = 0; i < n; ++i) {
-        sp->setCellReadOnly(i, true);
+        m_keySigPaletteWidget->setCellReadOnly(i, true);
     }
 
     if (!configuration()->useFactorySettings()) {
-        sp->readFromFile(configuration()->keySignaturesDirPath().toQString());
+        m_keySigPaletteWidget->readFromFile(configuration()->keySignaturesDirPath().toQString());
     }
+
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 //---------------------------------------------------------
@@ -344,31 +377,38 @@ KeyEditor::KeyEditor(QWidget* parent)
 void KeyEditor::addClicked()
 {
     const QList<Accidental*> al = canvas->getAccidentals();
-    double spatium = gpaletteScore->spatium();
-    double xoff = 10000000.0;
-
-    for (Accidental* a : al) {
-        PointF pos = a->ipos();
-        if (pos.x() < xoff) {
-            xoff = pos.x();
-        }
-    }
+    double spatium = gpaletteScore->style().spatium();
+    double xoff = KEYEDIT_ACC_ZERO_POINT * spatium;
 
     KeySigEvent e;
     e.setCustom(true);
-    for (Accidental* a : al) {
-        KeySym s;
-        s.sym       = a->symbol();
-        PointF pos = a->ipos();
-        pos.rx()   -= xoff;
-        s.spos      = pos / spatium;
-        e.keySymbols().append(s);
+    qreal accidentalGap = DefaultStyle::baseStyle().styleS(Sid::keysigAccidentalDistance).val();
+    for (int i = 0; i < al.size(); ++i) {
+        Accidental* a = al[i];
+        CustDef c;
+        c.sym = a->symId();
+        PointF pos = a->ldata()->pos();
+        c.xAlt = (pos.x() - xoff) / spatium;
+        if (i > 0) {
+            Accidental* prev = al[i - 1];
+            PointF prevPos = prev->ldata()->pos();
+            qreal prevWidth = prev->symWidth(prev->symId());
+            c.xAlt -= (prevPos.x() - xoff + prevWidth) / spatium + accidentalGap;
+        }
+        int line = static_cast<int>(round((pos.y() / spatium) * 2));
+        bool flat = std::string(SymNames::nameForSymId(c.sym).ascii()).find("Flat") != std::string::npos;
+        c.degree = (3 - line) % 7;
+        c.degree += (c.degree < 0) ? 7 : 0;
+        line += flat ? -1 : 1; // top accidentals in treble clef are gis (#), or es (b)
+        c.octAlt = static_cast<int>((line - (line >= 0 ? 0 : 6)) / 7);
+        e.customKeyDefs().push_back(c);
     }
     auto ks = Factory::makeKeySig(gpaletteScore->dummy()->segment());
     ks->setKeySigEvent(e);
-    sp->appendElement(ks, "custom");
-    _dirty = true;
-    emit keySigAdded(ks);
+    m_keySigPaletteWidget->appendElement(ks, "custom");
+    m_dirty = true;
+
+    paletteProvider()->addCustomItemRequested().send(ks);
 }
 
 //---------------------------------------------------------
@@ -384,9 +424,9 @@ void KeyEditor::clearClicked()
 //   showKeyPalette
 //---------------------------------------------------------
 
-void KeyEditor::showKeyPalette(bool val)
+void KeyEditor::setShowKeyPalette(bool showKeyPalette)
 {
-    _keyPalette->setVisible(val);
+    m_keySigArea->setVisible(showKeyPalette);
 }
 
 //---------------------------------------------------------
@@ -397,5 +437,10 @@ void KeyEditor::save()
 {
     QDir dir;
     dir.mkpath(configuration()->keySignaturesDirPath().toQString());
-    sp->writeToFile(configuration()->keySignaturesDirPath().toQString());
+    m_keySigPaletteWidget->writeToFile(configuration()->keySignaturesDirPath().toQString());
+}
+
+bool KeyEditor::showKeyPalette() const
+{
+    return m_keySigArea->isVisible();
 }

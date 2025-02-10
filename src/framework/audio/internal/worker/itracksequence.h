@@ -20,18 +20,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_ITRACKSEQUENCE_H
-#define MU_AUDIO_ITRACKSEQUENCE_H
+#ifndef MUSE_AUDIO_ITRACKSEQUENCE_H
+#define MUSE_AUDIO_ITRACKSEQUENCE_H
 
-#include "async/channel.h"
-#include "retval.h"
+#include "global/async/channel.h"
+#include "global/types/retval.h"
+#include "mpe/events.h"
 
-#include "iaudiosource.h"
 #include "isequenceplayer.h"
 #include "isequenceio.h"
 #include "audiotypes.h"
 
-namespace mu::audio {
+namespace muse::audio {
 class ITrackSequence
 {
 public:
@@ -39,9 +39,13 @@ public:
 
     virtual TrackSequenceId id() const = 0;
 
-    virtual RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, const midi::MidiData& midiData,
+    virtual RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, const mpe::PlaybackData& playbackData,
                                                    const AudioParams& requiredParams) = 0;
-    virtual RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, io::Device* device, const AudioParams& requiredParams) = 0;
+    virtual RetVal2<TrackId, AudioParams> addTrack(const std::string& trackName, io::IODevice* device,
+                                                   const AudioParams& requiredParams) = 0;
+
+    virtual RetVal2<TrackId, AudioOutputParams> addAuxTrack(const std::string& trackName,
+                                                            const AudioOutputParams& requiredOutputParams) = 0;
 
     virtual TrackName trackName(const TrackId id) const = 0;
     virtual TrackIdList trackIdList() const = 0;
@@ -59,4 +63,4 @@ public:
 using ITrackSequencePtr = std::shared_ptr<ITrackSequence>;
 }
 
-#endif // MU_AUDIO_ITRACKSEQUENCE_H
+#endif // MUSE_AUDIO_ITRACKSEQUENCE_H

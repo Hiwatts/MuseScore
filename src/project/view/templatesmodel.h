@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,10 +30,13 @@ class TemplatesModel : public QObject
 {
     Q_OBJECT
 
-    INJECT(project, ITemplatesRepository, repository)
+    INJECT(ITemplatesRepository, repository)
 
     Q_PROPERTY(QStringList categoriesTitles READ categoriesTitles NOTIFY categoriesChanged)
     Q_PROPERTY(QStringList templatesTitles READ templatesTitles NOTIFY templatesChanged)
+
+    Q_PROPERTY(int currentCategoryIndex READ currentCategoryIndex WRITE setCurrentCategoryIndex NOTIFY currentCategoryChanged)
+    Q_PROPERTY(int currentTemplateIndex READ currentTemplateIndex WRITE setCurrentTemplateIndex NOTIFY currentTemplateChanged)
 
     Q_PROPERTY(QString currentTemplatePath READ currentTemplatePath NOTIFY currentTemplateChanged)
 
@@ -43,33 +46,52 @@ public:
     QStringList categoriesTitles() const;
     QStringList templatesTitles() const;
 
+    int currentCategoryIndex() const;
+    int currentTemplateIndex() const;
+
     QString currentTemplatePath() const;
 
     Q_INVOKABLE void load();
 
-    Q_INVOKABLE void setCurrentCategory(int index);
-    Q_INVOKABLE void setCurrentTemplate(int index);
+    Q_INVOKABLE void saveCurrentCategory();
     Q_INVOKABLE void setSearchText(const QString& text);
+
+public slots:
+    void setCurrentCategoryIndex(int index);
+    void setCurrentTemplateIndex(int index);
 
 signals:
     void categoriesChanged();
     void templatesChanged();
+    void currentCategoryChanged();
     void currentTemplateChanged();
 
 private:
-    void updateTemplatesByCategory();
+    void loadAllCategories();
+
+    void setVisibleTemplates(const Templates& templates);
+    void setVisibleCategories(const QStringList& titles);
+
+    void setCurrentTemplate(const Template& templ);
+    void setCurrentCategory(const QString& category);
+
+    void updateTemplatesByCurrentCategory();
     void updateTemplatesAndCategoriesBySearch();
 
     bool titleAccepted(const QString& title) const;
 
+    bool isSearching() const;
+
     Templates m_allTemplates;
     Templates m_visibleTemplates;
-    QList<QString> m_visibleCategoriesTitles;
+    QStringList m_visibleCategoriesTitles;
 
     QString m_searchText;
 
-    int m_currentCategoryIndex = 0;
-    int m_currentTemplateIndex = 0;
+    QString m_currentCategory;
+    Template m_currentTemplate;
+
+    bool m_saveCurrentCategory = false;
 };
 }
 

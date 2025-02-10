@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,8 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../common"
@@ -48,10 +48,13 @@ Column {
         titleText: qsTrc("inspector", "Number position")
         propertyItem: root.model ? root.model.numberPosition : null
 
-        maxValue: 99.0
+        icon: IconCode.VERTICAL
+
         minValue: -99.0
+        maxValue: 99.0
         step: 0.5
         decimals: 2
+        measureUnitsSymbol: qsTrc("global", "sp")
 
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart + 1

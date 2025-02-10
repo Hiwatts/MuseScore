@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,24 +23,36 @@
 #ifndef MU_NOTATION_TIMELINEVIEW_H
 #define MU_NOTATION_TIMELINEVIEW_H
 
-#include "ui/view/widgetview.h"
+#include <QImage>
+#include <QTimer>
+
+#include "uicomponents/view/widgetview.h"
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "async/asyncable.h"
 
 namespace mu::notation {
-class TimelineView : public ui::WidgetView, public async::Asyncable
+class TimelineView : public muse::uicomponents::WidgetView, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(notation, context::IGlobalContext, globalContext)
+    muse::Inject<context::IGlobalContext> globalContext = { this };
 
 public:
     explicit TimelineView(QQuickItem* parent = nullptr);
 
+private slots:
+    void doDraw();
+
 private:
+
+    void paint(QPainter* painter) override;
     void componentComplete() override;
+
+    qreal m_dpr = 1.0; // device pixel ratio
+    QImage m_image;
+    QTimer m_drawTimer;
 };
 }
 

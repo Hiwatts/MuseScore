@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,23 +22,25 @@
 
 #include "fontStyleSelect.h"
 
-#include "ui/view/iconcodes.h"
+#include "ui/view/widgetutils.h"
 
 using namespace mu::notation;
-using namespace mu::ui;
+using namespace muse::ui;
 
 FontStyleSelect::FontStyleSelect(QWidget* parent)
-    : QWidget(parent)
+    : QWidget(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setupUi(this);
 
-    bold->setText(iconCodeToChar(IconCode::Code::TEXT_BOLD));
-    italic->setText(iconCodeToChar(IconCode::Code::TEXT_ITALIC));
-    underline->setText(iconCodeToChar(IconCode::Code::TEXT_UNDERLINE));
+    WidgetUtils::setWidgetIcon(bold, IconCode::Code::TEXT_BOLD);
+    WidgetUtils::setWidgetIcon(italic, IconCode::Code::TEXT_ITALIC);
+    WidgetUtils::setWidgetIcon(underline, IconCode::Code::TEXT_UNDERLINE);
+    WidgetUtils::setWidgetIcon(strike, IconCode::Code::TEXT_STRIKE);
 
     connect(bold, &QPushButton::toggled, this, &FontStyleSelect::_fontStyleChanged);
     connect(italic, &QPushButton::toggled, this, &FontStyleSelect::_fontStyleChanged);
     connect(underline, &QPushButton::toggled, this, &FontStyleSelect::_fontStyleChanged);
+    connect(strike, &QPushButton::toggled, this, &FontStyleSelect::_fontStyleChanged);
 }
 
 void FontStyleSelect::_fontStyleChanged()
@@ -46,26 +48,30 @@ void FontStyleSelect::_fontStyleChanged()
     emit fontStyleChanged(fontStyle());
 }
 
-Ms::FontStyle FontStyleSelect::fontStyle() const
+mu::engraving::FontStyle FontStyleSelect::fontStyle() const
 {
-    Ms::FontStyle fs = Ms::FontStyle::Normal;
+    mu::engraving::FontStyle fs = mu::engraving::FontStyle::Normal;
 
     if (bold->isChecked()) {
-        fs = fs + Ms::FontStyle::Bold;
+        fs = fs + mu::engraving::FontStyle::Bold;
     }
     if (italic->isChecked()) {
-        fs = fs + Ms::FontStyle::Italic;
+        fs = fs + mu::engraving::FontStyle::Italic;
     }
     if (underline->isChecked()) {
-        fs = fs + Ms::FontStyle::Underline;
+        fs = fs + mu::engraving::FontStyle::Underline;
+    }
+    if (strike->isChecked()) {
+        fs = fs + mu::engraving::FontStyle::Strike;
     }
 
     return fs;
 }
 
-void FontStyleSelect::setFontStyle(Ms::FontStyle fs)
+void FontStyleSelect::setFontStyle(mu::engraving::FontStyle fs)
 {
-    bold->setChecked(fs & Ms::FontStyle::Bold);
-    italic->setChecked(fs & Ms::FontStyle::Italic);
-    underline->setChecked(fs & Ms::FontStyle::Underline);
+    bold->setChecked(fs & mu::engraving::FontStyle::Bold);
+    italic->setChecked(fs & mu::engraving::FontStyle::Italic);
+    underline->setChecked(fs & mu::engraving::FontStyle::Underline);
+    strike->setChecked(fs & mu::engraving::FontStyle::Strike);
 }

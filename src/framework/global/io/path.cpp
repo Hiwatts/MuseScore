@@ -21,183 +21,283 @@
  */
 #include "path.h"
 
+#ifndef NO_QT_SUPPORT
 #include <QDir>
-#include <QFileInfo>
-#include <QRegularExpression>
+#endif
 
 #include "stringutils.h"
+#include "fileinfo.h"
 
-using namespace mu::io;
+using namespace muse;
+using namespace muse::io;
 
-path::path(const QString& s)
-    : m_path(s.toUtf8())
+path_t::path_t(const String& s)
+    : m_path(s.toStdString())
 {
 }
 
-path::path(const std::string& s)
-    : m_path(s.c_str())
-{
-}
-
-path::path(const char* s)
+path_t::path_t(const std::string& s)
     : m_path(s)
 {
 }
 
-bool path::empty() const
+path_t::path_t(std::string&& s)
+    : m_path(std::move(s))
 {
-    return m_path.isEmpty();
 }
 
-QString path::toQString() const
+path_t::path_t(const char* s)
+    : m_path(s ? s : "")
 {
-    return QString(m_path);
 }
 
-std::string path::toStdString() const
+bool path_t::empty() const
 {
-    return std::string(m_path.data());
+    return m_path.empty();
 }
 
-std::wstring path::toStdWString() const
+size_t path_t::size() const
 {
-    return QString(m_path).toStdWString();
+    return m_path.size();
 }
 
-const char* path::c_str() const
+bool path_t::withSuffix(const char* str) const
 {
-    return m_path.data();
+    return io::FileInfo::suffix(m_path).toLower() == str;
 }
 
-paths path::pathsFromString(const std::string& str, const std::string& delim)
+path_t path_t::appendingComponent(const path_t& other) const
 {
-    std::vector<std::string> strs;
-    strings::split(str, strs, delim);
-
-    paths ps;
-    ps.reserve(strs.size());
-    for (const std::string& s : strs) {
-        ps.push_back(path(s));
+    if ((!m_path.empty() && m_path.back() == '/')
+        || (!other.m_path.empty() && other.m_path.front() == '/')) {
+        return m_path + other.m_path;
     }
-    return ps;
+
+    return m_path + '/' + other.m_path;
 }
 
-std::string mu::io::suffix(const mu::io::path& path)
+path_t path_t::appendingSuffix(const path_t& suffix) const
 {
-    QFileInfo fi(path.toQString());
-    return fi.suffix().toLower().toStdString();
+    if (!suffix.m_path.empty() && suffix.m_path.front() == '.') {
+        return m_path + suffix.m_path;
+    }
+
+    return m_path + '.' + suffix.m_path;
 }
 
-mu::io::path mu::io::filename(const mu::io::path& path)
+String path_t::toString() const
 {
-    QFileInfo fi(path.toQString());
-    return fi.fileName();
+    return String::fromStdString(m_path);
 }
 
-mu::io::path mu::io::basename(const mu::io::path& path)
+std::string path_t::toStdString() const
 {
-    QFileInfo fi(path.toQString());
+    return m_path;
+}
+
+const char* path_t::c_str() const
+{
+    return m_path.c_str();
+}
+
+#ifndef NO_QT_SUPPORT
+path_t::path_t(const QString& s)
+    : m_path(s.toStdString())
+{
+}
+
+path_t::path_t(const QUrl& u)
+    : m_path(u.toLocalFile().toStdString())
+{
+}
+
+QString path_t::toQString() const
+{
+    return QString::fromStdString(m_path);
+}
+
+QUrl path_t::toQUrl() const
+{
+    return QUrl::fromLocalFile(QString::fromStdString(m_path));
+}
+
+std::wstring path_t::toStdWString() const
+{
+    return QString::fromStdString(m_path).toStdWString();
+}
+
+#endif
+
+std::string muse::io::suffix(const io::path_t& path)
+{
+    return FileInfo::suffix(path).toLower().toStdString();
+}
+
+io::path_t muse::io::filename(const io::path_t& path, bool includingExtension)
+{
+    FileInfo fi(path);
+    return includingExtension ? fi.fileName() : fi.completeBaseName();
+}
+
+io::path_t muse::io::basename(const io::path_t& path)
+{
+    FileInfo fi(path);
     return fi.baseName();
 }
 
-mu::io::path mu::io::completebasename(const mu::io::path& path)
+io::path_t muse::io::completeBasename(const io::path_t& path)
 {
-    QFileInfo fi(path.toQString());
+    FileInfo fi(path);
     return fi.completeBaseName();
 }
 
-mu::io::path mu::io::dirname(const mu::io::path& path)
+io::path_t muse::io::absolutePath(const path_t& path)
 {
-    return QFileInfo(path.toQString()).dir().dirName();
+    return FileInfo(path).absolutePath();
 }
 
-mu::io::path mu::io::dirpath(const mu::io::path& path)
+io::path_t muse::io::dirpath(const io::path_t& path)
 {
-    return QFileInfo(path.toQString()).dir().path();
+    return FileInfo(path).dir().path();
 }
 
-bool mu::io::isAllowedFileName(const path& fn_)
+io::path_t muse::io::absoluteDirpath(const io::path_t& path)
 {
-    QString fn = basename(fn_).toQString();
+    return FileInfo(path).dir().absolutePath();
+}
+
+bool muse::io::isAbsolute(const path_t& path)
+{
+    return FileInfo(path).isAbsolute();
+}
+
+bool muse::io::isAllowedFileName(const path_t& fn_)
+{
+    std::string fn = basename(fn_).toStdString();
+    if (fn.empty()) {
+        return false;
+    }
 
     // Windows filenames are not case sensitive.
-    fn = fn.toUpper();
+    fn = String::fromStdString(fn).toUpper().toStdString();
 
-    static const QString illegal="<>:\"|?*";
+    static const std::string illegal="<>:\"|?*";
 
-    for (const QChar& c : fn) {
+    for (const char& c : fn) {
         // Check for control characters
-        if (c.toLatin1() > 0 && c.toLatin1() < 32) {
+        if (c > 0 && c < 32) {
             return false;
         }
 
         // Check for illegal characters
-        if (illegal.contains(c)) {
-            return false;
+        for (const char& ilc : illegal) {
+            if (c == ilc) {
+                return false;
+            }
         }
     }
 
     // Check for device names in filenames
-    static const QStringList devices = {
+    static const std::vector<std::string> devices = {
         "CON", "PRN",  "AUX",  "NUL",
         "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
         "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
     };
 
-    foreach (const QString& s, devices) {
+    for (const std::string& s : devices) {
         if (fn == s) {
             return false;
         }
     }
 
     // Check for trailing periods or spaces
-    if (fn.right(1) == "." || fn.right(1) == " ") {
+    if (fn.back() == '.' || fn.back() == ' ') {
         return false;
     }
 
     // Check for pathnames that are too long
-    if (fn.length() > 96) {
+    if (fn.size() > 96) {
         return false;
     }
 
     // Since we are checking for a filename, it mustn't be a directory
-    if (fn.right(1) == "\\") {
+    if (fn.back() == '\\') {
         return false;
     }
 
     return true;
 }
 
-mu::io::path mu::io::escapeFileName(const mu::io::path& fn_)
+io::path_t muse::io::escapeFileName(const io::path_t& fn_)
 {
     //
     // special characters in filenames are a constant source
     // of trouble, this replaces some of them common in german:
     //
-    QString fn = fn_.toQString();
+    String fn = fn_.toString();
     fn = fn.simplified();
-    fn = fn.replace(QChar(' '),  "_");
-    fn = fn.replace(QChar('\n'), "_");
-    fn = fn.replace(QChar(0xe4), "ae"); // &auml;
-    fn = fn.replace(QChar(0xf6), "oe"); // &ouml;
-    fn = fn.replace(QChar(0xfc), "ue"); // &uuml;
-    fn = fn.replace(QChar(0xdf), "ss"); // &szlig;
-    fn = fn.replace(QChar(0xc4), "Ae"); // &Auml;
-    fn = fn.replace(QChar(0xd6), "Oe"); // &Ouml;
-    fn = fn.replace(QChar(0xdc), "Ue"); // &Uuml;
-    fn = fn.replace(QChar(0x266d), "b"); // musical flat sign, happen in instrument names, so can happen in part (file) names
-    fn = fn.replace(QChar(0x266f), "#"); // musical sharp sign, can happen in titles, so can happen in score (file) names
-    fn = fn.replace(QRegularExpression("[" + QRegularExpression::escape("\\/:*?\"<>|") + "]"), "_"); //FAT/NTFS special chars
+    fn = fn.replace(' ',  '_');
+    fn = fn.replace('\n', '_');
+    fn = fn.replace(Char(0xe4), u"ae"); // &auml;
+    fn = fn.replace(Char(0xf6), u"oe"); // &ouml;
+    fn = fn.replace(Char(0xfc), u"ue"); // &uuml;
+    fn = fn.replace(Char(0xdf), u"ss"); // &szlig;
+    fn = fn.replace(Char(0xc4), u"Ae"); // &Auml;
+    fn = fn.replace(Char(0xd6), u"Oe"); // &Ouml;
+    fn = fn.replace(Char(0xdc), u"Ue"); // &Uuml;
+    fn = fn.replace(Char(0x266d), u"b"); // musical flat sign, happen in instrument names, so can happen in part (file) names
+    fn = fn.replace(Char(0x266f), u"#"); // musical sharp sign, can happen in titles, so can happen in score (file) names
+    //FAT/NTFS special chars
+    fn = fn.replace('<', '_')
+         .replace('>', '_')
+         .replace(':', '_')
+         .replace('"', '_')
+         .replace('/', '_')
+         .replace('\\', '_')
+         .replace('|', '_')
+         .replace('?', '_')
+         .replace('*', '_');
+
     return fn;
 }
 
-mu::io::paths mu::io::pathsFromStrings(const QStringList& list)
+paths_t muse::io::pathsFromString(const std::string& str, const std::string& delim)
 {
-    paths result;
+    if (str.empty()) {
+        return {};
+    }
 
-    for (const QString& path : list) {
-        result.push_back(path);
+    std::vector<std::string> strs;
+    strings::split(str, strs, delim);
+
+    paths_t ps;
+    ps.reserve(strs.size());
+    for (const std::string& s : strs) {
+        ps.push_back(path_t(s));
+    }
+    return ps;
+}
+
+std::string muse::io::pathsToString(const paths_t& ps, const std::string& delim)
+{
+    std::string result;
+    bool first = true;
+    for (const path_t& _path: ps) {
+        if (!first) {
+            result += delim;
+        }
+        first = false;
+        result += _path.toStdString();
     }
 
     return result;
+}
+
+path_t muse::io::toNativeSeparators(const path_t& path)
+{
+#ifndef NO_QT_SUPPORT
+    return QDir::toNativeSeparators(path.toQString());
+#else
+    return path;
+#endif
 }

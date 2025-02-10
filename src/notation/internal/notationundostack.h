@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,13 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_NOTATION_UNDOSTACK
-#define MU_NOTATION_UNDOSTACK
+#pragma once
 
 #include "inotationundostack.h"
 #include "igetscore.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
 class MasterScore;
 class UndoStack;
@@ -37,47 +36,51 @@ namespace mu::notation {
 class NotationUndoStack : public INotationUndoStack
 {
 public:
-    NotationUndoStack(IGetScore* getScore, async::Notification notationChanged);
+    NotationUndoStack(IGetScore* getScore, muse::async::Notification notationChanged);
 
     bool canUndo() const override;
-    void undo(Ms::EditData*) override;
-    async::Notification undoNotification() const override;
+    void undo(mu::engraving::EditData*) override;
 
     bool canRedo() const override;
-    void redo(Ms::EditData*) override;
-    async::Notification redoNotification() const override;
+    void redo(mu::engraving::EditData*) override;
 
-    void prepareChanges() override;
+    void undoRedoToIndex(size_t idx, mu::engraving::EditData* editData) override;
+
+    void prepareChanges(const muse::TranslatableString& actionName) override;
     void rollbackChanges() override;
     void commitChanges() override;
+
+    bool isStackClean() const override;
+
+    void mergeCommands(size_t startIdx) override;
 
     void lock() override;
     void unlock() override;
     bool isLocked() const override;
 
-    async::Notification stackChanged() const override;
+    const muse::TranslatableString topMostUndoActionName() const override;
+    const muse::TranslatableString topMostRedoActionName() const override;
+    size_t undoRedoActionCount() const override;
+    size_t currentStateIndex() const override;
+    const muse::TranslatableString lastActionNameAtIdx(size_t idx) const override;
+
+    muse::async::Notification stackChanged() const override;
+    muse::async::Channel<ChangesRange> changesChannel() const override;
+    muse::async::Notification undoRedoNotification() const override;
 
 private:
     void notifyAboutNotationChanged();
     void notifyAboutStateChanged();
-    void notifyAboutUndo();
-    void notifyAboutRedo();
+    void notifyAboutUndoRedo();
 
-    bool isStackClean() const;
-
-    Ms::Score* score() const;
-    Ms::MasterScore* masterScore() const;
-    Ms::UndoStack* undoStack() const;
+    mu::engraving::Score* score() const;
+    mu::engraving::MasterScore* masterScore() const;
+    mu::engraving::UndoStack* undoStack() const;
 
     IGetScore* m_getScore = nullptr;
 
-    async::Notification m_notationChanged;
-    async::Notification m_stackStateChanged;
-    async::Notification m_undoNotification;
-    async::Notification m_redoNotification;
-
-    bool m_isLocked = false;
+    muse::async::Notification m_notationChanged;
+    muse::async::Notification m_stackStateChanged;
+    muse::async::Notification m_undoRedoNotification;
 };
 }
-
-#endif // MU_NOTATION_UNDOSTACK

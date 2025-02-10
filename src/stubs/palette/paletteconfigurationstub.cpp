@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,22 +22,46 @@
 #include "paletteconfigurationstub.h"
 
 using namespace mu::palette;
+using namespace muse;
+
+double PaletteConfigurationStub::paletteSpatium() const
+{
+    return 0.f;
+}
 
 double PaletteConfigurationStub::paletteScaling() const
 {
-    return 0.f;
+    return 1.f;
 }
 
 void PaletteConfigurationStub::setPaletteScaling(double)
 {
 }
 
-bool PaletteConfigurationStub::isSinglePalette() const
+ValCh<bool> PaletteConfigurationStub::isSinglePalette() const
 {
-    return false;
+    return ValCh<bool>();
 }
 
 void PaletteConfigurationStub::setIsSinglePalette(bool)
+{
+}
+
+ValCh<bool> PaletteConfigurationStub::isSingleClickToOpenPalette() const
+{
+    return ValCh<bool>();
+}
+
+void PaletteConfigurationStub::setIsSingleClickToOpenPalette(bool)
+{
+}
+
+ValCh<bool> PaletteConfigurationStub::isPaletteDragEnabled() const
+{
+    return ValCh<bool>();
+}
+
+void PaletteConfigurationStub::setIsPaletteDragEnabled(bool)
 {
 }
 
@@ -61,19 +85,19 @@ QColor PaletteConfigurationStub::accentColor() const
     return QColor();
 }
 
-mu::async::Notification PaletteConfigurationStub::colorsChanged() const
+muse::async::Notification PaletteConfigurationStub::colorsChanged() const
 {
-    return mu::async::Notification();
+    return muse::async::Notification();
 }
 
-mu::io::path PaletteConfigurationStub::keySignaturesDirPath() const
+muse::io::path_t PaletteConfigurationStub::keySignaturesDirPath() const
 {
-    return mu::io::path();
+    return muse::io::path_t();
 }
 
-mu::io::path PaletteConfigurationStub::timeSignaturesDirPath() const
+muse::io::path_t PaletteConfigurationStub::timeSignaturesDirPath() const
 {
-    return mu::io::path();
+    return muse::io::path_t();
 }
 
 bool PaletteConfigurationStub::useFactorySettings() const
@@ -86,18 +110,18 @@ bool PaletteConfigurationStub::enableExperimental() const
     return false;
 }
 
-mu::ValCh<IPaletteConfiguration::PaletteConfig> PaletteConfigurationStub::paletteConfig(const QString&) const
+ValCh<IPaletteConfiguration::PaletteConfig> PaletteConfigurationStub::paletteConfig(const QString&) const
 {
-    return mu::ValCh<IPaletteConfiguration::PaletteConfig>();
+    return ValCh<IPaletteConfiguration::PaletteConfig>();
 }
 
 void PaletteConfigurationStub::setPaletteConfig(const QString&, const IPaletteConfiguration::PaletteConfig&)
 {
 }
 
-mu::ValCh<IPaletteConfiguration::PaletteCellConfig> PaletteConfigurationStub::paletteCellConfig(const QString&) const
+ValCh<IPaletteConfiguration::PaletteCellConfig> PaletteConfigurationStub::paletteCellConfig(const QString&) const
 {
-    return mu::ValCh<IPaletteConfiguration::PaletteCellConfig>();
+    return ValCh<IPaletteConfiguration::PaletteCellConfig>();
 }
 
 void PaletteConfigurationStub::setPaletteCellConfig(const QString&, const IPaletteConfiguration::PaletteCellConfig&)

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,45 +20,44 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.12
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Audio")
+    title: qsTrc("appshell/preferences", "Audio")
 
-    property int firstColumnWidth: 0
-
-    property alias currentAudioApiIndex: apiComboBox.currentIndex
-    property alias audioApiList: apiComboBox.model
+    property int currentAudioApiIndex: -1
+    property var audioApiList: null
 
     signal currentAudioApiIndexChangeRequested(int newIndex)
 
-    Column {
-        spacing: 12
+    /*
+     * TODO: https://github.com/musescore/MuseScore/issues/9807
+    ComboBoxWithTitle {
+        id: apiComboBox
 
-        ComboBoxWithTitle {
-            id: apiComboBox
+        title: qsTrc("appshell/preferences", "Audio API:")
+        columnWidth: root.columnWidth
 
-            title: qsTrc("appshell", "Audio API:")
-            titleWidth: root.columnWidth
+        currentIndex: root.currentAudioApiIndex
+        model: root.audioApiList
 
-            navigation.name: "AudioApiBox"
-            navigation.panel: root.navigation
-            navigation.row: 1
+        navigation.name: "AudioApiBox"
+        navigation.panel: root.navigation
+        navigation.row: 1
 
-            onValueEdited: {
-                root.currentAudioApiIndexChangeRequested(currentIndex)
-            }
+        onValueEdited: function(newIndex, newValue) {
+            root.currentAudioApiIndexChangeRequested(newIndex)
         }
+    }
+    */
 
-        CommonAudioApiConfiguration {
-            firstColumnWidth: root.columnWidth
+    CommonAudioApiConfiguration {
+        columnWidth: root.columnWidth
 
-            navigation: root.navigation
-            navigationOrderStart: 2
-        }
+        navigation: root.navigation
+        navigationOrderStart: 2
     }
 }

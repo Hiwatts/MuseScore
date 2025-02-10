@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,8 +20,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_NOTATION_NOTATIONSWITCHLISTMODEL_H
-#define MU_NOTATION_NOTATIONSWITCHLISTMODEL_H
+#pragma once
 
 #include <QAbstractListModel>
 
@@ -29,14 +28,15 @@
 #include "async/asyncable.h"
 #include "context/iglobalcontext.h"
 #include "actions/iactionsdispatcher.h"
+#include "project/inotationproject.h"
 
 namespace mu::notation {
-class NotationSwitchListModel : public QAbstractListModel, public async::Asyncable
+class NotationSwitchListModel : public QAbstractListModel, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(notation, context::IGlobalContext, context)
-    INJECT(notation, actions::IActionsDispatcher, dispatcher)
+    muse::Inject<context::IGlobalContext> context = { this };
+    muse::Inject<muse::actions::IActionsDispatcher> dispatcher = { this };
 
 public:
     explicit NotationSwitchListModel(QObject* parent = nullptr);
@@ -48,28 +48,38 @@ public:
     Q_INVOKABLE void load();
     Q_INVOKABLE void setCurrentNotation(int index);
     Q_INVOKABLE void closeNotation(int index);
+    Q_INVOKABLE void closeOtherNotations(int index);
+    Q_INVOKABLE void closeAllNotations();
+
+    Q_INVOKABLE QVariantList contextMenuItems(int index) const;
+    Q_INVOKABLE void handleContextMenuItem(int index, const QString& itemId);
 
 signals:
     void currentNotationIndexChanged(int index);
 
 private:
-    IMasterNotationPtr masterNotation() const;
+    void onCurrentProjectChanged();
+    void onCurrentNotationChanged();
+
+    INotationPtr currentNotation() const;
+    IMasterNotationPtr currentMasterNotation() const;
 
     void loadNotations();
+    void listenProjectSavingStatusChanged();
     void listenNotationOpeningStatus(INotationPtr notation);
-    void listenNotationTitleChanged(INotationPtr notation);
-    void listenNotationSavingStatus(IMasterNotationPtr masterNotation);
+    void listenExcerptNotationTitleChanged(IExcerptNotationPtr excerptNotation);
+
     bool isIndexValid(int index) const;
 
     bool isMasterNotation(const INotationPtr notation) const;
 
     enum Roles {
         RoleTitle = Qt::UserRole + 1,
-        RoleNeedSave
+        RoleNeedSave,
+        RoleIsCloud
     };
 
     QList<INotationPtr> m_notations;
+    std::unique_ptr<muse::async::Asyncable> m_notationChangedReceiver;
 };
 }
-
-#endif // MU_NOTATION_NOTATIONSWITCHLISTMODEL_H

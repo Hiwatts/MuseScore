@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,82 +22,33 @@
 
 #include "notationtoolbarmodel.h"
 
-#include "log.h"
-
-#include "translation.h"
+#include "uicomponents/view/toolbaritem.h"
 
 using namespace mu::notation;
-using namespace mu::ui;
-
-NotationToolBarModel::NotationToolBarModel(QObject* parent)
-    : QAbstractListModel(parent)
-{
-}
-
-int NotationToolBarModel::rowCount(const QModelIndex&) const
-{
-    return m_items.size();
-}
-
-QVariant NotationToolBarModel::data(const QModelIndex& index, int role) const
-{
-    if (!index.isValid()) {
-        return QVariant();
-    }
-
-    MenuItem item = m_items[index.row()];
-
-    switch (role) {
-    case TitleRole: return item.title;
-    case CodeRole: return QString::fromStdString(item.code);
-    case IconRole: return static_cast<int>(item.iconCode);
-    case EnabledRole: return item.state.enabled;
-    case DescriptionRole: return item.description;
-    case ShortcutRole: return QString::fromStdString(item.shortcut);
-    }
-
-    return QVariant();
-}
-
-QHash<int, QByteArray> NotationToolBarModel::roleNames() const
-{
-    static const QHash<int, QByteArray> roles {
-        { TitleRole, "title" },
-        { CodeRole, "code" },
-        { IconRole, "icon" },
-        { EnabledRole, "enabled" },
-        { DescriptionRole, "description" },
-        { ShortcutRole, "shortcut" }
-    };
-
-    return roles;
-}
+using namespace muse::uicomponents;
+using namespace muse::actions;
 
 void NotationToolBarModel::load()
 {
-    beginResetModel();
+    muse::actions::ActionCodeList itemsCodes = {
+        "parts",
+        "toggle-mixer"
+    };
 
-    m_items.clear();
+    ToolBarItemList items;
+    for (const ActionCode& code : itemsCodes) {
+        ToolBarItem* item = makeItem(code);
+        item->setShowTitle(true);
+        item->setIsTitleBold(true);
 
-    m_items << makeItem("parts");
-    m_items << makeItem("toggle-mixer");
+        items << item;
+    }
 
-    endResetModel();
+    setItems(items);
 
     context()->currentMasterNotationChanged().onNotify(this, [this]() {
         load();
     });
-}
 
-void NotationToolBarModel::handleAction(const QString& actionCode)
-{
-    dispatcher()->dispatch(actions::codeFromQString(actionCode));
-}
-
-MenuItem NotationToolBarModel::makeItem(const actions::ActionCode& actionCode) const
-{
-    MenuItem item = actionsRegister()->action(actionCode);
-    item.state.enabled = context()->currentNotation() != nullptr;
-
-    return item;
+    AbstractToolBarModel::load();
 }

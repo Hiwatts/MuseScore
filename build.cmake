@@ -38,7 +38,7 @@ while(i LESS "${CMAKE_ARGC}")
 endwhile()
 
 # load custom CMake functions and macros
-include("${CMAKE_CURRENT_LIST_DIR}/build/cmake/GetUtilsFunctions.cmake") # "fn__" namespace
+include("${CMAKE_CURRENT_LIST_DIR}/buildscripts/cmake/GetUtilsFunctions.cmake") # "fn__" namespace
 
 # Set the name of the build folder (just the folder name, not the full path)
 function(build_folder
@@ -95,7 +95,7 @@ if(DEFINED ENV{QTDIR})
     endif()
 endif()
 
-fn__require_program(QMAKE Qt --version "https://musescore.org/en/handbook/developers-handbook/compilation" qmake)
+fn__require_program(QMAKE Qt --version "https://musescore.org/en/handbook/developers-handbook/compilation" qmake6 qmake)
 fn__set_qt_variables("${QMAKE}")
 message(STATUS "QT_LOCATION: ${QT_LOCATION}")
 message(STATUS "QT_VERSION: ${QT_VERSION}")
@@ -143,7 +143,7 @@ endif()
 
 fn__get_option(GENERATOR -G ${CONFIGURE_ARGS})
 if(WIN32)
-    fn__set_default(GENERATOR "Visual Studio 16 2019")
+    fn__set_default(GENERATOR "Visual Studio 17 2022")
 else()
     fn__set_default(GENERATOR "Unix Makefiles")
 endif()
@@ -186,9 +186,9 @@ list(APPEND CONFIGURE_ARGS "-DCMAKE_INSTALL_PREFIX=${INSTALL_PATH}")
 list(APPEND CONFIGURE_ARGS "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}")
 
 if(QT_COMPILER MATCHES "_64$" OR QT_COMPILER MATCHES "mingw64")
-    list(APPEND CONFIGURE_ARGS "-DBUILD_64=ON")
+    list(APPEND CONFIGURE_ARGS "-DMUSE_COMPILE_BUILD_64=ON")
 else()
-    list(APPEND CONFIGURE_ARGS "-DBUILD_64=OFF")
+    list(APPEND CONFIGURE_ARGS "-DMUSE_COMPILE_BUILD_64=OFF")
 endif()
 
 #### ACTUAL BUILD STEPS START HERE ####
@@ -196,7 +196,7 @@ endif()
 # Clean - delete an existing build directory.
 #
 # We usually avoid this because performing a clean build takes much longer
-# than an incremental build, but it is occassionally necessary. If you
+# than an incremental build, but it is occasionally necessary. If you
 # encounter errors during a build then you should try doing a clean build.
 
 if(ARG_CLEAN)
@@ -215,7 +215,7 @@ if(ARG_CONFIGURE AND NOT EXISTS "${BUILD_PATH}/CMakeCache.txt")
     message("\n~~~~ Actualizing Configure step ~~~~\n")
     file(MAKE_DIRECTORY "${BUILD_PATH}")
     if(QT_COMPILER MATCHES "msvc")
-        set(CMAKE_WRAPPER "${SOURCE_PATH}/build/cmake_wrapper.bat")
+        set(CMAKE_WRAPPER "${SOURCE_PATH}/buildscripts/tools/cmake_wrapper.bat")
     else()
         set(CMAKE_WRAPPER "cmake")
     endif()
@@ -272,7 +272,7 @@ endif()
 # The working directory is unchanged. Use build_override.cmake to set the
 # CMake variable RUN_ARGS to contain a list of arguments to pass to MuseScore
 # on the command line. In addition, script arguments after "run" will be
-# appened to this list, but note that certain arguments cannot be passed this
+# appended to this list, but note that certain arguments cannot be passed this
 # way (e.g. --help, --version) because they cancel CMake script processing.
 
 if(ARG_RUN)

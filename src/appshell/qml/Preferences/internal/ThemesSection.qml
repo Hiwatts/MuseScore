@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,91 +21,86 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+
+import "../../shared"
 
 BaseSection {
     id: root
 
-    title: highContrastEnabled ? qsTrc("appshell", "High Contrast Themes") : qsTrc("appshell", "Themes")
+    title: highContrastEnabled ? qsTrc("appshell/preferences", "High contrast themes") : qsTrc("appshell/preferences", "Themes")
     navigation.direction: NavigationPanel.Both
 
     property bool highContrastEnabled: false
 
-    property alias themes: view.model
-    property string currentThemeCode
+    property alias isFollowSystemThemeAvailable: followSystemThemeCheckBox.visible
+    property alias isFollowSystemTheme: followSystemThemeCheckBox.checked
+
+    property alias themes: themeSamplesList.themes
+    property alias currentThemeCode: themeSamplesList.currentThemeCode
 
     property alias accentColors: accentColorsSection.colors
     property alias currentAccentColorIndex: accentColorsSection.currentColorIndex
 
     signal themeChangeRequested(var newThemeCode)
     signal highContrastChangeRequested(bool enabled)
+    signal setFollowSystemThemeRequested(bool enabled)
     signal accentColorChangeRequested(var newColorIndex)
 
     signal ensureContentVisibleRequested(var contentRect)
 
-    CheckBox {
-        id: highContrastEnable
-
-        width: 200
-
-        text: qsTrc("appshell", "Enable high-contrast")
-
-        checked: root.highContrastEnabled
-
-        navigation.name: "EnableHighContrastBox"
-        navigation.panel: root.navigation
-        navigation.row: 0
-        navigation.column: 0
-
-        onClicked: {
-            root.highContrastChangeRequested(!checked)
-        }
-    }
-
-    ListView {
-        id: view
-
+    Column {
         width: parent.width
-        height: contentHeight
-        contentHeight: 120
+        spacing: 24
 
-        orientation: Qt.Horizontal
-        interactive: false
+        ThemeSamplesList {
+            id: themeSamplesList
+            width: parent.width
+            spacing: root.columnWidth + root.columnSpacing - sampleWidth
 
-        spacing: 106
+            navigationPanel: root.navigation
+            navigationRow: 0
 
-        delegate: Column {
-            width: 112
-            height: 120
+            onThemeChangeRequested: function(newThemeCode) {
+                root.themeChangeRequested(newThemeCode)
+            }
+        }
 
-            spacing: 16
+        Column {
+            width: parent.width
+            spacing: 12
 
-            ThemeSample {
-                strokeColor: modelData.strokeColor
-                backgroundPrimaryColor: modelData.backgroundPrimaryColor
-                backgroundSecondaryColor: modelData.backgroundSecondaryColor
-                fontPrimaryColor: modelData.fontPrimaryColor
-                buttonColor: modelData.buttonColor
-                accentColor: modelData.accentColor
+            CheckBox {
+                id: followSystemThemeCheckBox
+                width: parent.width
+
+                text: qsTrc("appshell/preferences", "Follow system theme")
+
+                navigation.name: "FollowSystemThemeBox"
+                navigation.panel: root.navigation
+                navigation.row: 1
+                navigation.column: 0
 
                 onClicked: {
-                    root.themeChangeRequested(modelData.codeKey)
+                    root.setFollowSystemThemeRequested(!checked)
                 }
             }
 
-            RoundedRadioButton {
+            CheckBox {
                 width: parent.width
-                checked: root.currentThemeCode === modelData.codeKey
-                text: modelData.title
 
-                navigation.name: text
+                text: qsTrc("appshell/preferences", "Enable high-contrast")
+
+                checked: root.highContrastEnabled
+
+                navigation.name: "EnableHighContrastBox"
                 navigation.panel: root.navigation
-                navigation.row: 1
-                navigation.column: index
+                navigation.row: 2
+                navigation.column: 0
 
-                onToggled: {
-                    root.themeChangeRequested(modelData.codeKey)
+                onClicked: {
+                    root.highContrastChangeRequested(!checked)
                 }
             }
         }
@@ -114,14 +109,15 @@ BaseSection {
     AccentColorsSection {
         id: accentColorsSection
 
-        firstColumnWidth: root.columnWidth
+        columnWidth: root.columnWidth
+        spacing: root.columnSpacing
 
         visible: !root.highContrastEnabled
 
         navigation.section: root.navigation.section
         navigation.order: root.navigation.order + 1
 
-        onAccentColorChangeRequested: {
+        onAccentColorChangeRequested: function(newColorIndex) {
             root.accentColorChangeRequested(newColorIndex)
         }
 

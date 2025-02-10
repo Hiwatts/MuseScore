@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,10 +23,10 @@
 #ifndef MU_PROJECT_ITEMPLATESREPOSITORY_H
 #define MU_PROJECT_ITEMPLATESREPOSITORY_H
 
-#include "modularity/imoduleexport.h"
-#include "project/projecttypes.h"
+#include "modularity/imoduleinterface.h"
+#include "project/types/projecttypes.h"
 
-#include "retval.h"
+#include "types/retval.h"
 
 namespace mu::project {
 class ITemplatesRepository : MODULE_EXPORT_INTERFACE
@@ -36,7 +36,7 @@ class ITemplatesRepository : MODULE_EXPORT_INTERFACE
 public:
     virtual ~ITemplatesRepository() = default;
 
-    virtual RetVal<Templates> templates() const = 0;
+    virtual muse::RetVal<Templates> templates() const = 0;
 };
 }
 

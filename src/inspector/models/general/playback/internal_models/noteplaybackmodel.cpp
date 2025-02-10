@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,7 +29,7 @@ using namespace mu::inspector;
 NotePlaybackModel::NotePlaybackModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
-    setTitle(qtrc("inspector", "Notes"));
+    setTitle(muse::qtrc("inspector", "Notes"));
     setModelType(InspectorModelType::TYPE_NOTE);
 
     createProperties();
@@ -37,26 +37,21 @@ NotePlaybackModel::NotePlaybackModel(QObject* parent, IElementRepositoryService*
 
 void NotePlaybackModel::createProperties()
 {
-    m_tuning = buildPropertyItem(Ms::Pid::TUNING);
-    m_velocity = buildPropertyItem(Ms::Pid::VELO_OFFSET);
-    m_overrideDynamics = buildPropertyItem(Ms::Pid::VELO_TYPE);
+    m_tuning = buildPropertyItem(mu::engraving::Pid::TUNING);
+    m_velocity = buildPropertyItem(mu::engraving::Pid::USER_VELOCITY);
 }
 
 void NotePlaybackModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::NOTE);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::NOTEHEAD);
 }
 
 void NotePlaybackModel::loadProperties()
 {
-    loadPropertyItem(m_tuning, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
-
-    loadPropertyItem(m_velocity);
-
-    loadPropertyItem(m_overrideDynamics, [](const QVariant& elementValue) -> QVariant {
-        return static_cast<bool>(elementValue.toInt());
+    loadPropertyItem(m_tuning, formatDoubleFunc);
+    loadPropertyItem(m_velocity, [](const QVariant& value) {
+        //! NOTE: display 64 instead of 0 in the Velocity field to avoid confusing the user
+        return value.toInt() == 0 ? 64 : value;
     });
 }
 
@@ -64,7 +59,6 @@ void NotePlaybackModel::resetProperties()
 {
     m_tuning->resetToDefault();
     m_velocity->resetToDefault();
-    m_overrideDynamics->resetToDefault();
 }
 
 PropertyItem* NotePlaybackModel::tuning() const
@@ -75,9 +69,4 @@ PropertyItem* NotePlaybackModel::tuning() const
 PropertyItem* NotePlaybackModel::velocity() const
 {
     return m_velocity;
-}
-
-PropertyItem* NotePlaybackModel::overrideDynamics() const
-{
-    return m_overrideDynamics;
 }

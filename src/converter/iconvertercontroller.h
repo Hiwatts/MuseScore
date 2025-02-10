@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,12 +19,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_CONVERTER_ICONVERTERCONTROLLER_H
-#define MU_CONVERTER_ICONVERTERCONTROLLER_H
+#pragma once
 
-#include "modularity/imoduleexport.h"
-#include "ret.h"
-#include "io/path.h"
+#include "modularity/imoduleinterface.h"
+#include "global/types/ret.h"
+#include "global/types/uri.h"
+#include "global/io/path.h"
+#include "global/progress.h"
 
 namespace mu::converter {
 class IConverterController : MODULE_EXPORT_INTERFACE
@@ -33,25 +34,33 @@ class IConverterController : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IConverterController() = default;
 
-    virtual Ret fileConvert(const io::path& in, const io::path& out, const io::path& stylePath = io::path(), bool forceMode = false) = 0;
-    virtual Ret batchConvert(const io::path& batchJobFile, const io::path& stylePath = io::path(), bool forceMode = false) = 0;
-    virtual Ret convertScoreParts(const io::path& in, const io::path& out, const io::path& stylePath = io::path(),
-                                  bool forceMode = false) = 0;
+    virtual muse::Ret fileConvert(const muse::io::path_t& in, const muse::io::path_t& out,
+                                  const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false,
+                                  const muse::String& soundProfile = muse::String(),
+                                  const muse::UriQuery& extensionUri = muse::UriQuery(), const std::string& transposeOptionsJson = {}) = 0;
 
-    virtual Ret exportScoreMedia(const io::path& in, const io::path& out,
-                                 const io::path& highlightConfigPath = io::path(),
-                                 const io::path& stylePath = io::path(), bool forceMode = false) = 0;
-    virtual Ret exportScoreMeta(const io::path& in, const io::path& out,
-                                const io::path& stylePath = io::path(), bool forceMode = false) = 0;
-    virtual Ret exportScoreParts(const io::path& in, const io::path& out, const io::path& stylePath = io::path(),
-                                 bool forceMode = false) = 0;
-    virtual Ret exportScorePartsPdfs(const io::path& in, const io::path& out,
-                                     const io::path& stylePath = io::path(), bool forceMode = false) = 0;
-    virtual Ret exportScoreTranspose(const io::path& in, const io::path& out, const std::string& optionsJson,
-                                     const io::path& stylePath = io::path(), bool forceMode = false) = 0;
+    virtual muse::Ret batchConvert(const muse::io::path_t& batchJobFile,
+                                   const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false,
+                                   const muse::String& soundProfile = muse::String(),
+                                   const muse::UriQuery& extensionUri = muse::UriQuery(), muse::ProgressPtr progress = nullptr) = 0;
 
-    virtual Ret updateSource(const io::path& in, const std::string& newSource, bool forceMode = false) = 0;
+    virtual muse::Ret convertScoreParts(const muse::io::path_t& in, const muse::io::path_t& out,
+                                        const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false) = 0;
+
+    virtual muse::Ret exportScoreMedia(const muse::io::path_t& in, const muse::io::path_t& out,
+                                       const muse::io::path_t& highlightConfigPath = muse::io::path_t(),
+                                       const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false) = 0;
+    virtual muse::Ret exportScoreMeta(const muse::io::path_t& in, const muse::io::path_t& out,
+                                      const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false) = 0;
+    virtual muse::Ret exportScoreParts(const muse::io::path_t& in, const muse::io::path_t& out,
+                                       const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false) = 0;
+    virtual muse::Ret exportScorePartsPdfs(const muse::io::path_t& in, const muse::io::path_t& out,
+                                           const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false) = 0;
+    virtual muse::Ret exportScoreTranspose(const muse::io::path_t& in, const muse::io::path_t& out, const std::string& optionsJson,
+                                           const muse::io::path_t& stylePath = muse::io::path_t(), bool forceMode = false) = 0;
+
+    virtual muse::Ret exportScoreVideo(const muse::io::path_t& in, const muse::io::path_t& out) = 0;
+
+    virtual muse::Ret updateSource(const muse::io::path_t& in, const std::string& newSource, bool forceMode = false) = 0;
 };
 }
-
-#endif // MU_CONVERTER_ICONVERTERCONTROLLER_H

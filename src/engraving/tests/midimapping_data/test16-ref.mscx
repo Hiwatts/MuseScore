@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <museScore version="3.01">
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
       <Spatium>1.76389</Spatium>
@@ -17,7 +15,6 @@
     <metaTag name="lyricist"></metaTag>
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -733,8 +730,6 @@
         </Measure>
       </Staff>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
       <Division>480</Division>
       <Style>
         <createMultiMeasureRests>1</createMultiMeasureRests>
@@ -801,7 +796,7 @@
           <linked>
             </linked>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Track 1</text>
             </Text>
           </VBox>
@@ -865,8 +860,6 @@
       <name>Track 1</name>
       </Score>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
       <Division>480</Division>
       <Style>
         <createMultiMeasureRests>1</createMultiMeasureRests>
@@ -937,7 +930,7 @@
             <indexDiff>-8</indexDiff>
             </linked>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Track 2</text>
             </Text>
           </VBox>
@@ -995,8 +988,6 @@
       <name>Track 2</name>
       </Score>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
       <Division>480</Division>
       <Style>
         <createMultiMeasureRests>1</createMultiMeasureRests>
@@ -1066,7 +1057,7 @@
               </location>
             </linked>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Track 3</text>
             </Text>
           </VBox>
@@ -1124,8 +1115,6 @@
       <name>Track 3</name>
       </Score>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
       <Division>480</Division>
       <Style>
         <createMultiMeasureRests>1</createMultiMeasureRests>
@@ -1195,7 +1184,7 @@
               </location>
             </linked>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Track 4</text>
             </Text>
           </VBox>
@@ -1253,8 +1242,6 @@
       <name>Track 4</name>
       </Score>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
       <Division>480</Division>
       <Style>
         <createMultiMeasureRests>1</createMultiMeasureRests>
@@ -1730,7 +1717,7 @@
               </location>
             </linked>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Track 5</text>
             </Text>
           </VBox>

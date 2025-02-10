@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,7 +22,7 @@
 #ifndef MU_INSTRUMENTSSCENE_INSTRUMENTPANELCONTEXTMENUMODEL_H
 #define MU_INSTRUMENTSSCENE_INSTRUMENTPANELCONTEXTMENUMODEL_H
 
-#include "ui/view/abstractmenumodel.h"
+#include "uicomponents/view/abstractmenumodel.h"
 #include "actions/actionable.h"
 
 #include "modularity/ioc.h"
@@ -31,24 +31,31 @@
 #include "actions/iactionsdispatcher.h"
 
 namespace mu::instrumentsscene {
-class InstrumentsPanelContextMenuModel : public ui::AbstractMenuModel, public actions::Actionable
+class InstrumentsPanelContextMenuModel : public muse::uicomponents::AbstractMenuModel, public muse::actions::Actionable
 {
     Q_OBJECT
 
-    INJECT(instrumentsscene, context::IGlobalContext, globalContext)
-    INJECT(instrumentsscene, notation::IInstrumentsRepository, instrumentsRepository)
-    INJECT(instrumentsscene, actions::IActionsDispatcher, dispatcher)
+    INJECT(context::IGlobalContext, globalContext)
+    INJECT(notation::IInstrumentsRepository, instrumentsRepository)
+    INJECT(muse::actions::IActionsDispatcher, dispatcher)
 
 public:
     explicit InstrumentsPanelContextMenuModel(QObject* parent = nullptr);
 
     Q_INVOKABLE void load() override;
 
+signals:
+    void expandCollapseAllRequested(bool expand);
+
 private:
-    void loadItems();
-    void setInstrumentsOrder(const actions::ActionData& args);
+    void updateMenu();
+    void loadInstrumentOrders();
+    void buildMenu(bool includeInstrumentsOrdering);
+    void setInstrumentsOrder(const muse::actions::ActionData& args);
     void updateOrderingMenu(const QString& newOrderId);
 
+    muse::uicomponents::MenuItem* createInstrumentsOrderingItem();
+    muse::uicomponents::MenuItem* createExpandCollapseAllItem(bool expand);
     notation::IMasterNotationPtr m_masterNotation;
     notation::ScoreOrderList m_orders;
 };

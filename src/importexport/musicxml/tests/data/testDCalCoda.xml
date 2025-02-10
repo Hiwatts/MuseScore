@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <work>
     <work-number>MuseScore testfile</work-number>
     <work-title>D.C. al Coda</work-title>
@@ -71,9 +71,10 @@
         </note>
       <direction placement="above">
         <direction-type>
-          <words>To Coda</words>
+          <words>To Coda
+&lt;sym&gt;coda&lt;/sym&gt;</words>
           </direction-type>
-        <sound tocoda="codab"/>
+        <sound tocoda="1"/>
         </direction>
       </measure>
     <measure number="3">
@@ -99,6 +100,11 @@
         </note>
       </measure>
     <measure number="5">
+      <print>
+        <measure-layout>
+          <measure-distance>100</measure-distance>
+          </measure-layout>
+        </print>
       <direction placement="above">
         <direction-type>
           <coda/>

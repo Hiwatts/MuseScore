@@ -1,4 +1,4 @@
-﻿/*
+/*
  * SPDX-License-Identifier: GPL-3.0-only
  * MuseScore-CLA-applies
  *
@@ -21,18 +21,21 @@
  */
 #include "accessibilitymodule.h"
 
-#include <QtQml>
+#include <QQmlEngine>
 
 #include "modularity/ioc.h"
-#include "log.h"
 
 #include "internal/accessibilitycontroller.h"
 #include "internal/accessibilityconfiguration.h"
+#include "internal/qaccessibleinterfaceregister.h"
 
-using namespace mu::accessibility;
-using namespace mu::modularity;
+#include "global/api/iapiregister.h"
+#include "api/accessibilityapi.h"
 
-static std::shared_ptr<AccessibilityController> s_accessibilityController = std::make_shared<AccessibilityController>();
+#include "log.h"
+
+using namespace muse::accessibility;
+using namespace muse::modularity;
 
 std::string AccessibilityModule::moduleName() const
 {
@@ -41,15 +44,49 @@ std::string AccessibilityModule::moduleName() const
 
 void AccessibilityModule::registerExports()
 {
-    ioc()->registerExport<IAccessibilityConfiguration>(moduleName(), new AccessibilityConfiguration());
-    ioc()->registerExport<IAccessibilityController>(moduleName(), s_accessibilityController);
+    m_configuration = std::make_shared<AccessibilityConfiguration>(iocContext());
+    m_controller = std::make_shared<AccessibilityController>(iocContext());
+
+    ioc()->registerExport<IAccessibilityConfiguration>(moduleName(), m_configuration);
+    ioc()->registerExport<IAccessibilityController>(moduleName(), m_controller);
+    ioc()->registerExport<IQAccessibleInterfaceRegister>(moduleName(), new QAccessibleInterfaceRegister());
 }
 
-void AccessibilityModule::onInit(const framework::IApplication::RunMode& mode)
+void AccessibilityModule::resolveImports()
 {
-    if (mode != framework::IApplication::RunMode::Editor) {
+    auto accr = ioc()->resolve<IQAccessibleInterfaceRegister>(moduleName());
+    if (accr) {
+#ifdef Q_OS_MAC
+        accr->registerInterfaceGetter("QQuickWindow", AccessibilityController::accessibleInterface);
+#endif
+        accr->registerInterfaceGetter("muse::accessibility::AccessibleObject", AccessibleObject::accessibleInterface);
+    }
+}
+
+void AccessibilityModule::registerApi()
+{
+    using namespace muse::api;
+
+    auto api = ioc()->resolve<IApiRegister>(moduleName());
+    if (api) {
+        api->regApiCreator(moduleName(), "api.accessibility", new ApiCreator<api::AccessibilityApi>());
+    }
+}
+
+void AccessibilityModule::onPreInit(const IApplication::RunMode& mode)
+{
+    if (mode != IApplication::RunMode::GuiApp) {
         return;
     }
 
-    s_accessibilityController->init();
+    m_controller->setAccesibilityEnabled(true);
+}
+
+void AccessibilityModule::onInit(const IApplication::RunMode& mode)
+{
+    if (mode != IApplication::RunMode::GuiApp) {
+        return;
+    }
+
+    m_configuration->init();
 }

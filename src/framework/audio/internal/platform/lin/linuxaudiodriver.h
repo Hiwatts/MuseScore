@@ -20,29 +20,66 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_LINUXAUDIODRIVER_H
-#define MU_AUDIO_LINUXAUDIODRIVER_H
+#ifndef MUSE_AUDIO_LINUXAUDIODRIVER_H
+#define MUSE_AUDIO_LINUXAUDIODRIVER_H
+
+#include "async/asyncable.h"
 
 #include "iaudiodriver.h"
 
-namespace mu::audio {
-class LinuxAudioDriver : public IAudioDriver
+#include "audiodeviceslistener.h"
+
+namespace muse::audio {
+class LinuxAudioDriver : public IAudioDriver, public async::Asyncable
 {
 public:
     LinuxAudioDriver();
+    ~LinuxAudioDriver();
+
+    void init() override;
 
     std::string name() const override;
     bool open(const Spec& spec, Spec* activeSpec) override;
     void close() override;
     bool isOpened() const override;
 
-    std::string outputDevice() const override;
-    bool selectOutputDevice(const std::string& name) override;
-    std::vector<std::string> availableOutputDevices() const override;
+    const Spec& activeSpec() const override;
+
+    AudioDeviceID outputDevice() const override;
+    bool selectOutputDevice(const AudioDeviceID& deviceId) override;
+    bool resetToDefaultOutputDevice() override;
+    async::Notification outputDeviceChanged() const override;
+
+    AudioDeviceList availableOutputDevices() const override;
     async::Notification availableOutputDevicesChanged() const override;
+
+    unsigned int outputDeviceBufferSize() const override;
+    bool setOutputDeviceBufferSize(unsigned int bufferSize) override;
+    async::Notification outputDeviceBufferSizeChanged() const override;
+
+    std::vector<unsigned int> availableOutputDeviceBufferSizes() const override;
+
+    unsigned int outputDeviceSampleRate() const override;
+    bool setOutputDeviceSampleRate(unsigned int sampleRate) override;
+    async::Notification outputDeviceSampleRateChanged() const override;
+
+    std::vector<unsigned int> availableOutputDeviceSampleRates() const override;
+
     void resume() override;
     void suspend() override;
+
+private:
+    async::Notification m_outputDeviceChanged;
+
+    mutable std::mutex m_devicesMutex;
+    AudioDevicesListener m_devicesListener;
+    async::Notification m_availableOutputDevicesChanged;
+
+    std::string m_deviceId;
+
+    async::Notification m_bufferSizeChanged;
+    async::Notification m_sampleRateChanged;
 };
 }
 
-#endif // MU_AUDIO_LINUXAUDIODRIVER_H
+#endif // MUSE_AUDIO_LINUXAUDIODRIVER_H

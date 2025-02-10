@@ -19,7 +19,7 @@
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
-     <widget class="QFrame" name="frame">
+     <widget class="QFrame" name="keySigframe">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
@@ -29,13 +29,13 @@
      </widget>
      <widget class="QGroupBox" name="groupBox">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Maximum" vsizetype="Expanding">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
       <property name="title">
-       <string>Create Key Signature</string>
+       <string>Create key signature</string>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
        <property name="leftMargin">
@@ -51,12 +51,18 @@
         <number>6</number>
        </property>
        <item>
-        <widget class="Ms::KeyCanvas" name="canvas">
+        <widget class="mu::palette::KeyCanvas" name="canvas">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>80</height>
+          </size>
          </property>
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
@@ -67,7 +73,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QFrame" name="frame_3">
+        <widget class="QFrame" name="accidentalsFrame">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -139,7 +145,7 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>Ms::KeyCanvas</class>
+   <class>mu::palette::KeyCanvas</class>
    <extends>QFrame</extends>
    <header>palette/view/widgets/keycanvas.h</header>
    <container>1</container>

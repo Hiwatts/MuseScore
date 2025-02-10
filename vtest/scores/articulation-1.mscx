@@ -42,7 +42,6 @@
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
     <metaTag name="platform">Linux</metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -87,7 +86,7 @@
       <VBox>
         <height>5.05053</height>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Fermata</text>
           </Text>
         </VBox>

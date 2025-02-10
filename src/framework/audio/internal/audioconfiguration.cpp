@@ -20,48 +20,81 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "audioconfiguration.h"
-#include "settings.h"
-#include "stringutils.h"
-
-#include "global/xmlreader.h"
-#include "global/xmlwriter.h"
-
-#include "log.h"
 
 //TODO: remove with global clearing of Q_OS_*** defines
 #include <QtGlobal>
 
-using namespace mu;
-using namespace mu::framework;
-using namespace mu::audio;
-using namespace mu::audio::synth;
+#include "global/settings.h"
+
+#include "soundfonttypes.h"
+
+#include "log.h"
+
+using namespace muse;
+using namespace muse::audio;
+using namespace muse::audio::synth;
 
 static const audioch_t AUDIO_CHANNELS = 2;
 
 //TODO: add other setting: audio device etc
 static const Settings::Key AUDIO_API_KEY("audio", "io/audioApi");
-static const Settings::Key AUDIO_BUFFER_SIZE("audio", "driver_buffer");
+static const Settings::Key AUDIO_OUTPUT_DEVICE_ID_KEY("audio", "io/outputDevice");
+static const Settings::Key AUDIO_BUFFER_SIZE_KEY("audio", "io/bufferSize");
+static const Settings::Key AUDIO_SAMPLE_RATE_KEY("audio", "io/sampleRate");
+static const Settings::Key AUDIO_MEASURE_INPUT_LAG("audio", "io/measureInputLag");
+static const Settings::Key AUDIO_DESIRED_THREAD_NUMBER_KEY("audio", "io/audioThreads");
 
-static const Settings::Key USER_SOUNDFONTS_PATH("midi", "application/paths/mySoundfonts");
+static const Settings::Key USER_SOUNDFONTS_PATHS("midi", "application/paths/mySoundfonts");
 
-static const Settings::Key SHOW_CONTROLS_IN_MIXER("midi", "io/midi/showControlsInMixer");
+static const AudioResourceId DEFAULT_SOUND_FONT_NAME = "MS Basic";
+static const AudioResourceAttributes DEFAULT_AUDIO_RESOURCE_ATTRIBUTES = {
+    { PLAYBACK_SETUP_DATA_ATTRIBUTE, muse::mpe::GENERIC_SETUP_DATA_STRING },
+    { SOUNDFONT_NAME_ATTRIBUTE, String::fromStdString(DEFAULT_SOUND_FONT_NAME) } };
 
-static const AudioResourceId DEFAULT_SOUND_FONT_NAME = "MuseScore_General";     // "GeneralUser GS v1.471.sf2"; // "MuseScore_General.sf3";
 static const AudioResourceMeta DEFAULT_AUDIO_RESOURCE_META
-    = { DEFAULT_SOUND_FONT_NAME, AudioResourceType::FluidSoundfont, "Fluid", false /*hasNativeEditor*/ };
+    = { DEFAULT_SOUND_FONT_NAME, AudioResourceType::FluidSoundfont, "Fluid", DEFAULT_AUDIO_RESOURCE_ATTRIBUTES, false /*hasNativeEditor*/ };
 
 void AudioConfiguration::init()
 {
     int defaultBufferSize = 0;
-#ifdef Q_OS_WASM
+#if defined(Q_OS_WASM)
     defaultBufferSize = 8192;
 #else
     defaultBufferSize = 1024;
 #endif
-    settings()->setDefaultValue(AUDIO_BUFFER_SIZE, Val(defaultBufferSize));
+    settings()->setDefaultValue(AUDIO_BUFFER_SIZE_KEY, Val(defaultBufferSize));
+    settings()->valueChanged(AUDIO_BUFFER_SIZE_KEY).onReceive(nullptr, [this](const Val&) {
+        m_driverBufferSizeChanged.notify();
+        updateSamplesToPreallocate();
+    });
 
-    settings()->setDefaultValue(SHOW_CONTROLS_IN_MIXER, Val(true));
     settings()->setDefaultValue(AUDIO_API_KEY, Val("Core Audio"));
+
+    settings()->setDefaultValue(AUDIO_OUTPUT_DEVICE_ID_KEY, Val(DEFAULT_DEVICE_ID));
+    settings()->valueChanged(AUDIO_OUTPUT_DEVICE_ID_KEY).onReceive(nullptr, [this](const Val&) {
+        m_audioOutputDeviceIdChanged.notify();
+    });
+
+    settings()->setDefaultValue(AUDIO_SAMPLE_RATE_KEY, Val(44100));
+    settings()->setCanBeManuallyEdited(AUDIO_SAMPLE_RATE_KEY, false, Val(44100), Val(192000));
+    settings()->valueChanged(AUDIO_SAMPLE_RATE_KEY).onReceive(nullptr, [this](const Val&) {
+        m_driverSampleRateChanged.notify();
+    });
+
+    settings()->setDefaultValue(USER_SOUNDFONTS_PATHS, Val(globalConfiguration()->userDataPath() + "/SoundFonts"));
+    settings()->valueChanged(USER_SOUNDFONTS_PATHS).onReceive(nullptr, [this](const Val&) {
+        m_soundFontDirsChanged.send(soundFontDirectories());
+    });
+
+    for (const auto& path : userSoundFontDirectories()) {
+        fileSystem()->makePath(path);
+    }
+
+    settings()->setDefaultValue(AUDIO_MEASURE_INPUT_LAG, Val(false));
+
+    settings()->setDefaultValue(AUDIO_DESIRED_THREAD_NUMBER_KEY, Val(0));
+
+    updateSamplesToPreallocate();
 }
 
 std::vector<std::string> AudioConfiguration::availableAudioApiList() const
@@ -86,6 +119,21 @@ void AudioConfiguration::setCurrentAudioApi(const std::string& name)
     settings()->setSharedValue(AUDIO_API_KEY, Val(name));
 }
 
+std::string AudioConfiguration::audioOutputDeviceId() const
+{
+    return settings()->value(AUDIO_OUTPUT_DEVICE_ID_KEY).toString();
+}
+
+void AudioConfiguration::setAudioOutputDeviceId(const std::string& deviceId)
+{
+    settings()->setSharedValue(AUDIO_OUTPUT_DEVICE_ID_KEY, Val(deviceId));
+}
+
+async::Notification AudioConfiguration::audioOutputDeviceIdChanged() const
+{
+    return m_audioOutputDeviceIdChanged;
+}
+
 audioch_t AudioConfiguration::audioChannelsCount() const
 {
     return AUDIO_CHANNELS;
@@ -93,35 +141,75 @@ audioch_t AudioConfiguration::audioChannelsCount() const
 
 unsigned int AudioConfiguration::driverBufferSize() const
 {
-    return settings()->value(AUDIO_BUFFER_SIZE).toInt();
+    return settings()->value(AUDIO_BUFFER_SIZE_KEY).toInt();
 }
 
-SoundFontPaths AudioConfiguration::soundFontDirectories() const
+void AudioConfiguration::setDriverBufferSize(unsigned int size)
 {
-    std::string pathsStr = settings()->value(USER_SOUNDFONTS_PATH).toString();
-    SoundFontPaths paths = io::path::pathsFromString(pathsStr, ";");
-    paths.push_back(globalConfiguration()->appDataPath());
-
-    //! TODO Implement me
-    // append extensions directory
-    //QStringList extensionsDir = Ms::Extension::getDirectoriesByType(Ms::Extension::soundfontsDir);
-
-    return paths;
+    settings()->setSharedValue(AUDIO_BUFFER_SIZE_KEY, Val(static_cast<int>(size)));
 }
 
-async::Channel<io::paths> AudioConfiguration::soundFontDirectoriesChanged() const
+async::Notification AudioConfiguration::driverBufferSizeChanged() const
 {
-    return m_soundFontDirsChanged;
+    return m_driverBufferSizeChanged;
 }
 
-bool AudioConfiguration::isShowControlsInMixer() const
+msecs_t AudioConfiguration::audioWorkerInterval(const samples_t samples, const sample_rate_t sampleRate) const
 {
-    return settings()->value(SHOW_CONTROLS_IN_MIXER).toBool();
+    msecs_t interval = float(samples) / 4.f / float(sampleRate) * 1000.f;
+    interval = std::max(interval, msecs_t(1));
+
+    // Found experementaly on a slow laptop (2 core) running on battery power
+    interval = std::min(interval, msecs_t(10));
+
+    return interval;
 }
 
-void AudioConfiguration::setIsShowControlsInMixer(bool show)
+samples_t AudioConfiguration::minSamplesToReserve(RenderMode mode) const
 {
-    settings()->setSharedValue(SHOW_CONTROLS_IN_MIXER, Val(show));
+    // Idle: render as little as possible for lower latency
+    if (mode == RenderMode::IdleMode) {
+        return 128;
+    }
+
+    // Active: render more for better quality (rendering is usually much heavier in this scenario)
+    return 1024;
+}
+
+samples_t AudioConfiguration::samplesToPreallocate() const
+{
+    return m_samplesToPreallocate;
+}
+
+async::Channel<samples_t> AudioConfiguration::samplesToPreallocateChanged() const
+{
+    return m_samplesToPreallocateChanged;
+}
+
+unsigned int AudioConfiguration::sampleRate() const
+{
+    return settings()->value(AUDIO_SAMPLE_RATE_KEY).toInt();
+}
+
+void AudioConfiguration::setSampleRate(unsigned int sampleRate)
+{
+    settings()->setSharedValue(AUDIO_SAMPLE_RATE_KEY, Val(static_cast<int>(sampleRate)));
+}
+
+async::Notification AudioConfiguration::sampleRateChanged() const
+{
+    return m_driverSampleRateChanged;
+}
+
+size_t AudioConfiguration::desiredAudioThreadNumber() const
+{
+    return settings()->value(AUDIO_DESIRED_THREAD_NUMBER_KEY).toInt();
+}
+
+size_t AudioConfiguration::minTrackCountForMultithreading() const
+{
+    // Start mutlithreading-processing only when there are more or equal number of tracks
+    return 2;
 }
 
 AudioInputParams AudioConfiguration::defaultAudioInputParams() const
@@ -132,153 +220,43 @@ AudioInputParams AudioConfiguration::defaultAudioInputParams() const
     return result;
 }
 
-const SynthesizerState& AudioConfiguration::defaultSynthesizerState() const
+SoundFontPaths AudioConfiguration::soundFontDirectories() const
 {
-    static SynthesizerState state;
-    if (state.isNull()) {
-        SynthesizerState::Group gf;
-        gf.name = "Fluid";
-        gf.vals.push_back(SynthesizerState::Val(SynthesizerState::ValID::SoundFontID, DEFAULT_SOUND_FONT_NAME));
-        state.groups.insert({ gf.name, std::move(gf) });
-    }
+    SoundFontPaths paths = userSoundFontDirectories();
+    paths.push_back(globalConfiguration()->appDataPath());
 
-    return state;
+    return paths;
 }
 
-const SynthesizerState& AudioConfiguration::synthesizerState() const
+io::paths_t AudioConfiguration::userSoundFontDirectories() const
 {
-    if (!m_state.isNull()) {
-        return m_state;
-    }
-
-    bool ok = readState(stateFilePath(), m_state);
-    if (!ok) {
-        LOGW() << "failed read synthesizer state, file: " << stateFilePath();
-        m_state = defaultSynthesizerState();
-    }
-
-    return m_state;
+    std::string pathsStr = settings()->value(USER_SOUNDFONTS_PATHS).toString();
+    return io::pathsFromString(pathsStr);
 }
 
-Ret AudioConfiguration::saveSynthesizerState(const SynthesizerState& state)
+void AudioConfiguration::setUserSoundFontDirectories(const io::paths_t& paths)
 {
-    std::list<std::string> changedGroups;
-    for (auto it = m_state.groups.cbegin(); it != m_state.groups.cend(); ++it) {
-        auto nit = state.groups.find(it->first);
-        if (nit == state.groups.cend()) {
-            continue;
-        }
-
-        if (it->second != nit->second) {
-            changedGroups.push_back(it->first);
-        }
-    }
-
-    Ret ret = writeState(stateFilePath(), state);
-    if (!ret) {
-        LOGE() << "failed write synthesizer state, file: " << stateFilePath();
-        return ret;
-    }
-
-    m_state = state;
-    m_synthesizerStateChanged.notify();
-    for (const std::string& gname : changedGroups) {
-        m_synthesizerStateGroupChanged[gname].notify();
-    }
-
-    return make_ret(Ret::Code::Ok);
+    settings()->setSharedValue(USER_SOUNDFONTS_PATHS, Val(io::pathsToString(paths)));
 }
 
-async::Notification AudioConfiguration::synthesizerStateChanged() const
+async::Channel<io::paths_t> AudioConfiguration::soundFontDirectoriesChanged() const
 {
-    return m_synthesizerStateChanged;
+    return m_soundFontDirsChanged;
 }
 
-async::Notification AudioConfiguration::synthesizerStateGroupChanged(const std::string& gname) const
+bool AudioConfiguration::shouldMeasureInputLag() const
 {
-    return m_synthesizerStateGroupChanged[gname];
+    return settings()->value(AUDIO_MEASURE_INPUT_LAG).toBool();
 }
 
-io::path AudioConfiguration::stateFilePath() const
+void AudioConfiguration::updateSamplesToPreallocate()
 {
-    return globalConfiguration()->userAppDataPath() + "/synthesizer.xml";
-}
+    samples_t minToReserve = minSamplesToReserve(RenderMode::RealTimeMode);
+    samples_t driverBufSize = driverBufferSize();
+    samples_t newValue = std::max(minToReserve, driverBufSize);
 
-bool AudioConfiguration::readState(const io::path& path, SynthesizerState& state) const
-{
-    XmlReader xml(path);
-
-    while (xml.canRead() && xml.success()) {
-        XmlReader::TokenType token = xml.readNext();
-        if (token == XmlReader::StartDocument) {
-            continue;
-        }
-
-        if (token == XmlReader::StartElement) {
-            if (xml.tagName() == "Synthesizer") {
-                continue;
-            }
-
-            while (xml.tokenType() != XmlReader::EndElement) {
-                SynthesizerState::Group group;
-                group.name = xml.tagName();
-
-                xml.readNext();
-
-                while (xml.tokenType() != XmlReader::EndElement) {
-                    if (xml.tokenType() == XmlReader::StartElement) {
-                        if (xml.tagName() == "val") {
-                            SynthesizerState::ValID id = static_cast<SynthesizerState::ValID>(xml.intAttribute("id"));
-                            group.vals.push_back(SynthesizerState::Val(id, xml.readString()));
-                        } else {
-                            xml.skipCurrentElement();
-                        }
-                    }
-                    xml.readNext();
-                }
-
-                state.groups.insert({ group.name, std::move(group) });
-            }
-        }
+    if (m_samplesToPreallocate != newValue) {
+        m_samplesToPreallocate = newValue;
+        m_samplesToPreallocateChanged.send(newValue);
     }
-
-    if (!xml.success()) {
-        LOGE() << "failed parse xml, error: " << xml.error() << ", path: " << path;
-    }
-
-    return xml.success();
-}
-
-bool AudioConfiguration::writeState(const io::path& path, const SynthesizerState& state)
-{
-    XmlWriter xml(path);
-    xml.writeStartDocument();
-
-    xml.writeStartElement("Synthesizer");
-
-    for (auto it = state.groups.cbegin(); it != state.groups.cend(); ++it) {
-        const SynthesizerState::Group& group = it->second;
-
-        if (group.name.empty()) {
-            continue;
-        }
-
-        xml.writeStartElement(group.name);
-        for (const SynthesizerState::Val& value : group.vals) {
-            xml.writeStartElement("val");
-            xml.writeAttribute("id", std::to_string(static_cast<int>(value.id)));
-            xml.writeCharacters(value.val);
-            xml.writeEndElement();
-        }
-        xml.writeEndElement();
-    }
-
-    xml.writeEndElement();
-    xml.writeEndDocument();
-
-    if (!xml.success()) {
-        LOGE() << "failed write xml";
-    }
-
-    return xml.success();
 }

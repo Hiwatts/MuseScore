@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,6 +28,7 @@
 
 #include "internal/selectinstrumentscenario.h"
 #include "internal/instrumentsuiactions.h"
+#include "internal/instrumentsactionscontroller.h"
 
 #include "view/instrumentspaneltreemodel.h"
 #include "view/instrumentlistmodel.h"
@@ -41,8 +42,9 @@
 #include "instrumentsscenetypes.h"
 
 using namespace mu::instrumentsscene;
-using namespace mu::modularity;
-using namespace mu::ui;
+using namespace muse;
+using namespace muse::modularity;
+using namespace muse::ui;
 
 static void instrumentsscene_init_qrc()
 {
@@ -56,6 +58,8 @@ std::string InstrumentsSceneModule::moduleName() const
 
 void InstrumentsSceneModule::registerExports()
 {
+    m_actionsController = std::make_shared<InstrumentsActionsController>();
+
     ioc()->registerExport<notation::ISelectInstrumentsScenario>(moduleName(), new SelectInstrumentsScenario());
 }
 
@@ -94,4 +98,13 @@ void InstrumentsSceneModule::registerUiTypes()
     if (uiengine) {
         uiengine->addSourceImportPath(instrumentsscene_QML_IMPORT);
     }
+}
+
+void InstrumentsSceneModule::onInit(const IApplication::RunMode& mode)
+{
+    if (mode != IApplication::RunMode::GuiApp) {
+        return;
+    }
+
+    m_actionsController->init();
 }

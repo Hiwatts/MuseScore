@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<museScore version="4.00">
+<museScore version="4.50">
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
       <pageWidth>8.27</pageWidth>
       <pageHeight>11.69</pageHeight>
       <pagePrintableWidth>7.4826</pagePrintableWidth>
-      <Spatium>1.76389</Spatium>
+      <maskBarlinesForText>0</maskBarlinesForText>
+      <scaleRythmicSpacingForSmallNotes>0</scaleRythmicSpacingForSmallNotes>
+      <spatium>1.76389</spatium>
       </Style>
     <showInvisible>1</showInvisible>
     <showUnprintable>1</showUnprintable>
@@ -20,12 +20,11 @@
     <metaTag name="lyricist"></metaTag>
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle">Stemless</metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -88,7 +87,7 @@
           </Channel>
         </Instrument>
       </Part>
-    <Part>
+    <Part id="2">
       <Staff id="2">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -154,10 +153,11 @@
     <Staff id="1">
       <VBox>
         <height>10</height>
+        <sizeIsSpatiumDependent>1</sizeIsSpatiumDependent>
         <linkedMain/>
         <Text>
           <linkedMain/>
-          <style>Title</style>
+          <style>title</style>
           <text>Stemless</text>
           </Text>
         </VBox>
@@ -233,8 +233,8 @@
       <Measure>
         <voice>
           <Beam>
-            <l1>-4</l1>
-            <l2>-3</l2>
+            <l1>-6</l1>
+            <l2>-4</l2>
             </Beam>
           <Chord>
             <linkedMain/>
@@ -273,8 +273,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>20</l1>
-            <l2>15</l2>
+            <l1>38</l1>
+            <l2>32</l2>
             </Beam>
           <Chord>
             <linkedMain/>
@@ -481,19 +481,17 @@
         </Measure>
       </Staff>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
+      <name>Flute</name>
       <Division>480</Division>
       <Style>
-        <createMultiMeasureRests>1</createMultiMeasureRests>
-        <Spatium>1.74978</Spatium>
+        <spatium>1.74978</spatium>
         </Style>
       <showInvisible>1</showInvisible>
       <showUnprintable>1</showUnprintable>
       <showFrames>1</showFrames>
       <showMargins>0</showMargins>
       <metaTag name="partName">Flute</metaTag>
-      <Part>
+      <Part id="1">
         <Staff id="1">
           <linkedTo>1</linkedTo>
           <StaffType group="pitched">
@@ -560,16 +558,17 @@
       <Staff id="1">
         <VBox>
           <height>10</height>
+          <sizeIsSpatiumDependent>1</sizeIsSpatiumDependent>
           <linked>
             </linked>
           <Text>
             <linked>
               </linked>
-            <style>Title</style>
+            <style>title</style>
             <text>Stemless</text>
             </Text>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Flute</text>
             </Text>
           </VBox>
@@ -658,8 +657,8 @@
         <Measure>
           <voice>
             <Beam>
-              <l1>-4</l1>
-              <l2>-3</l2>
+              <l1>-6</l1>
+              <l2>-4</l2>
               </Beam>
             <Chord>
               <linked>
@@ -706,8 +705,8 @@
                 </Note>
               </Chord>
             <Beam>
-              <l1>20</l1>
-              <l2>15</l2>
+              <l1>38</l1>
+              <l2>32</l2>
               </Beam>
             <Chord>
               <linked>
@@ -766,22 +765,19 @@
             </voice>
           </Measure>
         </Staff>
-      <name>Flute</name>
       </Score>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
+      <name>Oboe</name>
       <Division>480</Division>
       <Style>
-        <createMultiMeasureRests>1</createMultiMeasureRests>
-        <Spatium>1.74978</Spatium>
+        <spatium>1.74978</spatium>
         </Style>
       <showInvisible>1</showInvisible>
       <showUnprintable>1</showUnprintable>
       <showFrames>1</showFrames>
       <showMargins>0</showMargins>
       <metaTag name="partName">Oboe</metaTag>
-      <Part>
+      <Part id="2">
         <Staff id="1">
           <linkedTo>2</linkedTo>
           <StaffType group="pitched">
@@ -848,6 +844,7 @@
       <Staff id="1">
         <VBox>
           <height>10</height>
+          <sizeIsSpatiumDependent>1</sizeIsSpatiumDependent>
           <linked>
             <location>
               <staves>-1</staves>
@@ -859,11 +856,11 @@
                 <staves>-1</staves>
                 </location>
               </linked>
-            <style>Title</style>
+            <style>title</style>
             <text>Stemless</text>
             </Text>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Oboe</text>
             </Text>
           </VBox>
@@ -1052,7 +1049,6 @@
             </voice>
           </Measure>
         </Staff>
-      <name>Oboe</name>
       </Score>
     </Score>
   </museScore>

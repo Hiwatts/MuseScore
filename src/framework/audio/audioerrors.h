@@ -19,12 +19,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_AUDIOERRORS_H
-#define MU_AUDIO_AUDIOERRORS_H
+#ifndef MUSE_AUDIO_AUDIOERRORS_H
+#define MUSE_AUDIO_AUDIOERRORS_H
 
-#include "ret.h"
+#include "global/types/ret.h"
 
-namespace mu::audio {
+namespace muse::audio {
 enum class Err {
     Undefined       = int(Ret::Code::Undefined),
     NoError         = int(Ret::Code::Ok),
@@ -44,21 +44,24 @@ enum class Err {
     NoLoadedSoundFonts = 331,
     SoundFontFailedLoad = 332,
     SoundFontFailedUnload = 333,
-    UndefinedSoundFontFormat = 334,
-    UknownSynthType = 335,
+    UnknownSynthType = 334,
 
-    //common
+    // common
     InvalidTrackId = 340,
     InvalidMixerChannelId = 341,
     InvalidSequenceId = 342,
-    InvalidMidiMapping = 343,
+    InvalidSetupData = 343,
     InvalidAudioSource = 344,
     InvalidAudioFilePath = 345,
     InvalidFxParams = 346,
     InvalidAudioSourceParams = 347,
+    DisabledAudioExport = 348,
+    NoAudioToExport = 349,
+    ErrorEncode = 350,
+    UnknownPluginType = 351,
 
     // clock
-    InvalidTimeLoop = 350,
+    InvalidTimeLoop = 360,
 };
 
 inline Ret make_ret(Err e)
@@ -67,4 +70,4 @@ inline Ret make_ret(Err e)
 }
 }
 
-#endif // MU_AUDIO_AUDIOERRORS_H
+#endif // MUSE_AUDIO_AUDIOERRORS_H

@@ -20,18 +20,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_LIMITER_H
-#define MU_AUDIO_LIMITER_H
+#ifndef MUSE_AUDIO_LIMITER_H
+#define MUSE_AUDIO_LIMITER_H
 
 #include <memory>
 
 #include "envelopefilterconfig.h"
 
-namespace mu::audio::dsp {
+namespace muse::audio::dsp {
 class Limiter
 {
 public:
     Limiter(const unsigned int sampleRate);
+
+    bool isActive() const;
+    void setIsActive(const bool active);
 
     void process(const float& linearRms, float* buffer, const audioch_t& audioChannelsCount, const samples_t samplesPerChannel);
 
@@ -42,9 +45,11 @@ private:
     EnvelopeFilterConfig m_filterConfig;
 
     float m_previousGainReduction = 0.f;
+
+    bool m_isActive = false;
 };
 
 using LimiterPtr = std::unique_ptr<Limiter>;
 }
 
-#endif // MU_AUDIO_LIMITER_H
+#endif // MUSE_AUDIO_LIMITER_H

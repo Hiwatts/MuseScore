@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,17 +20,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "importmidi_swing.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/chordrest.h"
-#include "libmscore/stafftext.h"
-#include "libmscore/engravingitem.h"
-#include "libmscore/segment.h"
-#include "libmscore/measure.h"
-#include "libmscore/staff.h"
-#include "libmscore/tuplet.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/chordrest.h"
+#include "engraving/dom/stafftext.h"
+#include "engraving/dom/engravingitem.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/tuplet.h"
 #include "importmidi_fraction.h"
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace Swing {
 class SwingDetector
 {
@@ -68,7 +70,7 @@ void SwingDetector::add(ChordRest* cr)
             return;
         }
         const int tickInBar = (cr->tick() - cr->measure()->tick()).ticks();
-        if (tickInBar % MScore::division == 0) {
+        if (tickInBar % Constants::DIVISION == 0) {
             append(cr);
         }
     } else {
@@ -154,7 +156,7 @@ void SwingDetector::applySwing()
 
     Tuplet* tuplet = nullptr;
     for (ChordRest* el: elements) {
-        el->setDurationType(TDuration::DurationType::V_EIGHTH);
+        el->setDurationType(DurationType::V_EIGHTH);
         el->setTicks(Fraction(1, 8));
         el->setDots(0);
         if (el->tuplet()) {
@@ -170,7 +172,7 @@ void SwingDetector::applySwing()
     const int startTick = first->segment()->tick().ticks();
     ChordRest* last = elements.back();
     last->segment()->remove(last);
-    Segment* s = last->measure()->getSegment(SegmentType::ChordRest, Fraction::fromTicks(startTick + MScore::division / 2));
+    Segment* s = last->measure()->getSegment(SegmentType::ChordRest, Fraction::fromTicks(startTick + Constants::DIVISION / 2));
     s->add(last);
 
     if (elements.size() == 3) {
@@ -231,12 +233,12 @@ QString swingCaption(MidiOperations::Swing swingType)
 void detectSwing(Staff* staff, MidiOperations::Swing swingType)
 {
     Score* score = staff->score();
-    const int strack = staff->idx() * VOICES;
+    const track_idx_t strack = staff->idx() * VOICES;
     SwingDetector swingDetector(swingType);
 
     for (Segment* seg = score->firstSegment(SegmentType::ChordRest); seg;
          seg = seg->next1(SegmentType::ChordRest)) {
-        for (int voice = 0; voice < VOICES; ++voice) {
+        for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
             ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
             if (!cr) {
                 continue;
@@ -247,7 +249,7 @@ void detectSwing(Staff* staff, MidiOperations::Swing swingType)
     if (swingDetector.wasSwingApplied()) {
         // add swing label to the score
         Segment* seg = score->firstSegment(SegmentType::ChordRest);
-        StaffText* st = new StaffText(seg, Tid::STAFF);
+        StaffText* st = new StaffText(seg, TextStyleType::STAFF);
         st->setPlainText(swingCaption(swingType));
         st->setParent(seg);
         st->setTrack(strack);       // voice == 0
@@ -255,4 +257,4 @@ void detectSwing(Staff* staff, MidiOperations::Swing swingType)
     }
 }
 } // namespace Swing
-} // namespace Ms
+} // namespace mu::iex::midi

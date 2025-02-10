@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,96 +22,56 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+
+import "../../shared"
 
 Row {
     id: root
 
-    property alias colors: view.model
-    property alias currentColorIndex: view.currentIndex
+    property alias colors: colorsList.colors
+    property alias currentColorIndex: colorsList.currentColorIndex
 
     property NavigationPanel navigation: NavigationPanel {
         name: titleLabel.text
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
         accessible.name: titleLabel.text
-        enabled: root.visible
 
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
         }
     }
 
-    property int firstColumnWidth: 0
+    property int columnWidth: 0
 
     signal accentColorChangeRequested(var newColorIndex)
 
-    height: 36
-    spacing: 0
+    height: colorsList.height
+    spacing: 12
 
     StyledTextLabel {
         id: titleLabel
-        width: root.firstColumnWidth
+        width: root.columnWidth
 
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Qt.AlignLeft
 
-        text: qsTrc("appshell", "Accent colour:")
+        text: qsTrc("appshell/preferences", "Accent color:")
     }
 
-    RadioButtonGroup {
-        id: view
+    AccentColorsList {
+        id: colorsList
 
-        spacing: 10
+        navigationPanel: root.navigation
 
-        delegate: RoundedRadioButton {
-            id: button
+        sampleSize: 30
 
-            width: 36
-            height: width
-
-            checked: view.currentIndex === model.index
-
-            property color accentColor: modelData
-
-            navigation.name: "AccentColourButton"
-            navigation.panel: root.navigation
-            navigation.column: model.index
-            navigation.accessible.name: Utils.colorToString(accentColor)
-
-            onToggled: {
-                root.accentColorChangeRequested(model.index)
-            }
-
-            indicator: Rectangle {
-                anchors.fill: parent
-
-                radius: width / 2
-
-                border.color: ui.theme.fontPrimaryColor
-                border.width: parent.checked ? 1 : 0
-
-                color: "transparent"
-
-                NavigationFocusBorder { navigationCtrl: button.navigation }
-
-                Rectangle {
-                    anchors.centerIn: parent
-
-                    width: 30
-                    height: width
-                    radius: width / 2
-
-                    border.color: ui.theme.strokeColor
-                    border.width: 1
-
-                    color: button.accentColor
-                }
-            }
-
-            background: Item {}
+        onAccentColorChangeRequested: function(newColorIndex) {
+            root.accentColorChangeRequested(newColorIndex)
         }
     }
 }

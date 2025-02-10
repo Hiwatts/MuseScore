@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,28 +32,35 @@
 #include "async/asyncable.h"
 #include "actions/iactionsdispatcher.h"
 #include "actions/actionable.h"
+#include "shortcuts/ishortcutsregister.h"
+#include "iinteractive.h"
 
-namespace mu::uicomponents {
+Q_MOC_INCLUDE(< QItemSelectionModel >)
+
+namespace muse::uicomponents {
 class ItemMultiSelectionModel;
 }
 
 class QItemSelectionModel;
 
 namespace mu::instrumentsscene {
-class InstrumentsPanelTreeModel : public QAbstractItemModel, public async::Asyncable, public actions::Actionable
+class InstrumentsPanelTreeModel : public QAbstractItemModel, public muse::async::Asyncable, public muse::actions::Actionable
 {
     Q_OBJECT
 
-    INJECT(instruments, context::IGlobalContext, context)
-    INJECT(instruments, notation::ISelectInstrumentsScenario, selectInstrumentsScenario)
-    INJECT(instruments, actions::IActionsDispatcher, dispatcher)
+    INJECT(context::IGlobalContext, context)
+    INJECT(notation::ISelectInstrumentsScenario, selectInstrumentsScenario)
+    INJECT(muse::actions::IActionsDispatcher, dispatcher)
+    INJECT(muse::shortcuts::IShortcutsRegister, shortcutsRegister)
+    INJECT(muse::IInteractive, interactive)
 
-    Q_PROPERTY(QItemSelectionModel * selectionModel READ selectionModel NOTIFY selectionChanged)
     Q_PROPERTY(bool isMovingUpAvailable READ isMovingUpAvailable NOTIFY isMovingUpAvailableChanged)
     Q_PROPERTY(bool isMovingDownAvailable READ isMovingDownAvailable NOTIFY isMovingDownAvailableChanged)
     Q_PROPERTY(bool isRemovingAvailable READ isRemovingAvailable NOTIFY isRemovingAvailableChanged)
     Q_PROPERTY(bool isAddingAvailable READ isAddingAvailable NOTIFY isAddingAvailableChanged)
     Q_PROPERTY(bool isEmpty READ isEmpty NOTIFY isEmptyChanged)
+    Q_PROPERTY(QString addInstrumentsKeyboardShortcut READ addInstrumentsKeyboardShortcut NOTIFY addInstrumentsKeyboardShortcutChanged)
+    Q_PROPERTY(bool isInstrumentSelected READ isInstrumentSelected NOTIFY isInstrumentSelectedChanged)
 
 public:
     explicit InstrumentsPanelTreeModel(QObject* parent = nullptr);
@@ -66,54 +73,68 @@ public:
     QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    QItemSelectionModel* selectionModel() const;
     bool isMovingUpAvailable() const;
     bool isMovingDownAvailable() const;
     bool isRemovingAvailable() const;
     bool isAddingAvailable() const;
     bool isEmpty() const;
+    QString addInstrumentsKeyboardShortcut() const;
+    bool isInstrumentSelected() const;
 
     Q_INVOKABLE void load();
+    Q_INVOKABLE void setInstrumentsPanelVisible(bool visible);
     Q_INVOKABLE void selectRow(const QModelIndex& rowIndex);
-    Q_INVOKABLE bool isSelected(const QModelIndex& rowIndex) const;
+    Q_INVOKABLE void clearSelection();
     Q_INVOKABLE void addInstruments();
     Q_INVOKABLE void moveSelectedRowsUp();
     Q_INVOKABLE void moveSelectedRowsDown();
     Q_INVOKABLE void removeSelectedRows();
+    Q_INVOKABLE void toggleVisibilityOfSelectedRows(bool visible);
+
+    Q_INVOKABLE void startActiveDrag();
+    Q_INVOKABLE void endActiveDrag();
 
     Q_INVOKABLE bool moveRows(const QModelIndex& sourceParent, int sourceRow, int count, const QModelIndex& destinationParent,
                               int destinationChild) override;
 
+    Q_INVOKABLE QItemSelectionModel* selectionModel() const;
+
 signals:
-    void selectionChanged();
     void isMovingUpAvailableChanged(bool isMovingUpAvailable);
     void isMovingDownAvailableChanged(bool isMovingDownAvailable);
     void isAddingAvailableChanged(bool isAddingAvailable);
     void isRemovingAvailableChanged(bool isRemovingAvailable);
     void isEmptyChanged();
+    void addInstrumentsKeyboardShortcutChanged();
+    void isInstrumentSelectedChanged(bool isInstrumentSelected);
 
 private slots:
     void updateRearrangementAvailability();
     void updateMovingUpAvailability(bool isSelectionMovable, const QModelIndex& firstSelectedRowIndex = QModelIndex());
     void updateMovingDownAvailability(bool isSelectionMovable, const QModelIndex& lastSelectedRowIndex = QModelIndex());
     void updateRemovingAvailability();
+    void updateIsInstrumentSelected();
 
 private:
-    bool canReceiveAction(const actions::ActionCode&) const override;
     bool removeRows(int row, int count, const QModelIndex& parent) override;
 
     enum RoleNames {
         ItemRole = Qt::UserRole + 1
     };
 
+    void onMasterNotationChanged();
+    void onNotationChanged();
+
     void initPartOrders();
     void onBeforeChangeNotation();
+    void setLoadingBlocked(bool blocked);
 
     void sortParts(notation::PartList& parts);
 
     void setupPartsConnections();
-    void setupStavesConnections(const ID& stavesPartId);
-    void listenSelectionChanged();
+    void setupStavesConnections(const muse::ID& stavesPartId);
+    void listenNotationSelectionChanged();
+    void updateSelectedRows();
 
     void clear();
     void deleteItems();
@@ -121,26 +142,39 @@ private:
     void setIsMovingUpAvailable(bool isMovingUpAvailable);
     void setIsMovingDownAvailable(bool isMovingDownAvailable);
     void setIsRemovingAvailable(bool isRemovingAvailable);
+    void setIsInstrumentSelected(bool isInstrumentSelected);
+
+    void setItemsSelected(const QModelIndexList& indexes, bool selected);
+
+    bool warnAboutRemovingInstrumentsIfNecessary(int count);
 
     AbstractInstrumentsPanelTreeItem* loadMasterPart(const notation::Part* masterPart);
     AbstractInstrumentsPanelTreeItem* buildPartItem(const mu::notation::Part* masterPart);
     AbstractInstrumentsPanelTreeItem* buildMasterStaffItem(const mu::notation::Staff* masterStaff, QObject* parent);
-    AbstractInstrumentsPanelTreeItem* buildAddStaffControlItem(const ID& partId, QObject* parent);
+    AbstractInstrumentsPanelTreeItem* buildAddStaffControlItem(const muse::ID& partId, QObject* parent);
     AbstractInstrumentsPanelTreeItem* modelIndexToItem(const QModelIndex& index) const;
 
     bool m_isMovingUpAvailable = false;
     bool m_isMovingDownAvailable = false;
     bool m_isRemovingAvailable = false;
+    bool m_isInstrumentSelected = false;
     bool m_isLoadingBlocked = false;
+    bool m_notationChangedWhileLoadingWasBlocked = false;
 
     AbstractInstrumentsPanelTreeItem* m_rootItem = nullptr;
-    uicomponents::ItemMultiSelectionModel* m_selectionModel = nullptr;
+    muse::uicomponents::ItemMultiSelectionModel* m_selectionModel = nullptr;
     mu::notation::IMasterNotationPtr m_masterNotation = nullptr;
     mu::notation::INotationPtr m_notation = nullptr;
-    std::shared_ptr<async::Asyncable> m_partsNotifyReceiver = nullptr;
+    std::shared_ptr<muse::async::Asyncable> m_partsNotifyReceiver = nullptr;
 
     using NotationKey = QString;
-    QHash<NotationKey, QList<ID> > m_sortedPartIdList;
+    QHash<NotationKey, QList<muse::ID> > m_sortedPartIdList;
+
+    bool m_instrumentsPanelVisible = true;
+
+    bool m_dragInProgress = false;
+    bool m_activeDragIsStave = false;
+    MoveParams m_activeDragMoveParams;
 };
 }
 

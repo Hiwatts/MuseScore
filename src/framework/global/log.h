@@ -20,33 +20,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_FRAMEWORK_LOG_H
-#define MU_FRAMEWORK_LOG_H
+#ifndef MUSE_GLOBAL_LOG_H
+#define MUSE_GLOBAL_LOG_H
 
-#include "thirdparty/haw_profiler/src/profiler.h"
+#include <cstdlib> // IWYU pragma: export
+#include <cassert> // IWYU pragma: export
 
-#ifndef HAW_LOGGER_QT_SUPPORT
-#define HAW_LOGGER_QT_SUPPORT
+#include "profiler.h" // IWYU pragma: export
+#include "logger.h" // IWYU pragma: export
+
+#undef FALLTHROUGH
+
+#if __has_cpp_attribute(fallthrough)
+#define MU_FALLTHROUGH() [[fallthrough]]
+#else
+#define MU_FALLTHROUGH() (void)0
 #endif
-#include "thirdparty/haw_logger/logger/log_base.h"
 
-#define IF_ASSERT_FAILED_X(cond, msg) if (!(cond)) { \
-        LOGE() << "\"ASSERT FAILED!\":" << msg << __FILE__ << __LINE__; \
-        Q_ASSERT(cond); \
-} \
-    if (!(cond)) \
-
-#define IF_ASSERT_FAILED(cond) IF_ASSERT_FAILED_X(cond, #cond)
-
-#define IF_FAILED(cond) if (!(cond)) { \
-        LOGE() << "\"FAILED!\":" << #cond << __FILE__ << __LINE__; \
-} \
-    if (!(cond)) \
-
-#define UNUSED(x) (void)x;
-
-#define UNREACHABLE \
-    LOGE() << "\"UNREACHABLE!\":" << __FILE__ << __LINE__; \
-    Q_ASSERT_X(false, "UNREACHABLE", "UNREACHABLE was reached"); \
-
-#endif // MU_FRAMEWORK_LOG_H
+#endif // MUSE_GLOBAL_LOG_H

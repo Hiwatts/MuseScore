@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,8 +23,8 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 import "../../common"
 
@@ -52,21 +52,19 @@ Column {
         titleText: qsTrc("inspector", "Style")
         propertyItem: root.barlineSettingsModel ? root.barlineSettingsModel.type : null
 
+        navigationName: "Style"
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart
 
         model: [
-            { text: qsTrc("symUserNames", "Single barline"), value: BarlineTypes.TYPE_NORMAL },
-            { text: qsTrc("symUserNames", "Double barline"), value: BarlineTypes.TYPE_DOUBLE },
-            { text: qsTrc("symUserNames", "Left (start) repeat sign"), value: BarlineTypes.TYPE_START_REPEAT },
-            { text: qsTrc("symUserNames", "Right (end) repeat sign"), value: BarlineTypes.TYPE_END_REPEAT },
-            { text: qsTrc("symUserNames", "Right and left repeat sign"), value: BarlineTypes.TYPE_END_START_REPEAT },
-            { text: qsTrc("symUserNames", "Dashed barline"), value: BarlineTypes.TYPE_DASHED },
-            { text: qsTrc("symUserNames", "Final barline"), value: BarlineTypes.TYPE_FINAL },
-            { text: qsTrc("symUserNames", "Dotted barline"), value: BarlineTypes.TYPE_DOTTED },
-            { text: qsTrc("symUserNames", "Reverse final barline"), value: BarlineTypes.TYPE_REVERSE_END },
-            { text: qsTrc("symUserNames", "Heavy barline"), value: BarlineTypes.TYPE_HEAVY },
-            { text: qsTrc("symUserNames", "Heavy double barline"), value: BarlineTypes.TYPE_DOUBLE_HEAVY },
+            { text: qsTrc("inspector", "Single barline"), value: BarlineTypes.TYPE_NORMAL },
+            { text: qsTrc("inspector", "Double barline"), value: BarlineTypes.TYPE_DOUBLE },
+            { text: qsTrc("inspector", "Dashed barline"), value: BarlineTypes.TYPE_DASHED },
+            { text: qsTrc("inspector", "Final barline"), value: BarlineTypes.TYPE_FINAL },
+            { text: qsTrc("inspector", "Dotted barline"), value: BarlineTypes.TYPE_DOTTED },
+            { text: qsTrc("inspector", "Reverse final barline"), value: BarlineTypes.TYPE_REVERSE_END },
+            { text: qsTrc("inspector", "Heavy barline"), value: BarlineTypes.TYPE_HEAVY },
+            { text: qsTrc("inspector", "Heavy double barline"), value: BarlineTypes.TYPE_DOUBLE_HEAVY },
         ]
     }
 
@@ -77,6 +75,7 @@ Column {
 
         visible: root.barlineSettingsModel && root.barlineSettingsModel.isRepeatStyleChangingAllowed
 
+        navigationName: "RepeatStyle"
         navigationPanel: root.navigationPanel
         navigationRowStart: styleSection.navigationRowEnd + 1
 
@@ -86,28 +85,18 @@ Column {
         ]
     }
 
-    CheckBox {
+    PropertyCheckBox {
         id: spanToNextStaffCheckBox
-
-        isIndeterminate: root.barlineSettingsModel ? root.barlineSettingsModel.isSpanToNextStaff.isUndefined : false
-        checked: root.barlineSettingsModel && !isIndeterminate ? root.barlineSettingsModel.isSpanToNextStaff.value : false
-        text: qsTrc("inspector", "Span to next staff")
 
         navigation.name: "SpanToStaffCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: repeatStyleSection.navigationRowEnd + 1
-        navigation.enabled: root.enabled
 
-        onClicked: {
-            if (root.barlineSettingsModel) {
-                root.barlineSettingsModel.isSpanToNextStaff.value = !checked
-            }
-        }
+        text: qsTrc("inspector", "Span to next staff")
+        propertyItem: root.barlineSettingsModel ? root.barlineSettingsModel.isSpanToNextStaff : null
     }
 
-    SeparatorLine {
-        anchors.margins: -10
-    }
+    SeparatorLine { anchors.margins: -12 }
 
     Item {
         height: childrenRect.height
@@ -122,6 +111,12 @@ Column {
             titleText: qsTrc("inspector", "Span from")
             propertyItem: root.barlineSettingsModel ? root.barlineSettingsModel.spanFrom : null
 
+            decimals: 0
+            step: 1
+            minValue: -4
+            maxValue: 99
+
+            navigationName: "SpanFrom"
             navigationPanel: root.navigationPanel
             navigationRowStart: spanToNextStaffCheckBox.navigation.row + 1
         }
@@ -135,32 +130,31 @@ Column {
             titleText: qsTrc("inspector", "Span to")
             propertyItem: root.barlineSettingsModel ? root.barlineSettingsModel.spanTo : null
 
+            decimals: 0
+            step: 1
+            minValue: -99
+            maxValue: 99
+
+            navigationName: "SpanTo"
             navigationPanel: root.navigationPanel
             navigationRowStart: spanFrom.navigationRowEnd + 1
         }
     }
 
     FlatButton {
-        id: applyToAllStaffsButton
+        id: setAsStaffDefaultButton
         width: parent.width
 
-        text: qsTrc("inspector", "Apply to all staffs")
+        text: qsTrc("inspector", "Set as staff default")
 
         enabled: root.barlineSettingsModel
-                 && !root.barlineSettingsModel.spanFrom.isUndefined
-                 && !root.barlineSettingsModel.spanTo.isUndefined
 
-        navigation.name: "ApplyToAllStaffs"
+        navigation.name: "SetAsStaffDefault"
         navigation.panel: root.navigationPanel
         navigation.row: spanTo.navigationRowEnd + 1
 
         onClicked: {
-            if (!root.staffSettingsModel || !root.barlineSettingsModel) {
-                return
-            }
-
-            root.staffSettingsModel.barlinesSpanFrom.value = barlineSettingsModel.spanFrom.currentValue
-            root.staffSettingsModel.barlinesSpanTo.value = barlineSettingsModel.spanTo.currentValue
+            root.barlineSettingsModel.setSpanIntervalAsStaffDefault()
         }
     }
 
@@ -173,7 +167,9 @@ Column {
 
         StyledTextLabel {
             id: spanPresetsLabel
+            width: parent.width
             text: qsTrc("inspector", "Span presets")
+            horizontalAlignment: Text.AlignLeft
         }
 
         RowLayout {
@@ -186,7 +182,7 @@ Column {
 
                 navigation.name: "Default"
                 navigation.panel: root.navigationPanel
-                navigation.row: applyToAllStaffsButton.navigation.row + 1
+                navigation.row: setAsStaffDefaultButton.navigation.row + 1
                 navigation.accessible.name: spanPresetsLabel.text + " " + text
 
                 onClicked: { root.barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_DEFAULT) }
@@ -198,7 +194,7 @@ Column {
 
                 navigation.name: "Tick1"
                 navigation.panel: root.navigationPanel
-                navigation.row: applyToAllStaffsButton.navigation.row + 2
+                navigation.row: setAsStaffDefaultButton.navigation.row + 2
                 navigation.accessible.name: spanPresetsLabel.text + " " + text
 
                 onClicked: { root.barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_TICK_1) }
@@ -210,7 +206,7 @@ Column {
 
                 navigation.name: "Tick2"
                 navigation.panel: root.navigationPanel
-                navigation.row: applyToAllStaffsButton.navigation.row + 3
+                navigation.row: setAsStaffDefaultButton.navigation.row + 3
                 navigation.accessible.name: spanPresetsLabel.text + " " + text
 
                 onClicked: { root.barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_TICK_2) }
@@ -227,7 +223,7 @@ Column {
 
                 navigation.name: "Short1"
                 navigation.panel: root.navigationPanel
-                navigation.row: applyToAllStaffsButton.navigation.row + 4
+                navigation.row: setAsStaffDefaultButton.navigation.row + 4
                 navigation.accessible.name: spanPresetsLabel.text + " " + text
 
                 onClicked: { root.barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_SHORT_1) }
@@ -239,7 +235,7 @@ Column {
 
                 navigation.name: "Short2"
                 navigation.panel: root.navigationPanel
-                navigation.row: applyToAllStaffsButton.navigation.row + 5
+                navigation.row: setAsStaffDefaultButton.navigation.row + 5
                 navigation.accessible.name: spanPresetsLabel.text + " " + text
 
                 onClicked: { root.barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_SHORT_2) }

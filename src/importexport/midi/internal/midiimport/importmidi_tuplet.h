@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,12 +24,15 @@
 
 #include "importmidi_fraction.h"
 
-namespace Ms {
+namespace mu::engraving {
+class TimeSigMap;
+class DurationElement;
+}
+
+namespace mu::iex::midi {
 class MidiChord;
 class MidiNote;
-class TimeSigMap;
 class MTrack;
-class DurationElement;
 
 namespace MidiTuplet {
 struct TupletInfo;
@@ -40,7 +43,7 @@ struct TupletData
     ReducedFraction onTime;
     ReducedFraction len;
     int tupletNumber;
-    std::vector<DurationElement*> elements;
+    std::vector<engraving::DurationElement*> elements;
 };
 
 struct TupletLimits
@@ -101,8 +104,8 @@ findTupletContainingTime(int voice, const ReducedFraction& time, const std::mult
 // Find tuplets and set bar indexes
 
 void findAllTuplets(
-    std::multimap<ReducedFraction, TupletData>& tuplets, std::multimap<ReducedFraction, MidiChord>& chords, const TimeSigMap* sigmap,
-    const ReducedFraction& basicQuant);
+    std::multimap<ReducedFraction, TupletData>& tuplets, std::multimap<ReducedFraction, MidiChord>& chords,
+    const engraving::TimeSigMap* sigmap, const ReducedFraction& basicQuant);
 
 ReducedFraction findOnTimeBetweenChords(
     const std::pair<const ReducedFraction, MidiChord>& chord, const std::multimap<ReducedFraction, MidiChord>& chords,
@@ -125,6 +128,6 @@ bool areAllTupletsDifferent(const std::multimap<ReducedFraction, TupletData>& tu
 
 #endif
 } // namespace MidiTuplet
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_TUPLET_H

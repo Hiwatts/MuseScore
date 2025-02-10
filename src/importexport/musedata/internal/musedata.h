@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,16 +23,19 @@
 #ifndef __MUSEDATA_H__
 #define __MUSEDATA_H__
 
-#include "libmscore/fraction.h"
+#include "engraving/types/fraction.h"
 
-namespace Ms {
+namespace mu::engraving {
+class EngravingItem;
 class Staff;
 class Part;
 class Score;
 class ChordRest;
 class Measure;
 class Slur;
+}
 
+namespace mu::iex::musedata {
 //---------------------------------------------------------
 //   MuseData
 //    used importing Musedata files
@@ -41,29 +44,29 @@ class Slur;
 class MuseData
 {
     int _division;
-    Fraction curTick;
+    engraving::Fraction curTick;
     QList<QStringList> parts;
-    Score* score;
-    ChordRest* chordRest;
+    engraving::Score* score;
+    engraving::ChordRest* chordRest;
     int ntuplet;
-    Measure* measure;
+    engraving::Measure* measure;
     int voice;
-    Slur* slur[4];
+    engraving::Slur* slur[4];
 
-    void musicalAttribute(QString s, Part*);
-    void readPart(QStringList sl, Part*);
-    void readNote(Part*, const QString& s);
-    void readChord(Part*, const QString& s);
-    void readRest(Part*, const QString& s);
-    void readBackup(const QString& s);
-    Measure* createMeasure();
+    void musicalAttribute(QStringView s, engraving::Part*);
+    void readPart(const QStringList& sl, engraving::Part*);
+    void readNote(engraving::Part*, QStringView s);
+    void readChord(engraving::Part*, QStringView s);
+    void readRest(engraving::Part*, QStringView s);
+    void readBackup(QStringView s);
+    engraving::Measure* createMeasure();
     int countStaves(const QStringList& sl);
-    void openSlur(int idx, const Fraction& tick, Staff* staff, int voice);
-    void closeSlur(int idx, const Fraction& tick, Staff* staff, int voice);
-    QString diacritical(QString);
+    void openSlur(int idx, const engraving::Fraction& tick, engraving::Staff* staff, int voice, mu::engraving::EngravingItem* startChord);
+    void closeSlur(int idx, const engraving::Fraction& tick, engraving::Staff* staff, int voice, engraving::EngravingItem* endChord);
+    QString diacritical(QStringView);
 
 public:
-    MuseData(Score* s) { score = s; }
+    MuseData(engraving::Score* s) { score = s; }
     bool read(const QString&);
     void convert();
 };

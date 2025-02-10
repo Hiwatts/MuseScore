@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,33 +21,37 @@
  */
 #include "paletteworkspacesetup.h"
 
-#include <QBuffer>
+#include "io/buffer.h"
 
-#include "paletteprovider.h"
 #include "palettecreator.h"
+#include "../palettetypes.h"
 
-#include "engraving/infrastructure/io/xml.h"
+#include "engraving/rw/xmlreader.h"
+#include "engraving/rw/xmlwriter.h"
 
 #include "log.h"
 
+using namespace mu;
 using namespace mu::palette;
-using namespace mu::workspace;
+using namespace muse;
+using namespace muse::io;
+using namespace muse::workspace;
 
-static const QString PALETTE_XML_TAG("PaletteBox");
+static const AsciiStringView PALETTE_XML_TAG("PaletteBox");
 
-static PaletteTreePtr readPalette(const QByteArray& data)
+static PaletteTreePtr readPalette(const ByteArray& data)
 {
-    QBuffer buf;
-    buf.setData(data);
-    buf.open(QIODevice::ReadOnly);
-    Ms::XmlReader reader(&buf);
+    ByteArray ba = ByteArray::fromRawData(data.constData(), data.size());
+    Buffer buf(&ba);
+    buf.open(IODevice::ReadOnly);
+    mu::engraving::XmlReader reader(&buf);
 
     while (!reader.atEnd()) {
         reader.readNextStartElement();
 
         if (reader.name() == PALETTE_XML_TAG) {
             PaletteTreePtr tree = std::make_shared<PaletteTree>();
-            tree->read(reader);
+            tree->read(reader, false);
             return tree;
         }
     }
@@ -57,10 +61,11 @@ static PaletteTreePtr readPalette(const QByteArray& data)
 
 static void writePalette(const PaletteTreePtr& tree, QByteArray& data)
 {
-    QBuffer buf(&data);
-    buf.open(QIODevice::WriteOnly);
-    Ms::XmlWriter writer(nullptr, &buf);
-    tree->write(writer);
+    Buffer buf;
+    buf.open(IODevice::WriteOnly);
+    mu::engraving::XmlWriter writer(&buf);
+    tree->write(writer, false);
+    data = buf.data().toQByteArray();
 }
 
 void PaletteWorkspaceSetup::setup()
@@ -69,27 +74,28 @@ void PaletteWorkspaceSetup::setup()
         return;
     }
 
+    paletteProvider()->setDefaultPaletteTree(PaletteCreator::newDefaultPaletteTree());
+
     paletteProvider()->userPaletteTreeChanged().onNotify(this, [this]() {
         PaletteTreePtr tree = paletteProvider()->userPaletteTree();
 
         QByteArray newData;
         writePalette(tree, newData);
 
-        workspacesDataProvider()->setRawData(DataKey::Palettes, newData);
+        workspacesDataProvider()->setRawData(WS_Palettes, newData);
     });
 
     auto loadData = [this]() {
-        RetVal<QByteArray> data = workspacesDataProvider()->rawData(DataKey::Palettes);
+        RetVal<QByteArray> data = workspacesDataProvider()->rawData(WS_Palettes);
         PaletteTreePtr tree;
-        if (data.ret) {
+        if (data.ret && !data.val.isEmpty()) {
             LOGD() << "there is palette data in the workspace, we will use it";
-            tree = readPalette(data.val);
+            ByteArray ba = ByteArray::fromQByteArrayNoCopy(data.val);
+            tree = readPalette(ba);
         } else {
             LOGD() << "no palette data in workspace, will use default";
             tree = PaletteCreator::newDefaultPaletteTree();
         }
-
-        paletteProvider()->setDefaultPaletteTree(tree);
         paletteProvider()->setUserPaletteTree(tree);
     };
 

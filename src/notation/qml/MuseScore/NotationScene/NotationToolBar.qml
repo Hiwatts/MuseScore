@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,77 +20,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import MuseScore.Ui 1.0
+
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+
 import MuseScore.NotationScene 1.0
-import MuseScore.UiComponents 1.0
 
-Rectangle {
-    id: root
+StyledToolBarView {
+    navigationPanel.name: "NotationToolBar"
+    navigationPanel.accessible.name: qsTrc("notation", "Notation toolbar")
 
-    property alias navigation: keynavSub
+    spacing: 2
 
-    signal activeFocusRequested()
-
-    color: ui.theme.backgroundPrimaryColor
-
-    Component.onCompleted: {
-        toolbarModel.load()
-    }
-
-    NavigationPanel {
-        id: keynavSub
-        name: "NotationToolBar"
-        enabled: root.enabled && root.visible
-        accessible.name: qsTrc("notation", "Notation toolbar")
-        onActiveChanged: {
-            if (active) {
-                root.activeFocusRequested()
-                root.forceActiveFocus()
-            }
-        }
-    }
-
-    NotationToolBarModel {
-        id: toolbarModel
-    }
-
-    ListView {
-        id: view
-
-        anchors.verticalCenter: parent.verticalCenter
-
-        width: contentWidth
-        height: contentItem.childrenRect.height
-
-        orientation: Qt.Horizontal
-        interactive: false
-        spacing: 2
-
-        model: toolbarModel
-
-        delegate: FlatButton {
-            text: model.title
-            icon: model.icon
-            iconFont: ui.theme.toolbarIconsFont
-
-            toolTipTitle: model.title
-            toolTipDescription: model.description
-            toolTipShortcut: model.shortcut
-
-            enabled: model.enabled
-            textFont: ui.theme.tabFont
-
-            navigation.panel: keynavSub
-            navigation.name: model.title
-            navigation.order: model.index
-            navigation.enabled: model.enabled
-
-            transparent: true
-            orientation: Qt.Horizontal
-
-            onClicked: {
-                toolbarModel.handleAction(model.code)
-            }
-        }
-    }
+    model: NotationToolBarModel { }
 }

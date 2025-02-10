@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,8 +23,8 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 Item {
@@ -33,34 +33,30 @@ Item {
     property alias genres: genreBox.model
     property alias groups: groupsView.model
 
-    property alias currentGenreIndex: genreBox.currentIndex
-    property alias currentGroupIndex: groupsView.currentIndex
+    property int currentGenreIndex: -1
+    property int currentGroupIndex: -1
 
-    property alias navigation: navPanel
+    property alias navigation: groupsView.navigation
 
     signal genreSelected(int newIndex)
     signal groupSelected(int newIndex)
 
-    function focusGroup(groupIndex) {
+    function scrollToGroup(groupIndex) {
         groupsView.positionViewAtIndex(groupIndex, ListView.Beginning)
     }
 
-    QtObject {
-        id: prv
-
-        property var currentItemNavigationIndex: []
+    function focusOnFirst() {
+        if (root.currentGroupIndex !== -1) {
+            focusGroupNavigation(root.currentGroupIndex)
+        } else {
+            root.groupSelected(0)
+        }
     }
 
-    NavigationPanel {
-        id: navPanel
-        name: "FamilyView"
-        direction: NavigationPanel.Vertical
-        enabled: root.visible
-
-        onNavigationEvent: {
-            if (event.type === NavigationEvent.AboutActive) {
-                event.setData("controlIndex", prv.currentItemNavigationIndex)
-            }
+    function focusGroupNavigation(groupIndex: int) {
+        var item = groupsView.itemAtIndex(groupIndex)
+        if (item && item.navigation) {
+            item.navigation.requestActive()
         }
     }
 
@@ -74,7 +70,7 @@ Item {
         text: qsTrc("instruments", "Family")
     }
 
-    Dropdown {
+    StyledDropdown {
         id: genreBox
 
         anchors.top: titleLabel.bottom
@@ -83,16 +79,17 @@ Item {
         anchors.right: parent.right
 
         navigation.name: "genreBox"
-        navigation.panel: navPanel
+        navigation.panel: groupsView.navigation
         navigation.row: 1
 
-        onActivated: {
-            prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-            root.genreSelected(genreBox.currentIndex)
+        currentIndex: root.currentGenreIndex
+
+        onActivated: function(index, value) {
+            root.genreSelected(index)
         }
     }
 
-    ListView {
+    StyledListView {
         id: groupsView
 
         anchors.top: genreBox.bottom
@@ -101,29 +98,24 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        boundsBehavior: ListView.StopAtBounds
-        clip: true
+        accessible.name: titleLabel.text
 
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
+        onModelChanged: {
+            groupsView.currentIndex = Qt.binding(() => (root.currentGroupIndex))
         }
 
         delegate: ListItemBlank {
             id: item
 
+            property string groupName: modelData
+
             isSelected: groupsView.currentIndex === model.index
 
             navigation.name: modelData
-            navigation.panel: navPanel
+            navigation.panel: groupsView.navigation
             navigation.row: 2 + model.index
             navigation.accessible.name: itemTitleLabel.text
-
-            onNavigationActived: {
-                prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-                item.clicked(null)
-            }
+            navigation.accessible.row: model.index
 
             StyledTextLabel {
                 id: itemTitleLabel
@@ -132,7 +124,7 @@ Item {
 
                 font: ui.theme.bodyBoldFont
                 horizontalAlignment: Text.AlignLeft
-                text: modelData
+                text: groupName
             }
 
             onClicked: {

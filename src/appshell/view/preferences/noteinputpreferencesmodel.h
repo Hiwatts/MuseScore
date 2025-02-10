@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,63 +24,124 @@
 
 #include <QObject>
 
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
+#include "engraving/iengravingconfiguration.h"
 #include "shortcuts/ishortcutsconfiguration.h"
 #include "notation/inotationconfiguration.h"
 #include "playback/iplaybackconfiguration.h"
+#include "ui/iuiactionsregister.h"
 
 namespace mu::appshell {
-class NoteInputPreferencesModel : public QObject
+class NoteInputPreferencesModel : public QObject, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(appshell, shortcuts::IShortcutsConfiguration, shortcutsConfiguration)
-    INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
-    INJECT(appshell, playback::IPlaybackConfiguration, playbackConfiguration)
+    Q_PROPERTY(
+        int defaultNoteInputMethod READ defaultNoteInputMethod WRITE setDefaultNoteInputMethod NOTIFY defaultNoteInputMethodChanged)
+    Q_PROPERTY(
+        bool addAccidentalDotsArticulationsToNextNoteEntered READ addAccidentalDotsArticulationsToNextNoteEntered WRITE setAddAccidentalDotsArticulationsToNextNoteEntered NOTIFY addAccidentalDotsArticulationsToNextNoteEnteredChanged)
+    Q_PROPERTY(
+        bool useNoteInputCursorInInputByDuration READ useNoteInputCursorInInputByDuration WRITE setUseNoteInputCursorInInputByDuration NOTIFY useNoteInputCursorInInputByDurationChanged)
 
+    Q_PROPERTY(bool midiInputEnabled READ midiInputEnabled WRITE setMidiInputEnabled NOTIFY midiInputEnabledChanged)
+    Q_PROPERTY(
+        bool startNoteInputAtSelectionWhenPressingMidiKey READ startNoteInputAtSelectionWhenPressingMidiKey WRITE setStartNoteInputAtSelectionWhenPressingMidiKey NOTIFY startNoteInputAtSelectionWhenPressingMidiKeyChanged)
     Q_PROPERTY(
         bool advanceToNextNoteOnKeyRelease READ advanceToNextNoteOnKeyRelease WRITE setAdvanceToNextNoteOnKeyRelease NOTIFY advanceToNextNoteOnKeyReleaseChanged)
     Q_PROPERTY(
-        bool colorNotesOusideOfUsablePitchRange READ colorNotesOusideOfUsablePitchRange WRITE setColorNotesOusideOfUsablePitchRange NOTIFY colorNotesOusideOfUsablePitchRangeChanged)
+        bool colorNotesOutsideOfUsablePitchRange READ colorNotesOutsideOfUsablePitchRange WRITE setColorNotesOutsideOfUsablePitchRange NOTIFY colorNotesOutsideOfUsablePitchRangeChanged)
+    Q_PROPERTY(
+        bool warnGuitarBends READ warnGuitarBends WRITE setWarnGuitarBends NOTIFY warnGuitarBendsChanged)
     Q_PROPERTY(
         int delayBetweenNotesInRealTimeModeMilliseconds READ delayBetweenNotesInRealTimeModeMilliseconds WRITE setDelayBetweenNotesInRealTimeModeMilliseconds NOTIFY delayBetweenNotesInRealTimeModeMillisecondsChanged)
 
     Q_PROPERTY(bool playNotesWhenEditing READ playNotesWhenEditing WRITE setPlayNotesWhenEditing NOTIFY playNotesWhenEditingChanged)
     Q_PROPERTY(
+        bool playPreviewNotesInInputByDuration READ playPreviewNotesInInputByDuration WRITE setPlayPreviewNotesInInputByDuration NOTIFY playPreviewNotesInInputByDurationChanged)
+    Q_PROPERTY(
         int notePlayDurationMilliseconds READ notePlayDurationMilliseconds WRITE setNotePlayDurationMilliseconds NOTIFY notePlayDurationMillisecondsChanged)
     Q_PROPERTY(bool playChordWhenEditing READ playChordWhenEditing WRITE setPlayChordWhenEditing NOTIFY playChordWhenEditingChanged)
     Q_PROPERTY(
         bool playChordSymbolWhenEditing READ playChordSymbolWhenEditing WRITE setPlayChordSymbolWhenEditing NOTIFY playChordSymbolWhenEditingChanged)
+    Q_PROPERTY(
+        bool dynamicsApplyToAllVoices READ dynamicsApplyToAllVoices WRITE setDynamicsApplyToAllVoices NOTIFY dynamicsApplyToAllVoicesChanged FINAL)
+
+    muse::Inject<muse::shortcuts::IShortcutsConfiguration> shortcutsConfiguration = { this };
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
+    muse::Inject<playback::IPlaybackConfiguration> playbackConfiguration = { this };
+    muse::Inject<mu::engraving::IEngravingConfiguration> engravingConfiguration = { this };
+    muse::Inject<muse::ui::IUiActionsRegister> uiActionsRegister = { this };
 
 public:
     explicit NoteInputPreferencesModel(QObject* parent = nullptr);
 
+    Q_INVOKABLE void load();
+
+    Q_INVOKABLE QVariantList noteInputMethods() const;
+
+    int defaultNoteInputMethod() const;
+    bool addAccidentalDotsArticulationsToNextNoteEntered() const;
+    bool useNoteInputCursorInInputByDuration() const;
+
+    bool midiInputEnabled() const;
+    bool startNoteInputAtSelectionWhenPressingMidiKey() const;
     bool advanceToNextNoteOnKeyRelease() const;
-    bool colorNotesOusideOfUsablePitchRange() const;
     int delayBetweenNotesInRealTimeModeMilliseconds() const;
 
     bool playNotesWhenEditing() const;
+    bool playPreviewNotesInInputByDuration() const;
     int notePlayDurationMilliseconds() const;
     bool playChordWhenEditing() const;
     bool playChordSymbolWhenEditing() const;
 
+    bool dynamicsApplyToAllVoices() const;
+
+    bool colorNotesOutsideOfUsablePitchRange() const;
+    bool warnGuitarBends() const;
+
 public slots:
+    void setDefaultNoteInputMethod(int value);
+    void setAddAccidentalDotsArticulationsToNextNoteEntered(bool value);
+    void setUseNoteInputCursorInInputByDuration(bool value);
+
+    void setMidiInputEnabled(bool value);
+    void setStartNoteInputAtSelectionWhenPressingMidiKey(bool value);
     void setAdvanceToNextNoteOnKeyRelease(bool value);
-    void setColorNotesOusideOfUsablePitchRange(bool value);
     void setDelayBetweenNotesInRealTimeModeMilliseconds(int delay);
+
     void setPlayNotesWhenEditing(bool value);
+    void setPlayPreviewNotesInInputByDuration(bool value);
     void setNotePlayDurationMilliseconds(int duration);
     void setPlayChordWhenEditing(bool value);
     void setPlayChordSymbolWhenEditing(bool value);
 
+    void setDynamicsApplyToAllVoices(bool value);
+
+    void setColorNotesOutsideOfUsablePitchRange(bool value);
+    void setWarnGuitarBends(bool value);
+
 signals:
+    void defaultNoteInputMethodChanged(int value);
+    void addAccidentalDotsArticulationsToNextNoteEnteredChanged(bool value);
+    void useNoteInputCursorInInputByDurationChanged(bool value);
+
+    void midiInputEnabledChanged(bool value);
+    void startNoteInputAtSelectionWhenPressingMidiKeyChanged(bool value);
     void advanceToNextNoteOnKeyReleaseChanged(bool value);
-    void colorNotesOusideOfUsablePitchRangeChanged(bool value);
     void delayBetweenNotesInRealTimeModeMillisecondsChanged(int delay);
+
     void playNotesWhenEditingChanged(bool value);
+    void playPreviewNotesInInputByDurationChanged(bool value);
     void notePlayDurationMillisecondsChanged(int duration);
     void playChordWhenEditingChanged(bool value);
     void playChordSymbolWhenEditingChanged(bool value);
+
+    void dynamicsApplyToAllVoicesChanged(bool value);
+
+    void colorNotesOutsideOfUsablePitchRangeChanged(bool value);
+    void warnGuitarBendsChanged(bool value);
 };
 }
 

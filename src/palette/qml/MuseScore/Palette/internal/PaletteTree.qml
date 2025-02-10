@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,17 +20,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import QtQuick 2.8
+import QtQuick 2.15
 import QtQuick.Controls 2.1
 import QtQml.Models 2.2
 
 import MuseScore.Palette 1.0
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 import "utils.js" as Utils
 
-ListView {
+StyledListView {
     id: paletteTree
 
     property PaletteProvider paletteProvider
@@ -47,22 +47,23 @@ ListView {
     property string filter: ""
     property bool searchOpened: false
 
+    property bool isResultFound: count !== 0
+
     property bool enableAnimations: true
     property int expandDuration: enableAnimations ? 150 : 0 // duration of expand / collapse animations
-
-    property string backgroundColor: "#ffffff"
 
     preferredHighlightBegin: Math.min(48, Math.floor(0.1 * height))
     preferredHighlightEnd: Math.ceil(height - preferredHighlightBegin)
     highlightRangeMode: itemDragged ? ListView.ApplyRange : ListView.NoHighlightRange
 
-    Accessible.name: qsTrc("palette", "Palettes Tree, contains %n palette(s)", "", count)
+    cacheBuffer: 3000
 
     NavigationPanel {
         id: keynavTree
         name: "PalettesTree"
+        enabled: paletteTree.enabled && paletteTree.visible
         direction: NavigationPanel.Both
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 paletteTree.forceActiveFocus()
             }
@@ -81,8 +82,9 @@ ListView {
             expandedPopupIndex = null
         }
 
-        if (paletteModel) {
-            paletteModel.setFilterFixedString(filter)
+        if (paletteProvider) {
+            paletteProvider.setFilter(filter)
+            paletteTree.positionViewAtBeginning()   // Scroll to the top after a search
         }
     }
 
@@ -115,6 +117,7 @@ ListView {
             // in search and no cell selected: apply the first found element
             const parentIndex = paletteTreeDelegateModel.modelIndex(0);
             index = paletteModel.index(0, 0, parentIndex);
+            paletteSelectionModel.select(index, ItemSelectionModel.Select);
         }
 
         paletteController.applyPaletteElement(index, Qt.NoModifier);
@@ -154,11 +157,6 @@ ListView {
         enabled: paletteTree.enableAnimations
         NumberAnimation { property: "y"; duration: 150 }
     }
-
-    ScrollBar.vertical: StyledScrollBar {}
-
-    boundsBehavior: Flickable.StopAtBounds
-    maximumFlickVelocity: 1500
 
     PlaceholderManager {
         id: placeholder
@@ -214,25 +212,174 @@ ListView {
         }
     }
 
+    function numberOfExpandedPalettes() {
+        const startIndex = paletteModel.index(0, 0);
+        const collapsedIndexList = paletteModel.match(startIndex, PaletteTreeModel.PaletteExpandedRole, true);
+        return collapsedIndexList.length;
+    }
+
+    function numberOfCollapsedPalettes() {
+        const startIndex = paletteModel.index(0, 0);
+        const collapsedIndexList = paletteModel.match(startIndex, PaletteTreeModel.PaletteExpandedRole, false);
+        return collapsedIndexList.length;
+    }
+
+    function canExpandAll() {
+        return !paletteProvider.isSinglePalette && numberOfCollapsedPalettes() > 0
+    }
+
     function expandCollapseAll(expand) {
         console.assert([true, false, null].indexOf(expand) !== -1, "Invalid value for expand: " + expand);
         // expand = true  - expand all
         //          false - collapse all
-        //          null  - decide based on current state
+        //          null  - decide based on current state: expand if possible, collapse otherwise
         if (expand === null) {
-            // if any are collapsed then expand all, otherwise collapse all
-            const startIndex = paletteModel.index(0, 0);
-            const collapsedIndexList = paletteModel.match(startIndex, PaletteTreeModel.PaletteExpandedRole, false);
-            expand = !!collapsedIndexList.length;
+            expand = canExpandAll()
         }
 
-        for (var idx = 0; idx < count; idx++) {
+        for (let idx = 0; idx < count; idx++) {
             const paletteIndex = paletteModel.index(idx, 0);
             paletteModel.setData(paletteIndex, expand, PaletteTreeModel.PaletteExpandedRole);
         }
 
         currentItem.bringIntoViewAfterExpanding();
-        return expand; // bool, did we expand?
+
+        return expand; // return true if we did expand
+    }
+
+    Connections {
+        target: paletteProvider
+
+        function onIsSinglePaletteChanged() {
+            if (paletteProvider.isSinglePalette) {
+                // Collapse all except first one
+                let hasFoundExpandedPalette = false
+                for (let idx = 0; idx < count; idx++) {
+                    const paletteIndex = paletteModel.index(idx, 0);
+
+                    if (hasFoundExpandedPalette) {
+                        paletteModel.setData(paletteIndex, false, PaletteTreeModel.PaletteExpandedRole);
+                        continue
+                    }
+
+                    if (paletteModel.data(paletteIndex, PaletteTreeModel.PaletteExpandedRole)) {
+                        hasFoundExpandedPalette = true
+                    }
+                }
+            }
+        }
+    }
+
+    Loader {
+        id: palettePopup
+        active: false
+
+        property var control: null
+        property var model: null
+        property alias isOpened: palettePopup.active
+
+        sourceComponent: MoreElementsPopup {
+            id: moreElementsPopup
+
+            property var control: palettePopup.control
+            property var model: palettePopup.model
+
+            maxHeight: Math.min(0.75 * paletteTree.height, 500)
+
+            // TODO: change settings to "hidden" model?
+            cellSize: control.cellSize
+            drawGrid: control.drawGrid
+
+            paletteName: model.display
+            paletteIsCustom: model.custom
+            paletteEditingEnabled: model.editable
+
+            onIsOpenedChanged: {
+                // build pool model on first popup appearance
+                if (visible && !poolPalette) {
+                    poolPalette = paletteTree.paletteProvider.poolPaletteModel(control.modelIndex);
+                    poolPaletteRootIndex = paletteTree.paletteProvider.poolPaletteIndex(control.modelIndex, poolPalette);
+                    poolPaletteController = paletteTree.paletteProvider.poolPaletteController(poolPalette, control.modelIndex);
+
+                    customPalette = paletteTree.paletteProvider.customElementsPaletteModel
+                    customPaletteRootIndex = paletteTree.paletteProvider.customElementsPaletteIndex(control.modelIndex) // TODO: make a property binding? (but that works incorrectly)
+                    customPaletteController = paletteTree.paletteProvider.customElementsPaletteController
+                }
+                if (!isOpened) {
+                    paletteTree.expandedPopupIndex = null
+                }
+            }
+
+            property bool needScrollToBottom: false
+
+            onOpened: {
+                scrollToPopupBottom();
+                needScrollToBottom = false;
+                enablePaletteAnimations = true;
+            }
+
+            onClosed: {
+                enablePaletteAnimations = false;
+                // Deactivating the loader while dragging will cause a crash (#25848), so defer the deactivation...
+                if (!moreElementsPopup.isDragInProgress) {
+                    palettePopup.active = false;
+                }
+            }
+
+            onIsDragInProgressChanged: {
+                const deactivationWasDeferred = !moreElementsPopup.isOpened && palettePopup.active
+                if (!moreElementsPopup.isDragInProgress && deactivationWasDeferred) {
+                    // We're now safe to deactivate the loader...
+                    palettePopup.active = false
+                }
+            }
+
+            function scrollToPopupBottom() {
+                //! FIXME Not worked as should
+//                        const popupBottom = implicitHeight + y + control.y + 14; // 14 for DropShadow in StyledPopup: depends on blur radius and vertical offset
+//                        paletteTree.ensureYVisible(popupBottom);
+            }
+
+            onContentHeightChanged: {
+                if (visible && (needScrollToBottom || atYEnd))
+                    scrollToPopupBottom();
+            }
+
+            onAddElementsRequested: function(mimeDataList) {
+                const parentIndex = control.modelIndex;
+                var idx = paletteTree.paletteModel.rowCount(parentIndex);
+
+                for (var i = 0; i < mimeDataList.length; i++) {
+                    const mimeData = mimeDataList[i];
+
+                    if (paletteTree.paletteController.insert(parentIndex, idx, mimeData, Qt.MoveAction)) {
+                        idx++;
+                    }
+                }
+            }
+        }
+
+        function close() {
+            if (palettePopup.active) {
+                palettePopup.item.close();
+            }
+        }
+
+        function toggleOpened(model, control, parent) {
+            if (palettePopup.active) {
+                palettePopup.close();
+                return;
+            }
+
+            palettePopup.parent = parent;
+            palettePopup.model = model;
+            palettePopup.control = control;
+
+            palettePopup.active = true;
+            palettePopup.item.setParentItem(parent);
+
+            palettePopup.item.toggleOpened();
+        }
     }
 
     model: DelegateModel {
@@ -245,7 +392,19 @@ ListView {
             bottomPadding: expanded ? 4 : 0
             property int rowIndex: index
             property int navigationRow: (index + 1) * 10000 // to make unique
-            property var modelIndex: paletteTree.model.modelIndex(index, 0)
+            property var modelIndex: paletteTree.model.modelIndex(index)
+
+            Keys.onShortcutOverride: function(event) {
+                switch (event.key) {
+                case Qt.Key_Backspace:
+                case Qt.Key_Delete:
+                    event.accepted = true
+                    paletteTree.removeSelectedItems()
+                    break
+                default:
+                    break
+                }
+            }
 
             onActiveFocusChanged: {
                 if (activeFocus) {
@@ -258,7 +417,13 @@ ListView {
                 paletteTree.implicitWidth = Math.max(paletteTree.implicitWidth, w);
             }
 
-            property bool expanded: filter.length || model.expanded
+            Component.onDestruction: {
+                if (palettePopup.active && palettePopup.model === model) {
+                    palettePopup.close()
+                }
+            }
+
+            readonly property bool expanded: paletteTree.searchOpened || Boolean(model.expanded)
 
             function toggleExpand() {
                 model.expanded = !expanded
@@ -282,53 +447,73 @@ ListView {
 
             property bool selected: paletteSelectionModel.hasSelection ? paletteSelectionModel.isSelected(modelIndex) : false
 
-            function doItemClicked() {
+            onClicked: {
                 forceActiveFocus();
-                const cmd = selected ? ItemSelectionModel.Toggle : ItemSelectionModel.ClearAndSelect;
-                paletteSelectionModel.setCurrentIndex(modelIndex, cmd);
+
+                if (paletteProvider.isSingleClickToOpenPalette) {
+                    toggleExpand()
+
+                    if (selected && !expanded) {
+                        paletteSelectionModel.clearSelection();
+                    } else if (!selected) {
+                        paletteSelectionModel.setCurrentIndex(modelIndex, ItemSelectionModel.ClearAndSelect);
+                    }
+                } else {
+                    const cmd = selected ? ItemSelectionModel.Toggle : ItemSelectionModel.ClearAndSelect;
+                    paletteSelectionModel.setCurrentIndex(modelIndex, cmd);
+                }
+
                 paletteTree.currentIndex = index;
             }
 
-            onClicked: {
-                control.doItemClicked()
-            }
-
             onDoubleClicked: {
+                if (paletteProvider.isSingleClickToOpenPalette) {
+                    return;
+                }
+
                 forceActiveFocus();
                 paletteSelectionModel.setCurrentIndex(modelIndex, ItemSelectionModel.Deselect);
                 toggleExpand();
             }
 
             background: ListItemBlank {
-                background.color: paletteTree.backgroundColor
                 visible: !control.Drag.active
                 isSelected: control.selected
 
-                navigation.name: "PaletteTreeItem"
+                navigation.name: model.display
                 navigation.panel: keynavTree
                 navigation.row: control.navigationRow
                 navigation.column: 0
+                navigation.accessible.name: control.text
                 enabled: control.visible
                 navigation.onActiveChanged: {
-                    if (navigation.active && !control.selected) {
-                        control.doItemClicked()
+                    if (navigation.active) {
+                        forceActiveFocus();
+
+                        if (!control.selected) {
+                            paletteSelectionModel.setCurrentIndex(modelIndex, ItemSelectionModel.ClearAndSelect);
+                        }
+
+                        paletteTree.currentIndex = index;
+                        paletteTree.positionViewAtIndex(control.rowIndex, ListView.Contain);
                     }
-                    paletteTree.positionViewAtIndex(control.rowIndex, ListView.Contain);
+                }
+                navigation.onTriggered: {
+                    control.toggleExpand()
                 }
             }
 
             highlighted: (activeFocus && !selected) || DelegateModel.isUnresolved
 
             property bool popupExpanded: palettePopup.isOpened
+            onPopupExpandedChanged: {
+                paletteTree.interactive = !popupExpanded
+            }
 
             function togglePopup(btn) {
                 const expand = !popupExpanded;
                 paletteTree.expandedPopupIndex = expand ? modelIndex : null;
-                if (btn) {
-                    palettePopup.parent = btn
-                    palettePopup.navigationParentControl = btn.navigation
-                }
-                palettePopup.toggleOpened()
+                palettePopup.toggleOpened(model, control, btn)
             }
 
             property size cellSize: model.gridSize
@@ -339,14 +524,13 @@ ListView {
                 paletteTree.paletteController.remove(modelIndex);
             }
 
-            text: filter.length ? qsTrc("palette", "%1, contains %n matching element(s)", "palette", mainPalette.count).arg(model.accessibleText)
+            text: filter.length ? qsTrc("palette", "%1, contains %n matching element(s)", "", mainPalette.count).arg(model.accessibleText)
                                 : model.expanded ? qsTrc("palette", "%1 expanded", "tree item not collapsed").arg(model.accessibleText)
                                                  : model.accessibleText
-            Accessible.role: Accessible.TreeItem
 
             width: ListView.view.width
 
-            Drag.active: paletteHeaderDragArea.drag.active
+            Drag.active: paletteProvider.isPaletteDragEnabled && paletteHeaderDragArea.drag.active
             Drag.dragType: Drag.Automatic
             Drag.supportedActions: Qt.MoveAction
             Drag.proposedAction: Qt.MoveAction
@@ -357,16 +541,18 @@ ListView {
                     togglePopup();
                 }
 
+                paletteHeader.closeContextMenu()
+
                 paletteTree.itemDragged = true;
                 DelegateModel.inPersistedItems = true;
                 DelegateModel.inItems = false;
                 placeholder.makePlaceholder(control.rowIndex, paletteTree.placeholderData());
             }
 
-            Drag.onDragFinished: {
+            Drag.onDragFinished: function(dropAction) {
                 paletteTree.itemDragged = false;
 
-                if (dropAction != Qt.IgnoreAction) {
+                if (dropAction !== Qt.IgnoreAction) {
                     paletteTree.currentIndex = -1;
                 }
 
@@ -377,7 +563,7 @@ ListView {
                 DelegateModel.inItems = true;
                 DelegateModel.inPersistedItems = false;
 
-                if (dropAction == Qt.MoveAction) {
+                if (dropAction === Qt.MoveAction) {
                     controller.move(
                                 root, rowIndex,
                                 root, destIndex);
@@ -397,8 +583,8 @@ ListView {
                     }
                 }
 
-                onDropped: {
-                    if (drop.proposedAction == Qt.MoveAction)
+                onDropped: function(drop) {
+                    if (drop.proposedAction === Qt.MoveAction)
                         drop.acceptProposedAction();
                 }
             }
@@ -470,11 +656,13 @@ ListView {
                     }
 
                     editingEnabled: model.editable
-                    onEnableEditingToggled: model.editable = val
+                    onEnableEditingToggled: function(val) {
+                        model.editable = val
+                    }
 
                     onHideSelectedElementsRequested: paletteTree.removeSelectedItems(control.modelIndex);
 
-                    onInsertNewPaletteRequested: paletteTree.insertCustomPalette(control.rowIndex);
+                    onInsertNewPaletteRequested: paletteTree.insertCustomPalette(control.rowIndex, qsTrc("palette", "Untitled palette"));
                     onHidePaletteRequested: control.hidePalette();
 
                     paletteProvider: paletteTree.paletteProvider
@@ -492,12 +680,16 @@ ListView {
 
                         drag.axis: Drag.YAxis
 
-                        onPressed: control.grabToImage(function(result) {
-                            control.Drag.imageSource = result.url
-                        })
+                        onPressed: function(mouse) {
+                            control.grabToImage(function(result) {
+                                control.Drag.imageSource = result.url
+                                control.Drag.hotSpot.x = mouse.x
+                                control.Drag.hotSpot.y = mouse.y
+                            })
+                        }
 
-                        onClicked: control.onClicked(mouse)
-                        onDoubleClicked: control.onDoubleClicked(mouse)
+                        onClicked: function(mouse) { control.clicked() }
+                        onDoubleClicked: function(mouse) { control.doubleClicked() }
                     }
                 }
 
@@ -509,9 +701,10 @@ ListView {
                     height: implicitHeight
                     border { width: 1; color: ui.theme.strokeColor }
 
-                    Palette {
+                    PaletteGridView {
                         id: mainPalette
-                        anchors { fill: parent; margins: parent.padding }
+                        anchors.fill: parent
+                        anchors.margins: parent.padding
 
                         navigationPanel: keynavTree
                         navigationRow: control.navigationRow + 1
@@ -529,8 +722,8 @@ ListView {
                             return mainPaletteBottom >= paletteTree.contentY && mainPaletteBottom < (paletteTree.contentY + paletteTree.height)
                         }
 
-                        showMoreButton: !filter.length
-                        onMoreButtonClicked: control.togglePopup(btn);
+                        showMoreButton: !paletteTree.searchOpened
+                        onMoreButtonClicked: function(btn) { control.togglePopup(btn) }
 
                         onVisibleChanged: {
                             if (!visible && control.popupExpanded) {
@@ -540,67 +733,6 @@ ListView {
 
                         enableAnimations: paletteTree.enableAnimations
                         externalDropBlocked: paletteTree.expandedPopupIndex && !control.popupExpanded // FIXME: find another way to prevent drops go under a popup
-                    }
-                }
-
-                MoreElementsPopup {
-                    id: palettePopup
-
-                    maxHeight: Math.min(0.75 * paletteTree.height, 500)
-
-                    // TODO: change settings to "hidden" model?
-                    cellSize: control.cellSize
-                    drawGrid: control.drawGrid
-
-                    paletteName: model.display
-                    paletteIsCustom: model.custom
-                    paletteEditingEnabled: model.editable
-
-                    onIsOpenedChanged: {
-                        // build pool model on first popup appearance
-                        if (visible && !poolPalette) {
-                            poolPalette = paletteTree.paletteProvider.poolPaletteModel(control.modelIndex);
-                            poolPaletteRootIndex = paletteTree.paletteProvider.poolPaletteIndex(control.modelIndex, poolPalette);
-                            poolPaletteController = paletteTree.paletteProvider.poolPaletteController(poolPalette, control.modelIndex);
-
-                            customPalette = paletteTree.paletteProvider.customElementsPaletteModel
-                            customPaletteRootIndex = paletteTree.paletteProvider.customElementsPaletteIndex(control.modelIndex) // TODO: make a property binding? (but that works incorrectly)
-                            customPaletteController = paletteTree.paletteProvider.customElementsPaletteController
-                        }
-                    }
-
-                    property bool needScrollToBottom: false
-
-                    onOpened: {
-                        scrollToPopupBottom();
-                        needScrollToBottom = false;
-                        enablePaletteAnimations = true;
-                    }
-
-                    onClosed: enablePaletteAnimations = false
-
-                    function scrollToPopupBottom() {
-                        //! FIXME Not worked as should
-//                        const popupBottom = implicitHeight + y + control.y + 14; // 14 for DropShadow in StyledPopup: depends on blur radius and vertical offset
-//                        paletteTree.ensureYVisible(popupBottom);
-                    }
-
-                    onContentHeightChanged: {
-                        if (visible && (needScrollToBottom || atYEnd))
-                            scrollToPopupBottom();
-                    }
-
-                    onAddElementsRequested: {
-                        const parentIndex = control.modelIndex;
-                        var idx = paletteTree.paletteModel.rowCount(parentIndex);
-
-                        for (var i = 0; i < mimeDataList.length; i++) {
-                            const mimeData = mimeDataList[i];
-
-                            if (paletteTree.paletteController.insert(parentIndex, idx, mimeData, Qt.MoveAction)) {
-                                idx++;
-                            }
-                        }
                     }
                 }
             }

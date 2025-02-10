@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,12 +24,15 @@
 
 #include "timeline.h"
 
+#include <QApplication>
+#include <QQuickWindow>
 #include <QSplitter>
+#include <QTimer>
 
 #include "log.h"
 
 namespace mu::notation {
-class TimelineAdapter : public QSplitter, public ui::IDisplayableWidget
+class TimelineAdapter : public QSplitter, public muse::uicomponents::IDisplayableWidget
 {
 public:
     TimelineAdapter()
@@ -38,14 +41,14 @@ public:
         setFocusPolicy(Qt::NoFocus);
         setHandleWidth(0);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        setObjectName("TimeLineAdapter");
+        setObjectName("TimelineAdapter");
 
-        m_msTimeline = new Ms::Timeline(this);
+        m_msTimeline = new Timeline(this);
     }
 
     void updateView()
     {
-        m_msTimeline->updateGridView();
+        m_msTimeline->updateGridFromCmdState();
     }
 
     void setNotation(INotationPtr notation)
@@ -61,8 +64,7 @@ private:
 
     bool handleEvent(QEvent* e) override
     {
-        QMouseEvent* me = dynamic_cast<QMouseEvent*>(e);
-        if (me) {
+        if (QMouseEvent* me = dynamic_cast<QMouseEvent*>(e)) {
             return handleMouseEvent(me);
         }
 
@@ -72,28 +74,67 @@ private:
     bool handleMouseEvent(QMouseEvent* event)
     {
         QPoint pos = event ? event->pos() : QPoint();
-        Ms::TRowLabels* labelsColumn = m_msTimeline->labelsColumn();
 
-        if (m_msTimeline->geometry().contains(pos)) {
-            event->setLocalPos(m_msTimeline->mapFrom(this, pos));
-            return m_msTimeline->handleEvent(event);
-        } else if (labelsColumn->geometry().contains(pos)) {
-            event->setLocalPos(labelsColumn->mapFrom(this, pos));
-            return labelsColumn->handleEvent(event);
+        if (event->type() == QEvent::MouseButtonPress) {
+            m_mouseDownWidget = childAt(pos);
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            m_mouseDownWidget = nullptr;
         }
 
-        return false;
+        bool result = false;
+
+        if (QWidget* receiver = m_mouseDownWidget ? m_mouseDownWidget : childAt(pos)) {
+            QMouseEvent mappedEvent(event->type(), receiver->mapFrom(this, event->position()),
+                                    event->scenePosition(), event->globalPosition(),
+                                    event->button(), event->buttons(), event->modifiers(),
+                                    event->source(), event->pointingDevice());
+            result = qApp->notify(receiver, &mappedEvent);
+            event->setAccepted(mappedEvent.isAccepted());
+        }
+
+        return result;
     }
 
-    Ms::Timeline* m_msTimeline = nullptr;
+    Timeline* m_msTimeline = nullptr;
+    QWidget* m_mouseDownWidget = nullptr;
 };
 }
 
 using namespace mu::notation;
 
 TimelineView::TimelineView(QQuickItem* parent)
-    : WidgetView(parent)
+    : WidgetView(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
+    m_drawTimer.setSingleShot(true);
+    m_drawTimer.setInterval(32); // 30 fps
+
+    connect(&m_drawTimer, &QTimer::timeout, this, &TimelineView::doDraw);
+
+    doDraw();
+}
+
+void TimelineView::doDraw()
+{
+    if (isVisible()) {
+        m_dpr =  window() ? window()->devicePixelRatio() : 1.0;
+
+        m_image = QImage(width() * m_dpr, height() * m_dpr, QImage::Format_ARGB32_Premultiplied);
+        m_image.setDevicePixelRatio(m_dpr);
+        m_image.fill(Qt::transparent);
+
+        if (qWidget()) {
+            qWidget()->render(&m_image, QPoint(), QRegion(), QWidget::DrawWindowBackground | QWidget::DrawChildren);
+        }
+
+        update();
+    }
+
+    m_drawTimer.start();
+}
+
+void TimelineView::paint(QPainter* painter)
+{
+    painter->drawImage(0, 0, m_image);
 }
 
 void TimelineView::componentComplete()
@@ -110,7 +151,7 @@ void TimelineView::componentComplete()
         }
     };
 
-    globalContext()->currentNotationChanged().onNotify(this, [this, timeline, updateView]() {
+    auto initTimeline = [this, updateView, timeline] {
         INotationPtr notation = globalContext()->currentNotation();
         timeline->setNotation(notation);
 
@@ -120,14 +161,20 @@ void TimelineView::componentComplete()
             return;
         }
 
-        notation->notationChanged().onNotify(this, [=] {
+        notation->undoStack()->stackChanged().onNotify(this, [=] {
             updateView();
         });
 
         notation->interaction()->selectionChanged().onNotify(this, [=] {
             updateView();
         });
+    };
+
+    globalContext()->currentNotationChanged().onNotify(this, [initTimeline]() {
+        initTimeline();
     });
 
     setWidget(timeline);
+
+    initTimeline();
 }

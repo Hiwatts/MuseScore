@@ -19,18 +19,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_FRAMEWORK_SETTINGS_H
-#define MU_FRAMEWORK_SETTINGS_H
+#ifndef MUSE_GLOBAL_SETTINGS_H
+#define MUSE_GLOBAL_SETTINGS_H
 
 #include <string>
-#include <vector>
 
-#include "val.h"
+#include "types/val.h"
 #include "async/channel.h"
 #include "io/path.h"
 
+#include "muse_framework_config.h"
+#ifdef MUSE_MODULE_MULTIINSTANCES
 #include "modularity/ioc.h"
 #include "multiinstances/imultiinstancesprovider.h"
+#endif
 
 //! NOTE We are gradually abandoning Qt in non-GUI classes.
 //! This settings interface is almost independent of Qt,
@@ -39,11 +41,12 @@
 
 class QSettings;
 
-namespace mu::framework {
+namespace muse {
 class Settings
 {
-    INJECT(framework, mi::IMultiInstancesProvider, multiInstancesProvider)
-
+#ifdef MUSE_MODULE_MULTIINSTANCES
+    GlobalInject<muse::mi::IMultiInstancesProvider> multiInstancesProvider;
+#endif
 public:
     static Settings* instance();
 
@@ -65,7 +68,11 @@ public:
         Key key;
         Val value;
         Val defaultValue;
-        bool canBeMannualyEdited = false;
+        std::string description;
+
+        bool canBeManuallyEdited = false;
+        Val minValue;
+        Val maxValue;
 
         bool isNull() const { return key.isNull(); }
     };
@@ -77,10 +84,12 @@ public:
     void reload();
     void load();
 
-    void reset(bool keepDefaultSettings = false);
+    void reset(bool keepDefaultSettings = false, bool notifyAboutChanges = true, bool notifyOtherInstances = true);
 
     Val value(const Key& key) const;
     Val defaultValue(const Key& key) const;
+
+    std::string description(const Key& key) const;
 
     //! NOTE Will be write to global config and sync between all instances
     void setSharedValue(const Key& key, const Val& value);
@@ -89,7 +98,11 @@ public:
     void setLocalValue(const Key& key, const Val& value);
 
     void setDefaultValue(const Key& key, const Val& value);
-    void setCanBeMannualyEdited(const Settings::Key& key, bool canBeMannualyEdited);
+
+    void setDescription(const Key& key, const std::string& value);
+
+    void setCanBeManuallyEdited(const Settings::Key& key, bool canBeManuallyEdited, const Val& minValue = Val(),
+                                const Val& maxValue = Val());
 
     void beginTransaction(bool notifyToOtherInstances = true);
     void commitTransaction(bool notifyToOtherInstances = true);
@@ -97,7 +110,7 @@ public:
 
     async::Channel<Val> valueChanged(const Key& key) const;
 
-    io::path filePath() const;
+    io::path_t filePath() const;
 
 private:
     Settings();
@@ -126,4 +139,4 @@ inline Settings* settings()
 }
 }
 
-#endif // MU_FRAMEWORK_SETTINGS_H
+#endif // MUSE_GLOBAL_SETTINGS_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,11 +28,21 @@ namespace mu::iex::audioexport {
 class AudioExportConfiguration : public IAudioExportConfiguration
 {
 public:
-    int exportMp3Bitrate() override;
-    void setExportMp3Bitrate(std::optional<int> bitrate) override;
+    void init();
+
+    int exportMp3Bitrate() const override;
+    void setExportMp3Bitrate(int bitrate) override;
+    void setExportMp3BitrateOverride(std::optional<int> bitrate) override;
+    const std::vector<int>& availableMp3BitRates() const override;
+
+    int exportSampleRate() const override;
+    void setExportSampleRate(int rate) override;
+    const std::vector<int>& availableSampleRates() const override;
+
+    muse::audio::samples_t exportBufferSize() const override;
 
 private:
-    std::optional<int> m_exportMp3Bitrate = std::nullopt;
+    std::optional<int> m_exportMp3BitrateOverride = std::nullopt;
 };
 }
 

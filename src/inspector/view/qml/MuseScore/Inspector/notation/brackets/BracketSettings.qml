@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,8 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../common"
@@ -43,30 +43,54 @@ Column {
         columnSection.focusOnFirst()
     }
 
-    SpinBoxPropertyView {
-        id: columnSection
-        titleText: qsTrc("inspector", "Column")
-        propertyItem: root.model ? root.model.bracketColumnPosition : nul
+    Item {
+        height: childrenRect.height
+        width: parent.width
 
-        step: 1
-        decimals: 0
-        maxValue: 127
-        minValue: 0
+        enabled: root.model ? root.model.areSettingsAvailable : false
 
-        navigationPanel: root.navigationPanel
-        navigationRowStart: root.navigationRowStart + 1
+        SpinBoxPropertyView {
+            id: columnSection
+            anchors.left: parent.left
+            anchors.right: parent.horizontalCenter
+            anchors.rightMargin: 2
+
+            titleText: qsTrc("inspector", "Column")
+            propertyItem: root.model ? root.model.bracketColumnPosition : null
+            showButton: false
+
+            step: 1
+            decimals: 0
+            maxValue: root.model ? root.model.maxBracketColumnPosition : 0
+            minValue: 0
+
+            navigationPanel: root.navigationPanel
+            navigationRowStart: root.navigationRowStart + 1
+        }
+
+        SpinBoxPropertyView {
+            anchors.left: parent.horizontalCenter
+            anchors.leftMargin: 2
+            anchors.right: parent.right
+
+            titleText: qsTrc("inspector", "Span")
+            propertyItem: root.model ? root.model.bracketSpanStaves : null
+            showButton: false
+
+            step: 1
+            decimals: 0
+            maxValue: root.model ? root.model.maxBracketSpanStaves : 0
+            minValue: 1
+
+            navigationPanel: root.navigationPanel
+            navigationRowStart: columnSection.navigationRowEnd + 1
+        }
     }
 
-    SpinBoxPropertyView {
-        titleText: qsTrc("inspector", "Span")
-        propertyItem: root.model ? root.model.bracketSpanStaves : nul
-
-        step: 1
-        decimals: 0
-        maxValue: 127
-        minValue: 0
-
-        navigationPanel: root.navigationPanel
-        navigationRowStart: columnSection.navigationRowEnd + 1
+    StyledTextLabel {
+        width: parent.width
+        visible: root.model ? !root.model.areSettingsAvailable : false
+        text: qsTrc("inspector", "You have multiple brackets selected. Select a single bracket to edit its settings.")
+        wrapMode: Text.Wrap
     }
 }

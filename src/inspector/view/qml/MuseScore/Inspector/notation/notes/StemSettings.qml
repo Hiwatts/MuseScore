@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../common"
@@ -33,9 +33,9 @@ FocusableItem {
 
     //@note Current design assumes that stems and hooks should be represented at the same tab,
     //      but semantically it's different things, so they should have different models
+    property QtObject chordModel: null
     property QtObject stemModel: null
     property QtObject hookModel: null
-    property QtObject beamModel: null
 
     property NavigationPanel navigationPanel: null
     property int navigationRowStart: 1
@@ -51,38 +51,34 @@ FocusableItem {
 
         spacing: 12
 
-        CheckBox {
-            isIndeterminate: root.stemModel && root.beamModel ? root.stemModel.isStemHidden.isUndefined || root.beamModel.isBeamHidden.isUndefined : false
-            checked: root.stemModel && !isIndeterminate && root.beamModel ? root.stemModel.isStemHidden.value && root.beamModel.isBeamHidden.value : false
-            text: qsTrc("inspector", "Hide stem (also hides beam)")
+        PropertyCheckBox {
+            text: qsTrc("inspector", "Stemless")
+            propertyItem: root.chordModel ? root.chordModel.isStemless : null
 
-            navigation.name: "HideStemCheckBox"
+            navigation.name: "Stemless"
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 1
-            navigation.enabled: root.enabled
-
-            onClicked: {
-                var isHidden = !checked
-                root.stemModel.isStemHidden.value = isHidden
-                root.beamModel.isBeamHidden.value = isHidden
-            }
         }
 
-        FlatRadioButtonGroupPropertyView {
+        PropertyCheckBox {
+            text: qsTrc("inspector", "Show stem slash")
+            propertyItem: root.chordModel ? root.chordModel.showStemSlash : null
+            visible: root.chordModel ? root.chordModel.showStemSlashVisible : false
+            enabled: root.chordModel ? root.chordModel.showStemSlashEnabled : false
+
+            navigation.name: "Show stem slash"
+            navigation.panel: root.navigationPanel
+            navigation.row: root.navigationRowStart + 2
+        }
+
+        DirectionSection {
             id: stemDirectionGroup
 
             titleText: qsTrc("inspector", "Stem direction")
             propertyItem: root.stemModel ? root.stemModel.stemDirection : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: root.navigationRowStart + 2
-            navigationEnabled: root.enabled
-
-            model: [
-                { text: qsTrc("inspector", "Auto"), value: DirectionTypes.VERTICAL_AUTO, title: qsTrc("inspector", "Auto") },
-                { iconCode: IconCode.ARROW_DOWN, value: DirectionTypes.VERTICAL_DOWN, title: qsTrc("inspector", "Down") },
-                { iconCode: IconCode.ARROW_UP, value: DirectionTypes.VERTICAL_UP, title: qsTrc("inspector", "Up") }
-            ]
+            navigationRowStart: root.navigationRowStart + 3
         }
 
         Column {
@@ -103,8 +99,8 @@ FocusableItem {
                 width: parent.width
                 height: 70
 
-                property int navigationRowStart: stemDirectionGroup.navigationRowEnd + 1
-                property int navigationRowEnd: navigationRowStart + count
+                readonly property int navigationRowStart: stemDirectionGroup.navigationRowEnd + 1
+                readonly property int navigationRowEnd: navigationRowStart + count
 
                 model: [
                     { iconCode: IconCode.NOTEFLAGS_TRADITIONAL, text: qsTrc("inspector", "Traditional", "Note flags"), value: false },
@@ -114,10 +110,9 @@ FocusableItem {
                 delegate: FlatRadioButton {
                     height: 70
 
-                    navigation.name: "FlagStyleGroup"
+                    navigation.name: "FlagStyle" + modelData.text
                     navigation.panel: root.navigationPanel
                     navigation.row: flagStyleGroup.navigationRowStart + index
-                    navigation.enabled: root.enabled
                     navigation.accessible.name: flagStyleLabel.text + " " + modelData.text
 
                     Column {
@@ -181,9 +176,9 @@ FocusableItem {
                         minValue: 0.01
                         step: 0.01
 
+                        navigationName: "Thickness"
                         navigationPanel: root.navigationPanel
                         navigationRowStart: showItem.navigation.row + 1
-                        navigationEnabled: visible && showItem.isExpanded
                     }
 
                     SpinBoxPropertyView {
@@ -198,31 +193,29 @@ FocusableItem {
                         maxValue: 10
                         minValue: -10
 
+                        navigationName: "Length"
                         navigationPanel: root.navigationPanel
                         navigationRowStart: thicknessView.navigationRowEnd + 1
-                        navigationEnabled: visible && showItem.isExpanded
                     }
                 }
 
                 OffsetSection {
                     id: stemOffsetSection
                     titleText: qsTrc("inspector", "Stem offset")
-                    horizontalOffset: root.stemModel ? root.stemModel.horizontalOffset : null
-                    verticalOffset: root.stemModel ? root.stemModel.verticalOffset : null
+                    propertyItem: root.stemModel ? root.stemModel.offset : null
 
+                    navigationName: "StemOffset"
                     navigationPanel: root.navigationPanel
                     navigationRowStart: lengthView.navigationRowEnd + 1
-                    navigationEnabled: visible && showItem.isExpanded
                 }
 
                 OffsetSection {
                     titleText: qsTrc("inspector", "Flag offset")
-                    horizontalOffset: root.hookModel ? root.hookModel.horizontalOffset : null
-                    verticalOffset: root.hookModel ? root.hookModel.verticalOffset : null
+                    propertyItem: root.hookModel ? root.hookModel.offset : null
 
+                    navigationName: "FlagOffset"
                     navigationPanel: root.navigationPanel
                     navigationRowStart: stemOffsetSection.navigationRowEnd + 1
-                    navigationEnabled: visible && showItem.isExpanded
                 }
             }
         }

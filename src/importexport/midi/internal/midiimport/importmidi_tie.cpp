@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,24 +22,26 @@
 
 #include "importmidi_tie.h"
 
-#include <QDebug>
-
-#include "libmscore/engravingitem.h"
-#include "libmscore/segment.h"
-#include "libmscore/chordrest.h"
-#include "libmscore/chord.h"
-#include "libmscore/note.h"
+#include "engraving/dom/engravingitem.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/chordrest.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/note.h"
 
 #ifdef QT_DEBUG
-#include "libmscore/staff.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/measure.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/measure.h"
 #endif
 
-namespace Ms {
+#include "log.h"
+
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiTie {
-bool isTied(const Segment* seg, int strack, int voice,
-            Ms::Tie* (Note::* tieFunc)() const)
+static bool isTied(const Segment* seg, track_idx_t strack, voice_idx_t voice,
+                   mu::engraving::Tie* (Note::* tieFunc)() const)
 {
     ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
     if (cr && cr->isChord()) {
@@ -54,20 +56,20 @@ bool isTied(const Segment* seg, int strack, int voice,
     return false;
 }
 
-bool isTiedFor(const Segment* seg, int strack, int voice)
+bool isTiedFor(const Segment* seg, track_idx_t strack, voice_idx_t voice)
 {
     return isTied(seg, strack, voice, &Note::tieFor);
 }
 
-bool isTiedBack(const Segment* seg, int strack, int voice)
+bool isTiedBack(const Segment* seg, track_idx_t strack, voice_idx_t voice)
 {
     return isTied(seg, strack, voice, &Note::tieBack);
 }
 
-void TieStateMachine::addSeg(const Segment* seg, int strack)
+void TieStateMachine::addSeg(const Segment* seg, track_idx_t strack)
 {
     bool isChord = false;
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
         if (!cr || !cr->isChord()) {
             continue;
@@ -104,18 +106,18 @@ void TieStateMachine::addSeg(const Segment* seg, int strack)
 
 #ifdef QT_DEBUG
 
-void printInconsistentTieLocation(int measureIndex, int staffIndex)
+static void printInconsistentTieLocation(int measureIndex, staff_idx_t staffIndex)
 {
-    qDebug() << "Ties are inconsistent; measure number (from 1):"
-             << measureIndex + 1
-             << ", staff index (from 0):" << staffIndex;
+    LOGD() << "Ties are inconsistent; measure number (from 1):"
+           << measureIndex + 1
+           << ", staff index (from 0):" << staffIndex;
 }
 
 bool areTiesConsistent(const Staff* staff)
 {
-    const int strack = staff->idx() * VOICES;
+    const track_idx_t strack = staff->idx() * VOICES;
 
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         bool isTie = false;
         for (Segment* seg = staff->score()->firstSegment(SegmentType::All); seg; seg = seg->next1()) {
             if (seg->segmentType() == SegmentType::ChordRest) {
@@ -150,4 +152,4 @@ bool areTiesConsistent(const Staff* staff)
 
 #endif
 } // namespace MidiTie
-} // namespace Ms
+} // namespace mu::iex::midi

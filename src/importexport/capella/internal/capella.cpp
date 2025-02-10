@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,52 +23,57 @@
 //
 //    Capella 2000 import filter
 //
-#include <assert.h>
-#include <cmath>
-#include <QMessageBox>
-#include <QtMath>
-
-#include "libmscore/mscore.h"
 #include "capella.h"
 
-#include "libmscore/factory.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/part.h"
-#include "libmscore/staff.h"
-#include "libmscore/rest.h"
-#include "libmscore/chord.h"
-#include "libmscore/note.h"
-#include "libmscore/utils.h"
-#include "libmscore/lyrics.h"
-#include "libmscore/timesig.h"
-#include "libmscore/clef.h"
-#include "libmscore/pitchspelling.h"
-#include "libmscore/keysig.h"
-#include "libmscore/slur.h"
-#include "libmscore/tie.h"
-#include "libmscore/box.h"
-#include "libmscore/measure.h"
-#include "libmscore/sig.h"
-#include "libmscore/tuplet.h"
-#include "libmscore/segment.h"
-#include "libmscore/layoutbreak.h"
-#include "libmscore/dynamic.h"
-#include "libmscore/barline.h"
-#include "libmscore/volta.h"
-#include "libmscore/stafftext.h"
-#include "libmscore/trill.h"
-#include "libmscore/arpeggio.h"
-#include "libmscore/breath.h"
-#include "libmscore/hairpin.h"
-#include "libmscore/symid.h"
-#include "libmscore/articulation.h"
-#include "libmscore/harmony.h"
+#include <QFile>
+#include <QtMath>
+
+#include "engraving/dom/arpeggio.h"
+#include "engraving/dom/articulation.h"
+#include "engraving/dom/box.h"
+#include "engraving/dom/breath.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/clef.h"
+#include "engraving/dom/dynamic.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/hairpin.h"
+#include "engraving/dom/harmony.h"
+#include "engraving/dom/keysig.h"
+#include "engraving/dom/layoutbreak.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/pitchspelling.h"
+#include "engraving/dom/rest.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/sig.h"
+#include "engraving/dom/slur.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/stafftext.h"
+#include "engraving/dom/text.h"
+#include "engraving/dom/tie.h"
+#include "engraving/dom/timesig.h"
+#include "engraving/dom/trill.h"
+#include "engraving/dom/tuplet.h"
+#include "engraving/dom/utils.h"
+#include "engraving/dom/volta.h"
+
+#include "engraving/engravingerrors.h"
+
+#include "infrastructure/messagebox.h"
+
+#include "log.h"
+
+#include "translation.h"
 
 extern QString rtf2html(const QString&);
 
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::iex::capella {
 //---------------------------------------------------------
 //   errmsg
 //---------------------------------------------------------
@@ -80,6 +85,7 @@ const char* Capella::errmsg[] = {
     "bad voice signature",
     "bad staff signature",
     "bad system signature",
+    "bad file content",
 };
 
 //---------------------------------------------------------
@@ -88,8 +94,8 @@ const char* Capella::errmsg[] = {
 
 static void addDynamic(Score*, Segment* s, int track, const char* name)
 {
-    Dynamic* d = new Dynamic(s);
-    d->setDynamicType(name);
+    Dynamic* d = Factory::createDynamic(s);
+    d->setDynamicType(String::fromUtf8(name));
     d->setTrack(track);
     s->add(d);
 }
@@ -119,27 +125,27 @@ static void SetCapGraceDuration(Chord* chord, ChordObj* o)
     ((Chord*)chord)->setNoteType(nt);
     if (o->t == TIMESTEP::D4) {
         ((Chord*)chord)->setNoteType(NoteType::GRACE4);
-        chord->setDurationType(TDuration::DurationType::V_QUARTER);
+        chord->setDurationType(DurationType::V_QUARTER);
     } else if (o->t == TIMESTEP::D_BREVE) {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_BREVE);
+        ((Chord*)chord)->setDurationType(DurationType::V_BREVE);
     } else if (o->t == TIMESTEP::D1) {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_WHOLE);
+        ((Chord*)chord)->setDurationType(DurationType::V_WHOLE);
     } else if (o->t == TIMESTEP::D2) {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_HALF);
+        ((Chord*)chord)->setDurationType(DurationType::V_HALF);
     } else if (o->t == TIMESTEP::D16) {
         ((Chord*)chord)->setNoteType(NoteType::GRACE16);
-        chord->setDurationType(TDuration::DurationType::V_16TH);
+        chord->setDurationType(DurationType::V_16TH);
     } else if (o->t == TIMESTEP::D32) {
         ((Chord*)chord)->setNoteType(NoteType::GRACE32);
-        chord->setDurationType(TDuration::DurationType::V_32ND);
+        chord->setDurationType(DurationType::V_32ND);
     } else if (o->t == TIMESTEP::D64) {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_64TH);
+        ((Chord*)chord)->setDurationType(DurationType::V_64TH);
     } else if (o->t == TIMESTEP::D128) {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_128TH);
+        ((Chord*)chord)->setDurationType(DurationType::V_128TH);
     } else if (o->t == TIMESTEP::D256) {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_256TH);
+        ((Chord*)chord)->setDurationType(DurationType::V_256TH);
     } else {
-        ((Chord*)chord)->setDurationType(TDuration::DurationType::V_EIGHTH);
+        ((Chord*)chord)->setDurationType(DurationType::V_EIGHTH);
     }
 }
 
@@ -150,7 +156,7 @@ static void SetCapGraceDuration(Chord* chord, ChordObj* o)
 static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int track, ChordRest* cr)
 {
     Score* score = s->score();
-    foreach (BasicDrawObj* oo, objects) {
+    for (BasicDrawObj* oo : objects) {
         switch (oo->type) {
         case CapellaType::SIMPLE_TEXT:
         {
@@ -225,7 +231,7 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                     case 'b':                         // pedal asterisk *
                     case 'v':                         // 8va
                     case 186:                         // 15ma
-                        qDebug("Import of Capella text articulation %x(%c) not yet implemented", code, code);
+                        LOGD("Import of Capella text articulation %x(%c) not yet implemented", code, code);
                         break;
                     case 181:                         // caesura
                     {
@@ -239,14 +245,14 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                     default:
                         break;
                     }
-                    if (cr->type() == ElementType::CHORD) {
+                    if (cr && cr->type() == ElementType::CHORD) {
                         switch (code) {
                         case 172:                           // arpeggio (short)
                         case 173:                           // arpeggio (long)
                         {
-                            Arpeggio* a = Factory::createArpeggio(Ms::toChord(cr));
+                            Arpeggio* a = Factory::createArpeggio(toChord(cr));
                             a->setArpeggioType(ArpeggioType::NORMAL);
-                            if (Ms::toChord(cr)->arpeggio()) {                           // there can be only one
+                            if (mu::engraving::toChord(cr)->arpeggio()) {                           // there can be only one
                                 delete a;
                                 a = 0;
                             } else {
@@ -256,7 +262,7 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                         break;
                         case 187:                           // arpeggio (wiggle line, arrow up)
                         {
-                            Arpeggio* a = Factory::createArpeggio(Ms::toChord(cr));
+                            Arpeggio* a = Factory::createArpeggio(toChord(cr));
                             a->setArpeggioType(ArpeggioType::UP);
                             if ((static_cast<Chord*>(cr))->arpeggio()) {                           // there can be only one
                                 delete a;
@@ -268,7 +274,7 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                         break;
                         case 188:                           // arpeggio (wiggle line, arrow down)
                         {
-                            Arpeggio* a = Factory::createArpeggio(Ms::toChord(cr));
+                            Arpeggio* a = Factory::createArpeggio(toChord(cr));
                             a->setArpeggioType(ArpeggioType::DOWN);
                             if ((static_cast<Chord*>(cr))->arpeggio()) {                           // there can be only one
                                 delete a;
@@ -285,37 +291,38 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                     break;
                 }
             }
-            TextBase* text = new StaffText(s);
+            StaffText* text = Factory::createStaffText(s);
             QFont f(st->font());
             text->setFamily(f.family());
             text->setItalic(f.italic());
             // text->setUnderline(f.underline());
+            // text->setStrike(f.strikeOut());
             text->setBold(f.bold());
             text->setSize(f.pointSizeF());
 
             text->setPlainText(st->text());
             QPointF p(st->pos());
-            p = p / 32.0 * score->spatium();
+            p = p / 32.0 * score->style().spatium();
             // text->setUserOff(st->pos());
-            text->setOffset(mu::PointF::fromQPointF(p));
-            // qDebug("setText %s (%f %f)(%f %f) <%s>",
+            text->setOffset(muse::PointF::fromQPointF(p));
+            // LOGD("setText %s (%f %f)(%f %f) <%s>",
             //            qPrintable(st->font().family()),
             //            st->pos().x(), st->pos().y(), p.x(), p.y(), qPrintable(st->text()));
-            Align textalign;
+            AlignH textalign;
             switch (st->textalign()) {
             default:
             case 0:
-                textalign = Align::LEFT;
+                textalign = AlignH::LEFT;
                 break;
             case 1:
-                textalign = Align::HCENTER;
+                textalign = AlignH::HCENTER;
                 break;
             case 2:
-                textalign = Align::RIGHT;
+                textalign = AlignH::RIGHT;
                 break;
             }
-            text->setAlign(textalign | Align::BASELINE);
-            text->setOffset(mu::PointF(0.0, 2.0));
+            text->setAlign(Align(textalign, AlignV::BASELINE));
+            text->setOffset(muse::PointF(0.0, 2.0));
             text->setTrack(track);
             s->add(text);
         }
@@ -342,14 +349,14 @@ static void processBasicDrawObj(QList<BasicDrawObj*> objects, Segment* s, int tr
                     str += st->text();
                 }
             }
-            Harmony* harmony = new Harmony(s);
+            Harmony* harmony = Factory::createHarmony(s);
             harmony->setHarmony(str);
             harmony->setTrack(track);
             s->add(harmony);
             break;
         }
         case CapellaType::TEXT:
-            qDebug("======================Text:");
+            LOGD("======================Text:");
             break;
         default:
             break;
@@ -376,7 +383,7 @@ Fraction TupletFractionCap(int tupletCount, bool tuplettrp, bool tupletprol)
             exponent = qFloor(qLn(count) / qLn(2.0));
         }
     } else {
-        qDebug("Unknown tuplet, count = %d", tupletCount);
+        LOGD("Unknown tuplet, count = %d", tupletCount);
         return f;
     }
     if (tupletprol) {
@@ -390,7 +397,7 @@ Fraction TupletFractionCap(int tupletCount, bool tuplettrp, bool tupletprol)
     if (tuplettrp) {
         dd = dd * 3;
     }
-    qDebug("Tuplet Fraction: %d / %d", nn, dd);
+    LOGD("Tuplet Fraction: %d / %d", nn, dd);
     return Fraction(nn, dd);
 }
 
@@ -411,7 +418,7 @@ static bool findChordRests(BasicDrawObj const* const o, Score* score, const int 
     int graceNumber1 = 0;
     bool foundcr1 = false;
     Fraction tick2 = tick;
-    foreach (NoteObj* nobj, objects) {
+    for (NoteObj* nobj : objects) {
         BasicDurationalObj* d = 0;
         if (nobj->type() == CapellaNoteObjectType::REST) {
             d = static_cast<BasicDurationalObj*>(static_cast<RestObj*>(nobj));
@@ -460,14 +467,14 @@ static bool findChordRests(BasicDrawObj const* const o, Score* score, const int 
         if (seg->segmentType() != SegmentType::ChordRest) {
             continue;
         }
-        ChordRest* cr = static_cast<ChordRest*>(seg->element(track));
+        ChordRest* cr = toChordRest(seg->element(track));
         if (cr) {
-            if (graceNumber1 > 0) {       // the spanner is starting from a grace note
-                Chord* chord = static_cast<Chord*>(cr);
-                foreach (Chord* cc, chord->graceNotes()) {
+            if ((graceNumber1 > 0) && cr->isChord()) {       // the spanner is starting from a grace note
+                Chord* chord = toChord(cr);
+                for (Chord* cc : chord->graceNotes()) {
                     --graceNumber1;
                     if ((graceNumber1 == 0) && (!cr1)) {
-                        cr1 = static_cast<ChordRest*>(cc);             // found first ChordRest
+                        cr1 = toChordRest(cc);             // found first ChordRest
                     }
                 }
             }
@@ -481,14 +488,14 @@ static bool findChordRests(BasicDrawObj const* const o, Score* score, const int 
         if (seg->segmentType() != SegmentType::ChordRest) {
             continue;
         }
-        ChordRest* cr = static_cast<ChordRest*>(seg->element(track));
+        ChordRest* cr = toChordRest(seg->element(track));
         if (cr) {
-            if ((graceNumber > 0) && (cr->type() == ElementType::CHORD)) {       // the spanner is ending on a grace note
-                Chord* chord = static_cast<Chord*>(cr);
-                foreach (Chord* cc, chord->graceNotes()) {
+            if ((graceNumber > 0) && cr->isChord()) {       // the spanner is ending on a grace note
+                Chord* chord = toChord(cr);
+                for (Chord* cc : chord->graceNotes()) {
                     --graceNumber;
                     if ((graceNumber == 0) && (!cr2)) {
-                        cr2 = static_cast<ChordRest*>(cc);             // found 2nd ChordRest
+                        cr2 = toChordRest(cc);             // found 2nd ChordRest
                     }
                 }
             }
@@ -498,12 +505,12 @@ static bool findChordRests(BasicDrawObj const* const o, Score* score, const int 
             break;
         }
     }
-    qDebug("findChordRests o %p nNotes %d score %p track %d tick %d cr1 %p cr2 %p",
-           o, o->nNotes, score, track, tick.ticks(), cr1, cr2);
+    LOGD("findChordRests o %p nNotes %d score %p track %d tick %d cr1 %p cr2 %p",
+         o, o->nNotes, score, track, tick.ticks(), cr1, cr2);
 
     if (!(cr1 && cr2)) {
-        qDebug("first or second anchor for BasicDrawObj not found (tick %d type %d track %d first %p second %p)",
-               tick.ticks(), int(o->type), track, cr1, cr2);
+        LOGD("first or second anchor for BasicDrawObj not found (tick %d type %d track %d first %p second %p)",
+             tick.ticks(), int(o->type), track, cr1, cr2);
         return false;
     }
     return true;
@@ -544,13 +551,14 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
     bool tupletprol = false;
     int nTuplet     = 0;
     Fraction tupletTick = Fraction(0, 1);
+    ClefType pclef = score->staff(staffIdx)->defaultClefType().concertClef;
 
     QList<Chord*> graceNotes;
-    foreach (NoteObj* no, cvoice->objects) {
+    for (NoteObj* no : cvoice->objects) {
         switch (no->type()) {
         case CapellaNoteObjectType::REST:
         {
-            qDebug("     <Rest>");
+            LOGD("     <Rest>");
             Measure* m = score->getCreateMeasure(tick);
             RestObj* o = static_cast<RestObj*>(no);
             Fraction ticks  = o->ticks();
@@ -566,7 +574,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                     tupletprol  = o->isProlonging;
                     nTuplet     = 0;
                     tupletTick  = tick;
-                    tuplet      = new Tuplet(m);
+                    tuplet      = Factory::createTuplet(m);
                     Fraction f  = TupletFractionCap(tupletCount, tuplettrp, tupletprol);
                     tuplet->setRatio(f);
                     tuplet->setBaseLen(d);
@@ -586,7 +594,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                         Measure* m1 = score->getCreateMeasure(tick + (ft * i));
                         Segment* s = m1->getSegment(SegmentType::ChordRest, tick + (ft * i));
                         Rest* rest = Factory::createRest(s);
-                        rest->setDurationType(TDuration(TDuration::DurationType::V_MEASURE));
+                        rest->setDurationType(TDuration(DurationType::V_MEASURE));
                         rest->setTicks(m1->ticks());
                         rest->setTrack(staffIdx * VOICES + voice);
                         s->add(rest);
@@ -598,7 +606,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 Rest* rest = Factory::createRest(s);
                 TDuration d1;
                 if (o->fullMeasures) {
-                    d1.setType(TDuration::DurationType::V_MEASURE);
+                    d1.setType(DurationType::V_MEASURE);
                     rest->setTicks(m->ticks());
                 } else {
                     d1.setVal(ticks.ticks());
@@ -633,7 +641,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         break;
         case CapellaNoteObjectType::CHORD:
         {
-            qDebug("     <Chord>");
+            LOGD("     <Chord>");
             ChordObj* o = static_cast<ChordObj*>(no);
             Fraction ticks = o->ticks();
             if (o->invisible && ticks.isZero()) {              // get rid of placeholders
@@ -651,7 +659,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                     tupletprol  = o->isProlonging;
                     nTuplet     = 0;
                     tupletTick  = tick;
-                    tuplet      = new Tuplet(m);
+                    tuplet      = Factory::createTuplet(m);
                     Fraction f  = TupletFractionCap(tupletCount, tuplettrp, tupletprol);
                     tuplet->setRatio(f);
                     tuplet->setBaseLen(d);
@@ -661,9 +669,9 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                     Fraction nn = (ticks * tupletCount) / f;
                     tuplet->setTicks(nn);
                 }
-                qDebug("Tuplet at %d: count: %d  tri: %d  prolonging: %d  ticks %d objects %d",
-                       tick.ticks(), o->count, o->tripartite, o->isProlonging, ticks.ticks(),
-                       o->objects.size());
+                LOGD("Tuplet at %d: count: %d  tri: %d  prolonging: %d  ticks %d objects %lld",
+                     tick.ticks(), o->count, o->tripartite, o->isProlonging, ticks.ticks(),
+                     o->objects.size());
             }
 
             Chord* chord = Factory::createChord(score->dummy()->segment());
@@ -677,10 +685,10 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
             chord->setTrack(track);
             switch (o->stemDir) {
             case ChordObj::StemDir::DOWN:
-                chord->setStemDirection(Direction::DOWN);
+                chord->setStemDirection(DirectionV::DOWN);
                 break;
             case ChordObj::StemDir::UP:
-                chord->setStemDirection(Direction::UP);
+                chord->setStemDirection(DirectionV::UP);
                 break;
             case ChordObj::StemDir::NONE:
                 chord->setNoStem(true);
@@ -737,18 +745,20 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 break;
             case ClefType::C4:     off = -7;
                 break;
+            case ClefType::C4_8VB: off = -14;
+                break;
             case ClefType::C5:     off = -7;
                 break;
-            case ClefType::G_1:     off = 0;
+            case ClefType::G_1:    off = 0;
                 break;
             case ClefType::F_8VA:  off = -7;
                 break;
             case ClefType::F_15MA: off = 0;
                 break;
             default:          off = 0;
-                qDebug("clefType %d not implemented", int(clef));
+                LOGD("clefType %d not implemented", int(clef));
             }
-            // qDebug("clef %hhd off %d", clef, off);
+            // LOGD("clef %hhd off %d", clef, off);
 
             static int keyOffsets[15] = {
                 /*   -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7 */
@@ -756,7 +766,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
             };
             off += keyOffsets[int(key) + 7];
 
-            for (CNote n : o->notes) {
+            for (const CNote& n : o->notes) {
                 Note* note = Factory::createNote(chord);
                 int pitch = 0;
                 // .cap import: pitch contains the diatonic note number relative to clef and key
@@ -777,26 +787,26 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 }
                 pitch += n.alteration;
                 pitch += score->staff(staffIdx)->part()->instrument()->transpose().chromatic;               // assume not in concert pitch
-                pitch = limit(pitch, 0, 127);
+                pitch = std::clamp(pitch, 0, 127);
 
                 chord->add(note);
                 note->setPitch(pitch);
-                note->setHeadGroup(NoteHead::Group(n.headGroup));
+                note->setHeadGroup(NoteHeadGroup(n.headGroup));
                 // TODO: compute tpc from pitch & line
                 note->setTpcFromPitch();
                 if (o->rightTie) {
-                    Tie* tie = new Tie(score->dummy());
+                    Tie* tie = Factory::createTie(score->dummy());
                     tie->setStartNote(note);
                     tie->setTrack(track);
                     note->setTieFor(tie);
                 }
             }
             for (Verse v : o->verse) {
-                Lyrics* l = new Lyrics(chord);
+                Lyrics* l = Factory::createLyrics(chord);
                 l->setTrack(track);
                 l->setPlainText(v.text);
                 if (v.hyphen) {
-                    l->setSyllabic(Lyrics::Syllabic::BEGIN);
+                    l->setSyllabic(LyricsSyllabic::BEGIN);
                 }
                 l->setNo(v.num);
                 chord->add(l);
@@ -807,7 +817,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
             case 7:                     // "weak beat"
             case 8:                     // "strong beat"
             default:  if (o->articulation) {
-                    qDebug("Articulation # %d not implemented", o->articulation);
+                    LOGD("Articulation # %d not implemented", o->articulation);
             }
                 break;
             }
@@ -831,17 +841,18 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         break;
         case CapellaNoteObjectType::CLEF:
         {
-            qDebug("     <Clef>");
+            LOGD("     <Clef>");
             CapClef* o = static_cast<CapClef*>(no);
             ClefType nclef = o->clef();
-            qDebug("%d:%d <Clef> %s line %d oct %d clef %d",
-                   tick.ticks(), staffIdx, o->name(), int(o->line), int(o->oct), int(o->clef()));
-            if (nclef == ClefType::INVALID) {
+            LOGD("%d:%d <Clef> %s line %d oct %d clef %d",
+                 tick.ticks(), staffIdx, o->name(), int(o->line), int(o->oct), int(o->clef()));
+            if (nclef == ClefType::INVALID || nclef == pclef) {
                 break;
             }
+            pclef = nclef;
             // staff(staffIdx)->setClef(tick, nclef);
-            Measure* m = score->getCreateMeasure(tick);
             Segment* s;
+            Measure* m = score->getCreateMeasure(tick);
             if (tick == m->tick()) {
                 s = m->getSegment(SegmentType::HeaderClef, tick);
             } else {
@@ -855,11 +866,23 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         break;
         case CapellaNoteObjectType::KEY:
         {
-            qDebug("   <Key>");
+            LOGD("   <Key>");
             CapKey* o = static_cast<CapKey*>(no);
             KeySigEvent key = score->staff(staffIdx)->keySigEvent(tick);
-            KeySigEvent okey;
-            okey.setKey(Key(o->signature));
+            KeySigEvent okey = key;
+            Key tKey = Key(o->signature);
+            Key cKey = tKey;
+            Interval v = score->staff(staffIdx)->part()->instrument(tick)->transpose();
+            if (!v.isZero() && !score->style().styleB(mu::engraving::Sid::concertPitch)) {
+                cKey = transposeKey(tKey, v);
+                // if there are more than 6 accidentals in transposing key, it cannot be PreferSharpFlat::AUTO
+                Part* part = score->staff(staffIdx)->part();
+                if ((tKey > 6 || tKey < -6) && part->preferSharpFlat() == PreferSharpFlat::AUTO) {
+                    part->setPreferSharpFlat(PreferSharpFlat::NONE);
+                }
+            }
+            okey.setConcertKey(cKey);
+            okey.setKey(tKey);
             if (!(key == okey)) {
                 score->staff(staffIdx)->setKey(tick, okey);
                 Measure* m = score->getCreateMeasure(tick);
@@ -874,9 +897,9 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         case CapellaNoteObjectType::METER:
         {
             CapMeter* o = static_cast<CapMeter*>(no);
-            qDebug("     <Meter> tick %d %d/%d", tick.ticks(), o->numerator, 1 << o->log2Denom);
+            LOGD("     <Meter> tick %d %d/%d", tick.ticks(), o->numerator, 1 << o->log2Denom);
             if (o->log2Denom > 7 || o->log2Denom < 0) {
-                qFatal("illegal fraction");
+                ASSERT_X("illegal fraction");
             }
             SigEvent se = score->sigmap()->timesig(tick);
             Fraction f(o->numerator, 1 << o->log2Denom);
@@ -909,7 +932,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         case CapellaNoteObjectType::IMPL_BARLINE:              // does not exist?
         {
             CapExplicitBarline* o = static_cast<CapExplicitBarline*>(no);
-            qDebug("     <Barline>");
+            LOGD("     <Barline>");
             Measure* pm = 0;             // the previous measure (the one terminated by this barline)
             if (tick > Fraction(0, 1)) {
                 pm = score->getCreateMeasure(tick - Fraction::fromTicks(1));
@@ -924,11 +947,11 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
             }
 
             BarLineType st = o->type();
-            if (st == BarLineType::NORMAL) {
+            if (st & BarLineType::NORMAL) {
                 break;
             }
 
-            if (st == BarLineType::START_REPEAT || st == BarLineType::END_START_REPEAT) {
+            if (st & BarLineType::START_REPEAT || st & BarLineType::END_START_REPEAT) {
                 Measure* nm = 0;               // the next measure (the one started by this barline)
                 nm = score->getCreateMeasure(tick);
                 if (nm) {
@@ -936,7 +959,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 }
             }
 
-            if (st == BarLineType::END_REPEAT || st == BarLineType::END_START_REPEAT) {
+            if (st & BarLineType::END_REPEAT || st & BarLineType::END_START_REPEAT) {
                 if (pm) {
                     pm->setRepeatEnd(true);
                 }
@@ -944,7 +967,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         }
         break;
         case CapellaNoteObjectType::PAGE_BKGR:
-            qDebug("     <PageBreak>");
+            LOGD("     <PageBreak>");
             break;
         }
     }
@@ -954,7 +977,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
     // pass II
     //
     tick = startTick;
-    foreach (NoteObj* no, cvoice->objects) {
+    for (NoteObj* no : cvoice->objects) {
         BasicDurationalObj* d = 0;
         if (no->type() == CapellaNoteObjectType::REST) {
             d = static_cast<BasicDurationalObj*>(static_cast<RestObj*>(no));
@@ -967,14 +990,14 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
         for (BasicDrawObj* o : d->objects) {
             switch (o->type) {
             case CapellaType::SIMPLE_TEXT:
-                // qDebug("simple text at %d", tick);
+                // LOGD("simple text at %d", tick);
                 break;
             case CapellaType::WAVY_LINE:
                 break;
             case CapellaType::SLUR:
             {
                 // SlurObj* so = static_cast<SlurObj*>(o);
-                // qDebug("slur tick %d  %d-%d-%d-%d   %d-%d", tick, so->nEnd, so->nMid,
+                // LOGD("slur tick %d  %d-%d-%d-%d   %d-%d", tick, so->nEnd, so->nMid,
                 //        so->nDotDist, so->nDotWidth, so->nRefNote, so->nNotes);
                 ChordRest* cr1 = 0;               // ChordRest where slur begins
                 ChordRest* cr2 = 0;               // ChordRest where slur ends
@@ -982,12 +1005,12 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
 
                 if (res) {
                     if (cr1 == cr2) {
-                        qDebug("first and second anchor for slur identical (tick %d track %d first %p second %p)",
-                               tick.ticks(), track, cr1, cr2);
+                        LOGD("first and second anchor for slur identical (tick %d track %d first %p second %p)",
+                             tick.ticks(), track, cr1, cr2);
                     } else {
                         Slur* slur = Factory::createSlur(score->dummy());
-                        qDebug("tick %d track %d cr1 %p cr2 %p -> slur %p",
-                               tick.ticks(), track, cr1, cr2, slur);
+                        LOGD("tick %d track %d cr1 %p cr2 %p -> slur %p",
+                             tick.ticks(), track, cr1, cr2, slur);
                         slur->setTick(cr1->tick());
                         slur->setTick2(cr2->tick());
                         slur->setStartElement(cr1);
@@ -1002,15 +1025,15 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
             case CapellaType::TEXT: {
                 TextObj* to = static_cast<TextObj*>(o);
                 MeasureBase* measure = score->measures()->first();
-                Text* s = Factory::createText(measure, Tid::TITLE);
+                Text* s = Factory::createText(measure, TextStyleType::TITLE);
                 QString ss = ::rtf2html(QString(to->text));
 
-                // qDebug("string %f:%f w %d ratio %d <%s>",
+                // LOGD("string %f:%f w %d ratio %d <%s>",
                 //    to->relPos.x(), to->relPos.y(), to->width, to->yxRatio, qPrintable(ss));
                 s->setXmlText(ss);
 
                 if (measure->type() != ElementType::VBOX) {
-                    MeasureBase* mb = new VBox(score->dummy()->system());
+                    MeasureBase* mb = Factory::createVBox(score->dummy()->system());
                     mb->setTick(Fraction(0, 1));
                     score->addMeasure(mb, measure);
                     measure = mb;
@@ -1027,12 +1050,12 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 bool res = findChordRests(o, score, track, tick, cr1, cr2, no, cvoice->objects);
 
                 if (res) {
-                    Volta* volta = new Volta(score->dummy());
+                    Volta* volta = Factory::createVolta(score->dummy());
                     volta->setTrack(track);
                     volta->setTrack2(track);
                     // TODO also support endings such as "1 - 3"
                     volta->setText(QString("%1.").arg(vo->to));
-                    volta->endings().append(vo->to);
+                    volta->endings().push_back(vo->to);
                     if (vo->bRight) {
                         volta->setVoltaType(Volta::Type::CLOSED);
                     } else {
@@ -1052,16 +1075,16 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 bool res = findChordRests(o, score, track, tick, cr1, cr2, no, cvoice->objects);
                 if (res) {
                     if (cr1 == cr2) {
-                        qDebug("first and second anchor for trill line identical (tick %d track %d first %p second %p)",
-                               tick.ticks(), track, cr1, cr2);
+                        LOGD("first and second anchor for trill line identical (tick %d track %d first %p second %p)",
+                             tick.ticks(), track, cr1, cr2);
                     } else {
-                        Trill* trill = new Trill(score->dummy());
+                        Trill* trill = Factory::createTrill(score->dummy());
                         trill->setTrack(track);
                         trill->setTrack2(track);
                         trill->setTick(cr1->tick());
                         trill->setTick2(cr2->tick());
                         if (!(tro->trillSign)) {
-                            trill->setTrillType("prallprall");
+                            trill->setTrillType(TrillType::PRALLPRALL_LINE);
                         }
                         score->addElement(trill);
                     }
@@ -1076,10 +1099,10 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                 bool res = findChordRests(o, score, track, tick, cr1, cr2, no, cvoice->objects);
                 if (res) {
                     if (cr1 == cr2) {
-                        qDebug("first and second anchor for hairpin identical (tick %d track %d first %p second %p)",
-                               tick.ticks(), track, cr1, cr2);
+                        LOGD("first and second anchor for hairpin identical (tick %d track %d first %p second %p)",
+                             tick.ticks(), track, cr1, cr2);
                     } else {
-                        Hairpin* hp = new Hairpin(score->dummy()->segment());
+                        Hairpin* hp = Factory::createHairpin(score->dummy()->segment());
                         if (wdgo->decresc) {
                             hp->setHairpinType(HairpinType::DECRESC_HAIRPIN);
                         } else {
@@ -1091,7 +1114,6 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
                         hp->setTrack2(track);
                         hp->setAnchor(Spanner::Anchor::SEGMENT);
                         score->addSpanner(hp);
-                        score->updateHairpin(hp);
                     }
                 }
             }
@@ -1138,7 +1160,7 @@ static Fraction readCapVoice(Score* score, CapVoice* cvoice, int staffIdx, const
 
 static bool needPart(const int prevInst, const int currInst, const int staffIdx, QList<CapBracket> const& bracketList)
 {
-    foreach (CapBracket cb, bracketList) {
+    for (CapBracket cb : bracketList) {
         if (prevInst == currInst && cb.from < staffIdx && staffIdx <= cb.to && cb.curly) {
             return false;
         }
@@ -1157,19 +1179,19 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     }
 
     score->style().set(Sid::measureSpacing, 1.0);
-    score->setSpatium(cap->normalLineDist * DPMM);
+    score->style().setSpatium(cap->normalLineDist * DPMM);
     score->style().set(Sid::smallStaffMag, cap->smallLineDist / cap->normalLineDist);
     score->style().set(Sid::minSystemDistance, Spatium(8));
     score->style().set(Sid::maxSystemDistance, Spatium(12));
 
-    foreach (CapSystem* csys, cap->systems) {
-        qDebug("System:");
+    for (CapSystem* csys : cap->systems) {
+        LOGD("System:");
         for (CapStaff* cstaff : csys->staves) {
             CapStaffLayout* cl = cap->staffLayout(cstaff->iLayout);
-            qDebug("  Staff layout <%s><%s><%s><%s><%s> %d  barline %d-%d mode %d",
-                   qPrintable(cl->descr), qPrintable(cl->name), qPrintable(cl->abbrev),
-                   qPrintable(cl->intermediateName), qPrintable(cl->intermediateAbbrev),
-                   cstaff->iLayout, cl->barlineFrom, cl->barlineTo, cl->barlineMode);
+            LOGD("  Staff layout <%s><%s><%s><%s><%s> %d  barline %d-%d mode %d",
+                 qPrintable(cl->descr), qPrintable(cl->name), qPrintable(cl->abbrev),
+                 qPrintable(cl->intermediateName), qPrintable(cl->intermediateAbbrev),
+                 cstaff->iLayout, cl->barlineFrom, cl->barlineTo, cl->barlineMode);
         }
     }
 
@@ -1177,7 +1199,7 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     // find out the maximum number of staves
     //
     int staves = 0;
-    foreach (CapSystem* csys, cap->systems) {
+    for (CapSystem* csys : cap->systems) {
         staves = qMax(staves, csys->staves.size());
     }
     //
@@ -1185,8 +1207,8 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     // associated with a CapStaffLayout
     //
     if (staves != cap->staffLayouts().size()) {
-        qDebug("Capella: max number of staves != number of staff layouts (%d, %d)",
-               staves, cap->staffLayouts().size());
+        LOGD("Capella: max number of staves != number of staff layouts (%d, %lld)",
+             staves, cap->staffLayouts().size());
         staves = qMax(staves, cap->staffLayouts().size());
     }
 
@@ -1203,7 +1225,7 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     Part* part = 0;
     for (int staffIdx = 0; staffIdx < staves; ++staffIdx) {
         CapStaffLayout* cl = cap->staffLayout(staffIdx);
-        // qDebug("Midi staff %d program %d", staffIdx, cl->sound);
+        // LOGD("MIDI staff %d program %d", staffIdx, cl->sound);
 
         // create a new part if necessary
         if (needPart(midiPatch, cl->sound, staffIdx, cap->brackets)) {
@@ -1250,37 +1272,36 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
         bstaff->setBarLineSpan(span != 0);
     }
 
-    foreach (CapBracket cb, cap->brackets) {
-        qDebug("Bracket %d-%d curly %d", cb.from, cb.to, cb.curly);
-        Staff* staff = score->staves().value(cb.from);
+    for (CapBracket cb : cap->brackets) {
+        LOGD("Bracket %d-%d curly %d", cb.from, cb.to, cb.curly);
+        Staff* staff = muse::value(score->staves(), cb.from);
         if (staff == 0) {
-            qDebug("bad bracket 'from' value");
+            LOGD("bad bracket 'from' value");
             continue;
         }
         staff->setBracketType(0, cb.curly ? BracketType::BRACE : BracketType::NORMAL);
         staff->setBracketSpan(0, cb.to - cb.from + 1);
     }
     MeasureBase* measure = nullptr;
-    foreach (BasicDrawObj* o, cap->backgroundChord->objects) {
+    for (BasicDrawObj* o : cap->backgroundChord->objects) {
         switch (o->type) {
         case CapellaType::SIMPLE_TEXT:
         {
             SimpleTextObj* to = static_cast<SimpleTextObj*>(o);
-            Tid tid;
+            TextStyleType tid;
             switch (to->textalign()) {
-            case 0:   tid = Tid::POET;
+            case 0:   tid = TextStyleType::LYRICIST;
                 break;
-            case 1:   tid = Tid::TITLE;
+            case 1:   tid = TextStyleType::TITLE;
                 break;
-            case 2:   tid = Tid::COMPOSER;
+            case 2:   tid = TextStyleType::COMPOSER;
                 break;
-            default:  tid = Tid::DEFAULT;
+            default:  tid = TextStyleType::DEFAULT;
                 break;
             }
 
             if (!measure) {
-                measure = new VBox(score->dummy()->system());
-                measure->setTick(Fraction(0, 1));
+                measure = Factory::createTitleVBox(score->dummy()->system());
                 score->addMeasure(measure, score->measures()->first());
             }
 
@@ -1288,6 +1309,7 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
             QFont f(to->font());
             s->setItalic(f.italic());
             // s->setUnderline(f.underline());
+            // s->setStrike(f.strikeOut());
             s->setBold(f.bold());
             s->setSize(f.pointSizeF());
 
@@ -1295,11 +1317,11 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
             s->setPlainText(ss);
 
             measure->add(s);
-            // qDebug("page background object type %d (CapellaType::SIMPLE_TEXT) text %s", o->type, qPrintable(ss));
+            // LOGD("page background object type %d (CapellaType::SIMPLE_TEXT) text %s", o->type, qPrintable(ss));
         }
         break;
         default:
-            qDebug("page background object type %d", int(o->type));
+            LOGD("page background object type %d", int(o->type));
             break;
         }
     }
@@ -1310,8 +1332,7 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
         if (mbl->size() && mbl->first()->type() == ElementType::VBOX) {
             mb = static_cast<VBox*>(mbl->first());
         } else {
-            VBox* vb = new VBox(score->dummy()->system());
-            vb->setTick(Fraction(0, 1));
+            VBox* vb = Factory::createTitleVBox(score->dummy()->system());
             score->addMeasure(vb, mb);
             mb = vb;
         }
@@ -1319,11 +1340,11 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     }
 
     Fraction systemTick = Fraction(0, 1);
-    foreach (CapSystem* csys, cap->systems) {
-        qDebug("readCapSystem");
+    for (CapSystem* csys : cap->systems) {
+        LOGD("readCapSystem");
         /*
         if (csys->explLeftIndent > 0) {
-              HBox* mb = new HBox(score);
+              HBox* mb = Factory::createHBox(score);
               mb->setTick(systemTick);
               mb->setBoxWidth(Spatium(csys->explLeftIndent));
               score->addMeasure(mb);
@@ -1336,12 +1357,10 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
             //    which means that there is a 1:1 relation between layout/staff
             //
 
-            qDebug("  ReadCapStaff %d/%d", cstaff->numerator, 1 << cstaff->log2Denom);
+            LOGD("  ReadCapStaff %d/%d", cstaff->numerator, 1 << cstaff->log2Denom);
             int staffIdx = cstaff->iLayout;
-            int voice = 0;
             for (CapVoice* cvoice : cstaff->voices) {
                 Fraction tick = readCapVoice(score, cvoice, staffIdx, systemTick, capxMode);
-                ++voice;
                 if (tick > mtick) {
                     mtick = tick;
                 }
@@ -1350,8 +1369,8 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
         Measure* m = score->tick2measure(mtick - Fraction::fromTicks(1));
         if (m && !m->lineBreak()) {
             LayoutBreak* lb = Factory::createLayoutBreak(m);
-            lb->setLayoutBreakType(LayoutBreak::Type::LINE);
-            lb->setTrack(-1);             // this are system elements
+            lb->setLayoutBreakType(LayoutBreakType::LINE);
+            lb->setTrack(0);
             m->add(lb);
         }
         systemTick = mtick;
@@ -1362,10 +1381,10 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     //
     SegmentType st = SegmentType::ChordRest;
     for (Measure* m = score->firstMeasure(); m; m = m->nextMeasure()) {
-        for (int staffIdx = 0; staffIdx < score->staves().size(); ++staffIdx) {
+        for (size_t staffIdx = 0; staffIdx < score->staves().size(); ++staffIdx) {
             bool empty = true;
             for (Segment* s = m->first(st); s; s = s->next(st)) {
-                if (s->element(staffIdx * VOICES)) {
+                if (s->element(static_cast<int>(staffIdx) * VOICES)) {
                     empty = false;
                     break;
                 }
@@ -1374,9 +1393,9 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
                 if ((m->ticks() == m->timesig())) {
                     Segment* s = m->getSegment(SegmentType::ChordRest, m->tick());
                     Rest* rest = Factory::createRest(s);
-                    rest->setDurationType(TDuration::DurationType::V_MEASURE);
+                    rest->setDurationType(DurationType::V_MEASURE);
                     rest->setTicks(m->ticks());
-                    rest->setTrack(staffIdx * VOICES);
+                    rest->setTrack(static_cast<int>(staffIdx) * VOICES);
                     s->add(rest);
                 } else {
                     auto durList = toDurationList(m->ticks(), true);
@@ -1385,7 +1404,7 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
                         Segment* s = m->getSegment(SegmentType::ChordRest, m->tick() + Fraction::fromTicks(tickOffset));
                         Rest* rest = Factory::createRest(s);
                         rest->setDurationType(d);
-                        rest->setTrack(staffIdx * VOICES);
+                        rest->setTrack(static_cast<int>(staffIdx) * VOICES);
                         s->add(rest);
                         tickOffset += d.ticks().ticks();
                     }
@@ -1395,10 +1414,9 @@ void convertCapella(Score* score, Capella* cap, bool capxMode)
     }
     // score->connectSlurs();
     score->connectTies();
-    score->fixTicks();
+    score->setUpTempoMap();
     score->setPlaylistDirty();
     score->setLayoutAll();
-    score->addLayoutFlags(LayoutFlag::FIX_PITCH_VELO);
 }
 
 //---------------------------------------------------------
@@ -1435,7 +1453,7 @@ void SlurObj::read()
     nMid      = cap->readByte();
     nDotDist  = cap->readByte();
     nDotWidth = cap->readByte();
-    // qDebug("SlurObj nEnd %d nMid %d nDotDist %d nDotWidth %d",
+    // LOGD("SlurObj nEnd %d nMid %d nDotDist %d nDotWidth %d",
     //        nEnd, nMid, nDotDist, nDotWidth);
 }
 
@@ -1458,7 +1476,7 @@ void TextObj::read()
     cap->read(txt, size);
     txt[size] = 0;
     text = QString(txt);
-    // qDebug("read textObj len %d <%s>", size, txt);
+    // LOGD("read textObj len %d <%s>", size, txt);
 }
 
 //---------------------------------------------------------
@@ -1472,7 +1490,7 @@ void SimpleTextObj::read()
     align  = cap->readByte();
     _font  = cap->readFont();
     _text  = cap->readQString();
-    // qDebug("read SimpletextObj(%f,%f) len %zd <%s>",
+    // LOGD("read SimpletextObj(%f,%f) len %zd <%s>",
     //        relPos.x(), relPos.y(), _text.length(), qPrintable(_text));
 }
 
@@ -1487,7 +1505,7 @@ void LineObj::read()
     pt2       = cap->readPoint();
     color     = cap->readColor();
     lineWidth = cap->readByte();
-    // qDebug("LineObj: %f:%f  %f:%f  width %d", pt1.x(), pt1.y(), pt2.x(), pt2.y(), lineWidth);
+    // LOGD("LineObj: %f:%f  %f:%f  width %d", pt1.x(), pt1.y(), pt2.x(), pt2.y(), lineWidth);
 }
 
 //---------------------------------------------------------
@@ -1522,13 +1540,12 @@ void TransposableObj::read()
     relPos = cap->readPoint();
     b = cap->readByte();
     if (b != 12 && b != 21) {
-        qDebug("TransposableObj::read: warning: unknown drawObjectArray size of %d", b);
+        LOGD("TransposableObj::read: warning: unknown drawObjectArray size of %d", b);
     }
     variants = cap->readDrawObjectArray();
-    if (variants.size() != b) {
-        qDebug("variants.size %d, expected %d", variants.size(), b);
+    IF_ASSERT_FAILED_X(variants.size() == b, QString::asprintf("variants.size %lld, expected %d", variants.size(), b)) {
+        throw Capella::Error::BAD_FORMAT;
     }
-    Q_ASSERT(variants.size() == b);
     /*int nRefNote =*/ cap->readInt();
 }
 
@@ -1549,7 +1566,7 @@ void MetafileObj::read()
     char* enhMetaFileBits = vEnhMetaFileBits.data();
 #endif
     cap->read(enhMetaFileBits, size);
-    // qDebug("MetaFileObj::read %d bytes", size);
+    // LOGD("MetaFileObj::read %d bytes", size);
 }
 
 //---------------------------------------------------------
@@ -1612,7 +1629,9 @@ void NotelinesObj::read()
     case 1: break;         // Einlinienzeile
     case 2: break;         // Standard (5 Linien)
     default: {
-        Q_ASSERT(b == 0);
+        IF_ASSERT_FAILED(b == 0) {
+            throw Capella::Error::BAD_FORMAT;
+        }
         char lines[11];
         cap->read(lines, 11);
         break;
@@ -1642,8 +1661,8 @@ void VoltaObj::read()
     unsigned char numbers = cap->readByte();
     from = numbers & 0x0F;
     to = (numbers >> 4) & 0x0F;
-    qDebug("VoltaObj::read x0 %d x1 %d y %d bLeft %d bRight %d bDotted %d allNumbers %d from %d to %d",
-           x0, x1, y, bLeft, bRight, bDotted, allNumbers, from, to);
+    LOGD("VoltaObj::read x0 %d x1 %d y %d bLeft %d bRight %d bDotted %d allNumbers %d from %d to %d",
+         x0, x1, y, bLeft, bRight, bDotted, allNumbers, from, to);
 }
 
 //---------------------------------------------------------
@@ -1682,11 +1701,11 @@ QList<BasicDrawObj*> Capella::readDrawObjectArray()
     QList<BasicDrawObj*> ol;
     int n = readUnsigned();         // draw obj array
 
-    // qDebug("readDrawObjectArray %d elements", n);
+    // LOGD("readDrawObjectArray %d elements", n);
     for (int i = 0; i < n; ++i) {
         CapellaType type = CapellaType(readByte());
 
-        // qDebug("   readDrawObject %d of %d, type %d", i, n, type);
+        // LOGD("   readDrawObject %d of %d, type %d", i, n, type);
         switch (type) {
         case  CapellaType::GROUP: {
             GroupObj* o = new GroupObj(this);
@@ -1785,7 +1804,9 @@ QList<BasicDrawObj*> Capella::readDrawObjectArray()
         }
         break;
         default:
-            qFatal("readDrawObjectArray unsupported type %d", int(type));
+            IF_ASSERT_FAILED_X(false, QString::asprintf("readDrawObjectArray unsupported type %d", int(type))) {
+                throw Capella::Error::BAD_FORMAT;
+            }
             break;
         }
     }
@@ -1807,8 +1828,8 @@ void BasicDrawObj::read()
     nNotes      = range & 0x0fff;
     background  = range & 0x1000;
     pageRange   = (range >> 13) & 0x7;
-    qDebug("BasicDrawObj::read modeX %d modeY %d distY %d flags %d nRefNote %d nNotes %d background %d pageRange %d",
-           modeX, modeY, distY, flags, nRefNote, nNotes, background, pageRange);
+    LOGD("BasicDrawObj::read modeX %d modeY %d distY %d flags %d nRefNote %d nNotes %d background %d pageRange %d",
+         modeX, modeY, distY, flags, nRefNote, nNotes, background, pageRange);
 }
 
 //---------------------------------------------------------
@@ -1831,17 +1852,22 @@ void BasicRectObj::read()
 void BasicDurationalObj::read()
 {
     unsigned char b = cap->readByte();
+    IF_ASSERT_FAILED(!(b & 0x80)) {
+        throw Capella::Error::BAD_FORMAT;
+    }
     nDots      = b & 0x03;
     noDuration = b & 0x04;
     postGrace  = b & 0x08;
     bSmall     = b & 0x10;
     invisible  = b & 0x20;
     notBlack   = b & 0x40;
-    Q_ASSERT(!(b & 0x80));
 
     color = notBlack ? cap->readColor() : Qt::black;
 
     unsigned char c = cap->readByte();
+    IF_ASSERT_FAILED(!(c & 0x80)) {
+        throw Capella::Error::BAD_FORMAT;
+    }
     t = TIMESTEP(c & 0x0f);
     horizontalShift = (c & 0x10) ? cap->readInt() : 0;
     count = 0;
@@ -1853,16 +1879,15 @@ void BasicDurationalObj::read()
         tripartite   = (tuplet & 0x10) != 0;
         isProlonging = (tuplet & 0x20) != 0;
         if (tuplet & 0xc0) {
-            qDebug("bad tuplet value 0x%02x", tuplet);
+            LOGD("bad tuplet value 0x%02x", tuplet);
         }
     }
     if (c & 0x40) {
         objects = cap->readDrawObjectArray();
     }
-    Q_ASSERT(!(c & 0x80));
-    qDebug("DurationObj ndots %d nodur %d postgr %d bsm %d inv %d notbl %d t %d hsh %d cnt %d trp %d ispro %d",
-           nDots, noDuration, postGrace, bSmall, invisible, notBlack, int(t), horizontalShift, count, tripartite, isProlonging
-           );
+    LOGD("DurationObj ndots %d nodur %d postgr %d bsm %d inv %d notbl %d t %d hsh %d cnt %d trp %d ispro %d",
+         nDots, noDuration, postGrace, bSmall, invisible, notBlack, int(t), horizontalShift, count, tripartite, isProlonging
+         );
 }
 
 //---------------------------------------------------------
@@ -1889,7 +1914,7 @@ void RestObj::read()
     bVerticalCentered      = b & 2;
     bool bAddVerticalShift = b & 4;
     if (b & 0xf8) {
-        qFatal("RestObj: res. bits 0x%02x", b);
+        ASSERT_X(QString::asprintf("RestObj: res. bits 0x%02x", b));
     }
     fullMeasures = bMultiMeasures ? cap->readUnsigned() : 0;
     vertShift    = bAddVerticalShift ? cap->readInt() : 0;
@@ -1903,7 +1928,7 @@ ChordObj::ChordObj(Capella* c)
     : BasicDurationalObj(c), NoteObj(CapellaNoteObjectType::CHORD)
 {
     cap      = c;
-    beamMode = BeamMode::AUTO;
+    beamMode = CapBeamMode::AUTO;
 }
 
 //---------------------------------------------------------
@@ -1924,9 +1949,11 @@ void ChordObj::read()
     BasicDurationalObj::read();
 
     unsigned char flags = cap->readByte();
-    beamMode      = (flags & 0x01) ? BeamMode(cap->readByte()) : BeamMode::AUTO;
+    beamMode      = (flags & 0x01) ? CapBeamMode(cap->readByte()) : CapBeamMode::AUTO;
     notationStave = (flags & 0x02) ? cap->readChar() : 0;
-    Q_ASSERT(notationStave >= -1 && notationStave <= 1);
+    IF_ASSERT_FAILED(notationStave >= -1 && notationStave <= 1) {
+        throw Capella::Error::BAD_FORMAT;
+    }
 
     if (flags & 0x04) {
         stemDir     = StemDir(cap->readChar());
@@ -1982,17 +2009,17 @@ void ChordObj::read()
         n.headType      = b & 7;
         if (n.headType == 6) {
             n.headType = 0;
-            n.headGroup = int(NoteHead::Group::HEAD_CROSS);
+            n.headGroup = int(NoteHeadGroup::HEAD_CROSS);
         } else {
-            n.headGroup = int(NoteHead::Group::HEAD_NORMAL);
+            n.headGroup = int(NoteHeadGroup::HEAD_NORMAL);
         }
         n.alteration    = ((b >> 3) & 7) - 2;      // -2 -- +2
         if (b & 0x40) {
             n.explAlteration = 1;
         }
         n.silent = b & 0x80;
-        qDebug("ChordObj::read() note pitch %d explAlt %d head group %d %d alt %d silent %d",
-               n.pitch, n.explAlteration, n.headType, n.headGroup, n.alteration, n.silent);
+        LOGD("ChordObj::read() note pitch %d explAlt %d head group %d %d alt %d silent %d",
+             n.pitch, n.explAlteration, n.headType, n.headGroup, n.alteration, n.silent);
         notes.append(n);
     }
 }
@@ -2120,7 +2147,7 @@ int Capella::readInt()
 char* Capella::readString()
 {
     unsigned len = readUnsigned();
-    char* buffer = new char[len + 1];
+    char* buffer = new char[static_cast<size_t>(len) + 1];
     read(buffer, len);
     buffer[len] = 0;
     return buffer;
@@ -2168,7 +2195,9 @@ QColor Capella::readColor()
     QColor c;
     unsigned char b = readByte();
     if (b >= 16) {
-        Q_ASSERT(b == 255);
+        IF_ASSERT_FAILED(b == 255) {
+            throw Capella::Error::BAD_FORMAT;
+        }
         int r = readByte();
         int g = readByte();
         int bi = readByte();
@@ -2185,7 +2214,7 @@ QColor Capella::readColor()
 
 QFont Capella::readFont()
 {
-    int index = readUnsigned();
+    unsigned index = readUnsigned();
     if (index == 0) {
         int lfHeight           = readLong();
         /*int lfWidth            =*/ readLong();
@@ -2203,7 +2232,7 @@ QFont Capella::readFont()
         /*QColor color           =*/ readColor();
         QString face             = readQString();
 
-        qDebug("Font <%s> size %d, weight %d", qPrintable(face), lfHeight, lfWeight);
+        LOGD("Font <%s> size %d, weight %d", qPrintable(face), lfHeight, lfWeight);
         QFont font(face);
         font.setPointSizeF(lfHeight / 1000.0);
         font.setItalic(lfItalic);
@@ -2223,7 +2252,8 @@ QFont Capella::readFont()
     }
     index -= 1;
     if (index >= fonts.size()) {
-        qDebug("illegal font index %d (max %d)", index, fonts.size() - 1);
+        LOGD("illegal font index %u (max %lld)", index, fonts.size() - 1);
+        return QFont();
     }
     return fonts[index];
 }
@@ -2247,24 +2277,24 @@ void Capella::readStaveLayout(CapStaffLayout* sl, int idx)
     }
     break;
     }
-    qDebug("StaffLayout %d: barlineMode %d noteLines %d", idx, sl->barlineMode, sl->noteLines);
+    LOGD("StaffLayout %d: barlineMode %d noteLines %d", idx, sl->barlineMode, sl->noteLines);
 
     sl->bSmall      = readByte();
-    qDebug("staff size small %d", sl->bSmall);
+    LOGD("staff size small %d", sl->bSmall);
 
     sl->topDist      = readInt();
     sl->btmDist      = readInt();
     sl->groupDist    = readInt();
     sl->barlineFrom = readByte();
     sl->barlineTo   = readByte();
-    // qDebug("topDist %d btmDist %d groupDist %d barlineFrom %d barlineTo %d",
+    // LOGD("topDist %d btmDist %d groupDist %d barlineFrom %d barlineTo %d",
     //        sl->topDist, sl->btmDist, sl->groupDist, sl->barlineFrom, sl->barlineTo);
 
     unsigned char clef = readByte();
     sl->form = Form(clef & 7);
     sl->line = ClefLine((clef >> 3) & 7);
     sl->oct  = Oct((clef >> 6));
-    qDebug("   clef %x  form %d, line %d, oct %d", clef, int(sl->form), int(sl->line), int(sl->oct));
+    LOGD("   clef %x  form %d, line %d, oct %d", clef, int(sl->form), int(sl->line), int(sl->oct));
 
     // Schlagzeuginformation
     unsigned char b   = readByte();
@@ -2273,33 +2303,35 @@ void Capella::readStaveLayout(CapStaffLayout* sl, int idx)
     sl->bSoundMapOut = b & 4;
     if (sl->bSoundMapIn) {        // Umleitungstabelle für Eingabe vom Keyboard
         uchar iMin = readByte();
-        Q_UNUSED(iMin);
         uchar n    = readByte();
-        Q_ASSERT(n > 0 && iMin + n <= 128);
+        IF_ASSERT_FAILED(n > 0 && iMin + n <= 128) {
+            throw Capella::Error::BAD_FORMAT;
+        }
         f->read(sl->soundMapIn, n);
         curPos += n;
     }
     if (sl->bSoundMapOut) {       // Umleitungstabelle für das Vorspielen
         unsigned char iMin = readByte();
-        Q_UNUSED(iMin);
         unsigned char n    = readByte();
-        Q_ASSERT(n > 0 && iMin + n <= 128);
+        IF_ASSERT_FAILED(n > 0 && iMin + n <= 128) {
+            throw Capella::Error::BAD_FORMAT;
+        }
         f->read(sl->soundMapOut, n);
         curPos += n;
     }
     sl->sound  = readInt();
     sl->volume = readInt();
     sl->transp = readInt();
-    qDebug("   sound %d vol %d transp %d", sl->sound, sl->volume, sl->transp);
+    LOGD("   sound %d vol %d transp %d", sl->sound, sl->volume, sl->transp);
 
     sl->descr              = readQString();
     sl->name               = readQString();
     sl->abbrev             = readQString();
     sl->intermediateName   = readQString();
     sl->intermediateAbbrev = readQString();
-    qDebug("   descr <%s> name <%s>  abbrev <%s> iname <%s> iabrev <%s>",
-           qPrintable(sl->descr), qPrintable(sl->name), qPrintable(sl->abbrev),
-           qPrintable(sl->intermediateName), qPrintable(sl->intermediateAbbrev));
+    LOGD("   descr <%s> name <%s>  abbrev <%s> iname <%s> iabbrev <%s>",
+         qPrintable(sl->descr), qPrintable(sl->name), qPrintable(sl->abbrev),
+         qPrintable(sl->intermediateName), qPrintable(sl->intermediateAbbrev));
 }
 
 //---------------------------------------------------------
@@ -2310,19 +2342,21 @@ void Capella::readLayout()
 {
     smallLineDist  = double(readInt()) / 100;
     normalLineDist = double(readInt()) / 100;
-    qDebug("Capella::readLayout(): smallLineDist %g normalLineDist %g", smallLineDist, normalLineDist);
+    LOGD("Capella::readLayout(): smallLineDist %g normalLineDist %g", smallLineDist, normalLineDist);
 
     topDist        = readInt();
     interDist      = readInt();
-    qDebug("Capella::readLayout(): topDist %d", topDist);
+    LOGD("Capella::readLayout(): topDist %d", topDist);
 
     txtAlign   = readByte();      // Stimmenbezeichnungen 0=links, 1=zentriert, 2=rechts
-    adjustVert = readByte();      // 0=nein, 1=au�er letzte Seite, 3=alle Seiten
+    adjustVert = readByte();      // 0=nein, 1=außer letzte Seite, 3=alle Seiten
 
-    unsigned char b          = readByte();
+    unsigned char b  = readByte();
+    IF_ASSERT_FAILED(!(b & 0xFC)) {   // bits 2...7 reserviert
+        throw Capella::Error::BAD_FORMAT;
+    }
     redundantKeys    = b & 1;
     modernDoubleNote = b & 2;
-    Q_ASSERT((b & 0xFC) == 0);   // bits 2...7 reserviert
 
     bSystemSeparators = readByte();
     nUnnamed           = readInt();
@@ -2332,7 +2366,7 @@ void Capella::readLayout()
     // Musterzeilen
     unsigned nStaveLayouts = readUnsigned();
 
-    // qDebug("%d staves", nStaveLayouts);
+    // LOGD("%d staves", nStaveLayouts);
 
     for (unsigned iStave = 0; iStave < nStaveLayouts; iStave++) {
         CapStaffLayout* sl = new CapStaffLayout;
@@ -2347,10 +2381,10 @@ void Capella::readLayout()
         cb.from   = readInt();
         cb.to     = readInt();
         cb.curly = readByte();
-        // qDebug("Bracket%d %d-%d curly %d", i, b.from, b.to, b.curly);
+        // LOGD("Bracket%d %d-%d curly %d", i, b.from, b.to, b.curly);
         brackets.append(cb);
     }
-    // qDebug("Capella::readLayout(): done");
+    // LOGD("Capella::readLayout(): done");
 }
 
 //---------------------------------------------------------
@@ -2361,7 +2395,7 @@ void Capella::readExtra()
 {
     uchar n = readByte();
     if (n) {
-        qDebug("Capella::readExtra(%d)", n);
+        LOGD("Capella::readExtra(%d)", n);
         for (int i = 0; i < n; ++i) {
             readByte();
         }
@@ -2378,7 +2412,7 @@ void CapClef::read()
     form            = Form(b & 7);
     line            = ClefLine((b >> 3) & 7);
     oct             = Oct(b >> 6);
-    qDebug("Clef::read form %d line %d oct %d", int(form), int(line), int(oct));
+    LOGD("Clef::read form %d line %d oct %d", int(form), int(line), int(oct));
 }
 
 //---------------------------------------------------------
@@ -2402,6 +2436,7 @@ ClefType CapClef::clefType(Form form, ClefLine line, Oct oct)
     case int(Form::C) + (int(ClefLine::L2) << 3) + (int(Oct::OCT_NULL) << 5):  return ClefType::C2;
     case int(Form::C) + (int(ClefLine::L3) << 3) + (int(Oct::OCT_NULL) << 5):  return ClefType::C3;
     case int(Form::C) + (int(ClefLine::L4) << 3) + (int(Oct::OCT_NULL) << 5):  return ClefType::C4;
+    case int(Form::C) + (int(ClefLine::L4) << 3) + (int(Oct::OCT_BASSA) << 5): return ClefType::C4_8VB;
     case int(Form::C) + (int(ClefLine::L5) << 3) + (int(Oct::OCT_NULL) << 5):  return ClefType::C5;
 
     case int(Form::F) + (int(ClefLine::L4) << 3) + (int(Oct::OCT_NULL) << 5):  return ClefType::F;
@@ -2413,7 +2448,7 @@ ClefType CapClef::clefType(Form form, ClefLine line, Oct oct)
         if (form == Form::FORM_NULL) {
             return ClefType::INVALID;
         }
-        qDebug("unknown clef %d %d %d", int(form), int(line), int(oct));
+        LOGD("unknown clef %d %d %d", int(form), int(line), int(oct));
         break;
     }
     return ClefType::INVALID;
@@ -2427,7 +2462,7 @@ void CapKey::read()
 {
     unsigned char b = cap->readByte();
     signature = int(b) - 7;
-    // qDebug("         Key %d", signature);
+    // LOGD("         Key %d", signature);
 }
 
 //---------------------------------------------------------
@@ -2440,9 +2475,9 @@ void CapMeter::read()
     uchar d   = cap->readByte();
     log2Denom = (d & 0x7f) - 1;
     allaBreve = d & 0x80;
-    qDebug("   Meter %d/%d allaBreve %d", numerator, log2Denom, allaBreve);
+    LOGD("   Meter %d/%d allaBreve %d", numerator, log2Denom, allaBreve);
     if (log2Denom > 7 || log2Denom < 0) {
-        qDebug("   illegal fraction");
+        LOGD("   illegal fraction");
         // abort();
         log2Denom = 2;
         numerator = 4;
@@ -2487,9 +2522,11 @@ void CapExplicitBarline::read()
         _type = BarLineType::NORMAL;    // default
     }
     _barMode = b >> 4;           // 0 = auto, 1 = nur Zeilen, 2 = durchgezogen
-    Q_ASSERT(_barMode <= 2);
+    IF_ASSERT_FAILED(_barMode <= 2) {
+        throw Capella::Error::BAD_FORMAT;
+    }
 
-    qDebug("         Expl.Barline type %d mode %d", int(_type), _barMode);
+    LOGD("         Expl.Barline type %d mode %d", int(_type), _barMode);
 }
 
 //---------------------------------------------------------
@@ -2498,7 +2535,7 @@ void CapExplicitBarline::read()
 
 void Capella::readVoice(CapStaff* cs, int idx)
 {
-    qDebug("      readVoice %d", idx);
+    LOGD("      readVoice %d", idx);
 
     if (readChar() != 'C') {
         throw Capella::Error::BAD_VOICE_SIG;
@@ -2516,7 +2553,7 @@ void Capella::readVoice(CapStaff* cs, int idx)
     for (unsigned i = 0; i < nNoteObjs; i++) {
         QColor color       = Qt::black;
         uchar type = readByte();
-        // qDebug("         Voice %d read object idx %d(%d) type %d", idx,  i, nNoteObjs, type);
+        // LOGD("         Voice %d read object idx %d(%d) type %d", idx,  i, nNoteObjs, type);
         readExtra();
         if ((type != uchar(CapellaNoteObjectType::REST)) && (type != uchar(CapellaNoteObjectType::CHORD))
             && (type != uchar(CapellaNoteObjectType::PAGE_BKGR))) {
@@ -2565,12 +2602,12 @@ void Capella::readVoice(CapStaff* cs, int idx)
         {
             CapExplicitBarline* bl = new CapExplicitBarline(this);
             bl->read();
-            qDebug("append Expl Barline==========");
+            LOGD("append Expl Barline==========");
             v->objects.append(bl);
         }
         break;
         default:
-            qFatal("bad voice type %d", type);
+            ASSERT_X(QString::asprintf("bad voice type %d", type));
         }
     }
     cs->voices.append(v);
@@ -2592,9 +2629,9 @@ void Capella::readStaff(CapSystem* system)
     uchar d          = readByte();
     staff->log2Denom = (d & 0x7f) - 1;
     staff->allaBreve = d & 0x80;
-    qDebug("   CapStaff meter %d/%d allaBreve %d", staff->numerator, staff->log2Denom, staff->allaBreve);
+    LOGD("   CapStaff meter %d/%d allaBreve %d", staff->numerator, staff->log2Denom, staff->allaBreve);
     if (staff->log2Denom > 7 || staff->log2Denom < 0) {
-        qDebug("   illegal fraction");
+        LOGD("   illegal fraction");
         staff->log2Denom = 2;
         staff->numerator = 4;
     }
@@ -2605,7 +2642,7 @@ void Capella::readStaff(CapSystem* system)
     staff->color     = readColor();
     readExtra();
 
-    qDebug("      Staff iLayout %d", staff->iLayout);
+    LOGD("      Staff iLayout %d", staff->iLayout);
     // Stimmen
     unsigned nVoices = readUnsigned();
     for (unsigned i = 0; i < nVoices; i++) {
@@ -2629,7 +2666,7 @@ void Capella::readSystem()
     s->bBarCountReset = readByte();
     s->explLeftIndent = readByte();
 
-    s->beamMode = BeamMode(readByte());
+    s->beamMode = CapBeamMode(readByte());
     s->tempo    = readUnsigned();
     s->color    = readColor();
     readExtra();
@@ -2675,10 +2712,10 @@ Fraction BasicDurationalObj::ticks() const
         break;
     case TIMESTEP::D256:        len = Fraction(1, 256);
         break;
-    case TIMESTEP::D_BREVE:     len = Fraction(2, 2);
+    case TIMESTEP::D_BREVE:     len = Fraction(2, 1);
         break;
     default:
-        qDebug("BasicDurationalObj::ticks: illegal duration value %d", int(t));
+        LOGD("BasicDurationalObj::ticks: illegal duration value %d", int(t));
         break;
     }
     Fraction slen = len;
@@ -2717,7 +2754,7 @@ void Capella::read(QFile* fp)
         throw Capella::Error::BAD_SIG;
     }
 
-    // qDebug("read Capella file signature <%s>", signature);
+    // LOGD("read Capella file signature <%s>", signature);
 
     // TODO: test for signature[7] = a-z
 
@@ -2725,7 +2762,7 @@ void Capella::read(QFile* fp)
     keywords = readString();
     comment  = readString();
 
-    // qDebug("author <%s> keywords <%s> comment <%s>", author, keywords, comment);
+    // LOGD("author <%s> keywords <%s> comment <%s>", author, keywords, comment);
 
     nRel   = readUnsigned();              // 75
     nAbs   = readUnsigned();              // 16
@@ -2734,7 +2771,7 @@ void Capella::read(QFile* fp)
     bAllowCompression = b & 2;
     bPrintLandscape   = b & 16;
 
-    // qDebug("  nRel %d  nAbs %d useRealSize %d compresseion %d", nRel, nAbs, bUseRealSize, bAllowCompression);
+    // LOGD("  nRel %d  nAbs %d useRealSize %d compression %d", nRel, nAbs, bUseRealSize, bAllowCompression);
 
     readLayout();
 
@@ -2749,18 +2786,18 @@ void Capella::read(QFile* fp)
 
     unsigned n = readUnsigned();
     if (n) {
-        qDebug("Gallery objects");
+        LOGD("Gallery objects");
     }
     for (unsigned int i = 0; i < n; ++i) {
         /*char* s =*/
         readString();                       // Namen der Galerie-Objekte
-        // qDebug("Galerie: <%s>", s);
+        // LOGD("Galerie: <%s>", s);
     }
 
-    // qDebug("read backgroundChord");
+    // LOGD("read backgroundChord");
     backgroundChord = new ChordObj(this);
     backgroundChord->read();                // contains graphic objects on the page background
-    // qDebug("read backgroundChord done");
+    // LOGD("read backgroundChord done");
     bShowBarCount    = readByte();          // Taktnumerierung zeigen
     barNumberFrame   = readByte();          // 0=kein, 1=Rechteck, 2=Ellipse
     nBarDistX        = readByte();
@@ -2787,14 +2824,14 @@ void Capella::read(QFile* fp)
 //   importCapella
 //---------------------------------------------------------
 
-Score::FileError importCapella(MasterScore* score, const QString& name)
+Err importCapella(MasterScore* score, const QString& name)
 {
     QFile fp(name);
     if (!fp.exists()) {
-        return Score::FileError::FILE_NOT_FOUND;
+        return Err::FileNotFound;
     }
     if (!fp.open(QIODevice::ReadOnly)) {
-        return Score::FileError::FILE_OPEN_ERROR;
+        return Err::FileOpenError;
     }
 
     Capella cf;
@@ -2803,17 +2840,16 @@ Score::FileError importCapella(MasterScore* score, const QString& name)
     }
     catch (Capella::Error errNo) {
         if (!MScore::noGui) {
-            QMessageBox::warning(0,
-                                 QWidget::tr("Import Capella"),
-                                 QWidget::tr("Load failed: %1").arg(cf.error(errNo)),
-                                 QString(), QWidget::tr("Quit"), QString(), 0, 1);
+            MessageBox(score->iocContext()).warning(muse::trc("iex_capella", "Import Capella"),
+                                                    muse::qtrc("iex_capella", "Import failed: %1").arg(cf.error(errNo)).toStdString(),
+                                                    { MessageBox::Ok });
         }
         fp.close();
         // avoid another error message box
-        return Score::FileError::FILE_NO_ERROR;
+        return Err::NoError;
     }
     fp.close();
     convertCapella(score, &cf, false);
-    return Score::FileError::FILE_NO_ERROR;
+    return Err::NoError;
 }
 }

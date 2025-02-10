@@ -20,18 +20,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_IFXRESOLVER_H
-#define MU_AUDIO_IFXRESOLVER_H
+#ifndef MUSE_AUDIO_IFXRESOLVER_H
+#define MUSE_AUDIO_IFXRESOLVER_H
 
 #include <memory>
 
-#include "modularity/imoduleexport.h"
-#include "async/promise.h"
+#include "modularity/imoduleinterface.h"
 
 #include "ifxprocessor.h"
 #include "audiotypes.h"
 
-namespace mu::audio::fx {
+namespace muse::audio::fx {
 class IFxResolver : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IFxResolver)
@@ -48,6 +47,7 @@ public:
         virtual std::vector<IFxProcessorPtr> resolveMasterFxList(const AudioFxChain& fxChain) = 0;
         virtual AudioResourceMetaList resolveResources() const = 0;
         virtual void refresh() = 0;
+        virtual void clearAllFx() = 0;
     };
     using IResolverPtr = std::shared_ptr<IResolver>;
 
@@ -55,9 +55,10 @@ public:
     virtual std::vector<IFxProcessorPtr> resolveFxList(const TrackId trackId, const AudioFxChain& fxChain) = 0;
     virtual AudioResourceMetaList resolveAvailableResources() const = 0;
     virtual void registerResolver(const AudioFxType type, IResolverPtr resolver) = 0;
+    virtual void clearAllFx() = 0;
 };
 
 using IFxResolverPtr = std::shared_ptr<IFxResolver>;
 }
 
-#endif // MU_AUDIO_IFXRESOLVER_H
+#endif // MUSE_AUDIO_IFXRESOLVER_H

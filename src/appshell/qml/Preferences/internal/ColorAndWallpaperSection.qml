@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
@@ -45,23 +45,21 @@ BaseSection {
     signal colorChangeRequested(var newColor)
     signal wallpaperPathChangeRequested(var newWallpaperPath)
 
-    titleOpacity: 1.0
-
     GridLayout {
         id: gridSection
 
         rows: 2
         columns: 2
 
-        rowSpacing: 8
-        columnSpacing: 0
+        rowSpacing: root.rowSpacing
+        columnSpacing: root.columnSpacing
 
         RoundedRadioButton {
             id: colorButton
             implicitWidth: root.columnWidth
 
             checked: root.useColor
-            text: qsTrc("appshell", "Color:")
+            text: qsTrc("appshell/preferences", "Color:")
 
             navigation.name: "ColorBox"
             navigation.panel: root.navigation
@@ -85,7 +83,7 @@ BaseSection {
             navigation.row: 0
             navigation.column: 1
 
-            onNewColorSelected: {
+            onNewColorSelected: function(newColor) {
                 root.colorChangeRequested(newColor)
             }
         }
@@ -94,7 +92,7 @@ BaseSection {
             implicitWidth: root.columnWidth
 
             checked: !root.useColor
-            text: qsTrc("appshell", "Wallpaper:")
+            text: qsTrc("appshell/preferences", "Wallpaper:")
 
             navigation.name: "WallpaperBox"
             navigation.panel: root.navigation
@@ -108,8 +106,7 @@ BaseSection {
 
         FilePicker {
             id: wallpaperPicker
-
-            width: 208
+            pathFieldWidth: root.columnWidth
 
             enabled: !root.useColor
 
@@ -117,7 +114,7 @@ BaseSection {
             navigationRowOrderStart: 1
             navigationColumnOrderStart: 1
 
-            onPathEdited: {
+            onPathEdited: function(newPath) {
                 root.wallpaperPathChangeRequested(newPath)
             }
         }

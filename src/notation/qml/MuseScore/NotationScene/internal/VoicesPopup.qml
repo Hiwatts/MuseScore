@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,19 +19,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick 2.15
+import QtQuick.Controls 2.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 
-StyledPopup {
+StyledPopupView {
     id: root
 
-    property var voicesVisibility: [] // array of bool
-    signal voiceVisibilityChangeRequested(var voiceIndex, var voiceVisible)
+    property var voicesVisibility: []
+    signal voiceVisibilityChangeRequested(int voiceIndex, bool voiceVisible)
 
-    height: contentColumn.implicitHeight + bottomPadding + topPadding
-    width: contentColumn.implicitWidth + leftPadding + rightPadding
+    contentHeight: contentColumn.childrenRect.height
+    contentWidth: contentColumn.childrenRect.width
 
     Column {
         id: contentColumn
@@ -39,7 +39,7 @@ StyledPopup {
         spacing: 18
 
         StyledTextLabel {
-            text: qsTrc("notation", "Voices visible on this score")
+            text: qsTrc("notation", "Voices visible on this staff")
         }
 
         ListView {
@@ -52,7 +52,7 @@ StyledPopup {
 
             delegate: CheckBox {
                 checked: modelData
-                text: qsTrc("notation", "Voice ") + (model.index + 1)
+                text: qsTrc("notation", "Voice %1").arg(model.index + 1)
 
                 onClicked: {
                     checked = !checked

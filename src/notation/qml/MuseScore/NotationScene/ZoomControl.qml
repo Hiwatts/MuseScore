@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 RowLayout {
     id: root
@@ -45,34 +45,40 @@ RowLayout {
     spacing: 0
 
     FlatButton {
-        id: zoomInButton
-        icon: IconCode.ZOOM_IN
+        id: zoomOutButton
+        icon: IconCode.ZOOM_OUT
         iconFont: ui.theme.toolbarIconsFont
 
+        width: height
+        height: 28
         transparent: true
 
         navigation.panel: root.navigationPanel
         navigation.order: root.navigationOrderMin
+        accessible.name: qsTrc("notation", "Zoom out")
 
         onClicked: {
-            root.zoomInRequested()
+            root.zoomOutRequested()
         }
     }
 
     FlatButton {
-        id: zoomOutButton
+        id: zoomInButton
         Layout.leftMargin: 4
 
-        icon: IconCode.ZOOM_OUT
+        icon: IconCode.ZOOM_IN
         iconFont: ui.theme.toolbarIconsFont
 
+        width: height
+        height: 28
         transparent: true
 
         navigation.panel: root.navigationPanel
-        navigation.order: zoomInButton.navigation.order + 1
+        navigation.order: zoomOutButton.navigation.order + 1
+        accessible.name: qsTrc("notation", "Zoom in")
 
         onClicked: {
-            root.zoomOutRequested()
+            root.zoomInRequested()
         }
     }
 
@@ -87,13 +93,15 @@ RowLayout {
 
             anchors.verticalCenter: parent.verticalCenter
 
+            live: false
+
             addLeadingZeros: false
             font: ui.theme.bodyFont
 
             navigation.panel: root.navigationPanel
             navigation.order: zoomOutButton.navigation.order + 1
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 root.changeZoomPercentageRequested(newValue)
             }
         }
@@ -109,15 +117,17 @@ RowLayout {
         id: menuButton
         Layout.leftMargin: 4
         Layout.preferredWidth: 20
+        height: 28
 
         icon: IconCode.SMALL_ARROW_DOWN
 
         navigation.panel: root.navigationPanel
         navigation.order: zoomInputField.navigation.order + 1
+        accessible.name: qsTrc("notation", "Zoom menu")
 
         menuModel: root.availableZoomList
         menuAnchorItem: ui.rootItem
-        onHandleMenuItem: {
+        onHandleMenuItem: function(itemId) {
             root.changeZoomRequested(itemId)
         }
     }

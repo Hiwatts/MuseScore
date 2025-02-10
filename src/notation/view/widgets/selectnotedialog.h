@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,26 +27,20 @@
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 
-namespace Ms {
+namespace mu::engraving {
 struct NotePattern;
 class Note;
 }
 
 namespace mu::notation {
-//---------------------------------------------------------
-//   SelectNoteDialog
-//---------------------------------------------------------
-
-class SelectNoteDialog : public QDialog, Ui::SelectNoteDialog
+class SelectNoteDialog : public QDialog, Ui::SelectNoteDialog, public muse::Injectable
 {
     Q_OBJECT
-    INJECT(notation, context::IGlobalContext, globalContext)
+
+    muse::Inject<context::IGlobalContext> globalContext = { this };
 
 public:
     SelectNoteDialog(QWidget* parent = nullptr);
-    SelectNoteDialog(const SelectNoteDialog& other);
-
-    static int metaTypeId();
 
     bool doReplace() const;
     bool doAdd() const;
@@ -68,10 +62,8 @@ private:
     void apply() const;
     FilterNotesOptions noteOptions() const;
 
-    const Ms::Note* m_note = nullptr;
+    const mu::engraving::Note* m_note = nullptr;
 };
 }
-
-Q_DECLARE_METATYPE(mu::notation::SelectNoteDialog)
 
 #endif // MU_NOTATION_SELECTNOTEDIALOG_H

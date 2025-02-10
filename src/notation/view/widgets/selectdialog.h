@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,7 +27,7 @@
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 
-namespace Ms {
+namespace mu::engraving {
 class System;
 }
 
@@ -36,16 +36,14 @@ namespace mu::notation {
 //   SelectDialog
 //---------------------------------------------------------
 
-class SelectDialog : public QDialog, Ui::SelectDialog
+class SelectDialog : public QDialog, Ui::SelectDialog, public muse::Injectable
 {
     Q_OBJECT
-    INJECT(notation, context::IGlobalContext, globalContext)
+
+    muse::Inject<context::IGlobalContext> globalContext = { this };
 
 public:
     SelectDialog(QWidget* parent = nullptr);
-    SelectDialog(const SelectDialog& other);
-
-    static int metaTypeId();
 
     bool doReplace() const;
     bool doAdd() const;
@@ -66,7 +64,7 @@ private:
     void apply() const;
     FilterElementsOptions elementOptions() const;
 
-    Ms::System* elementSystem(const EngravingItem* element) const;
+    mu::engraving::System* elementSystem(const EngravingItem* element) const;
 
     const EngravingItem* m_element = nullptr;
 };

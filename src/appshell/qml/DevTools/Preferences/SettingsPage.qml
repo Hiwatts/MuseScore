@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,19 +19,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.7
-import QtQuick.Controls 2.2
-import QtQuick.Dialogs 1.2
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Dock 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Dock 1.0
 import MuseScore.Preferences 1.0
 
-Rectangle {
+ColumnLayout {
     id: root
-
-    color: ui.theme.backgroundPrimaryColor
 
     SettingListModel {
         id: settingsModel
@@ -41,10 +39,34 @@ Rectangle {
         settingsModel.load()
     }
 
-    ListView {
-        anchors.fill: parent
+    SearchField {
+        id: searchField
+    }
 
-        model: settingsModel
+    StyledListView {
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+
+        model: SortFilterProxyModel {
+            id: sortFilterModel
+            sourceModel: settingsModel
+
+            filters: [
+                FilterValue {
+                    roleName: "keyRole"
+                    roleValue: searchField.searchText
+                    compareType: CompareType.Contains
+                }
+            ]
+
+            sorters: [
+                SorterValue {
+                    roleName: "sectionRole"
+                    sortOrder: Qt.AscendingOrder
+                    enabled: true
+                }
+            ]
+        }
 
         section.property: "sectionRole"
         section.delegate: Rectangle {
@@ -59,13 +81,12 @@ Rectangle {
             }
         }
 
-        delegate: Rectangle {
+        delegate: Item {
             anchors.left: parent ? parent.left : undefined
             anchors.right: parent ? parent.right : undefined
             anchors.leftMargin: 8
             anchors.rightMargin: 8
             height: 32
-            color: root.color
 
             StyledTextLabel {
                 anchors.top: parent.top
@@ -87,10 +108,23 @@ Rectangle {
 
                 Loader {
                     id: loader
-                    property var val: valRole
+                    property var val: valueRole
+                    property var minValue: minValueRole
+                    property var maxValue: maxValueRole
                     anchors.fill: parent
                     sourceComponent: root.componentByType(typeRole)
-                    onLoaded: loader.item.val = loader.val
+                    onLoaded: {
+                        loader.item.val = loader.val
+
+                        if (loader.item.minValue !== undefined) {
+                            loader.item.minValue = loader.minValue
+                        }
+
+                        if (loader.item.maxValue !== undefined) {
+                            loader.item.maxValue = loader.maxValue
+                        }
+                    }
+
                     onValChanged: {
                         if (loader.item) {
                             loader.item.val = loader.val
@@ -101,7 +135,9 @@ Rectangle {
                 Connections {
                     target: loader.item
                     function onChanged(newVal) {
-                        settingsModel.changeVal(model.index, newVal)
+                        let sortFilterModelIndex = sortFilterModel.index(model.index, 0);
+                        let sourceModelIndex = sortFilterModel.mapToSource(sortFilterModelIndex)
+                        settingsModel.changeVal(sourceModelIndex.row, newVal)
                     }
                 }
             }
@@ -135,7 +171,7 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 2
                 verticalAlignment: Text.AlignVCenter
-                text: val
+                text: String(val)
                 onEditingFinished: textControl.changed(text)
             }
         }
@@ -143,62 +179,59 @@ Rectangle {
 
     Component {
         id: colorComp
-        Rectangle {
-            id: colorControl
+        ColorPicker {
             property var val
             signal changed(var newVal)
+
             anchors.fill: parent
             color: val
 
-            ColorDialog {
-                id: colorDialog
-                title: "Please choose a color"
-                onAccepted: colorControl.changed(colorDialog.color)
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: colorDialog.open()
+            onNewColorSelected: function(newColor) {
+                changed(newColor)
             }
         }
     }
 
     Component {
         id: intComp
-        SpinBox {
-            id: spinbox
-            property var val
+
+        IncrementalPropertyControl {
+            id: control
+
+            property int val
+
             signal changed(var newVal)
-            anchors.fill: parent
-            value: val
-            stepSize: 1
-            textFromValue: function(value, locale) { return String(value) }
-            valueFromText: function(text, locale) { return Number(text) }
-            onValueModified: spinbox.changed(Number(spinbox.value))
+            anchors.centerIn: parent
+
+            currentValue: val
+
+            step: 1
+            decimals: 0
+
+            onValueEdited: function(newValue) {
+                control.changed(newValue)
+            }
         }
     }
 
     Component {
         id: doubleComp
-        SpinBox {
-            id: spinbox
-            property var val
+
+        IncrementalPropertyControl {
+            id: control
+
+            property real val
+
             signal changed(var newVal)
             anchors.centerIn: parent
-            value: val * 10
-            stepSize: 10
-            from: -1000
-            to: 1000
 
-            property int decimals: 1
-            property real realValue: value / 10
+            currentValue: val
 
-            textFromValue: function(value, locale) {
-                return Number(value / 10).toLocaleString(locale, 'f', spinbox.decimals)
-            }
+            step: 1
+            decimals: 2
 
-            valueFromText: function(text, locale) {
-                return Number.fromLocaleString(locale, text) * 10
+            onValueEdited: function(newValue) {
+                control.changed(newValue)
             }
         }
     }

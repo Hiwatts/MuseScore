@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,11 +23,13 @@
 #define MU_PROJECT_INOTATIONREADER_H
 
 #include <memory>
+#include <map>
 
-#include "ret.h"
+#include "types/ret.h"
+#include "types/val.h"
 #include "io/path.h"
 
-namespace Ms {
+namespace mu::engraving {
 class MasterScore;
 }
 
@@ -39,11 +41,11 @@ public:
         ForceMode // Ignore lower priority errors (like version errors)
     };
 
-    using Options = QMap<OptionKey, QVariant>;
+    using Options = std::map<OptionKey, muse::Val>;
 
     virtual ~INotationReader() = default;
 
-    virtual Ret read(Ms::MasterScore* score, const io::path& path, const Options& options = Options()) = 0;
+    virtual muse::Ret read(mu::engraving::MasterScore* score, const muse::io::path_t& path, const Options& options = Options()) = 0;
 };
 
 using INotationReaderPtr = std::shared_ptr<INotationReader>;

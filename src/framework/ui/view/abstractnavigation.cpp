@@ -21,15 +21,18 @@
  */
 #include "abstractnavigation.h"
 
+#include <QQuickWindow>
+
 #include "qmlaccessible.h"
 
 #include "log.h"
 
-using namespace mu::ui;
-using namespace mu::accessibility;
+using namespace muse;
+using namespace muse::ui;
+using namespace muse::accessibility;
 
 AbstractNavigation::AbstractNavigation(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
@@ -44,6 +47,10 @@ void AbstractNavigation::componentComplete()
         m_accessible->setState(IAccessible::State::Active, active());
         m_accessible->componentComplete();
     }
+
+    navigationController()->highlightChanged().onNotify(this, [this](){
+        emit highlightChanged();
+    });
 }
 
 void AbstractNavigation::setName(QString name)
@@ -66,7 +73,36 @@ const INavigation::Index& AbstractNavigation::index() const
     return m_index;
 }
 
-mu::async::Channel<INavigation::Index> AbstractNavigation::indexChanged() const
+void AbstractNavigation::setIndex(const INavigation::Index& index)
+{
+    if (m_index == index) {
+        return;
+    }
+
+    bool _rowChanged = m_index.row != index.row;
+    bool _columnChanged = m_index.column != index.column;
+    bool _orderChanged = m_index.order() != index.order();
+
+    m_index = index;
+
+    if (m_indexChanged.isConnected()) {
+        m_indexChanged.send(m_index);
+    }
+
+    if (_rowChanged) {
+        emit rowChanged(m_index.row);
+    }
+
+    if (_columnChanged) {
+        emit columnChanged(m_index.column);
+    }
+
+    if (_orderChanged) {
+        emit orderChanged(m_index.order());
+    }
+}
+
+async::Channel<INavigation::Index> AbstractNavigation::indexChanged() const
 {
     return m_indexChanged;
 }
@@ -151,7 +187,7 @@ bool AbstractNavigation::enabled() const
     return m_enabled;
 }
 
-mu::async::Channel<bool> AbstractNavigation::enabledChanged() const
+async::Channel<bool> AbstractNavigation::enabledChanged() const
 {
     return m_enabledChanged;
 }
@@ -164,6 +200,7 @@ void AbstractNavigation::setActive(bool active)
 
     m_active = active;
     emit activeChanged(m_active);
+    emit highlightChanged();
 
     if (m_activeChanged.isConnected()) {
         m_activeChanged.send(m_active);
@@ -175,7 +212,7 @@ bool AbstractNavigation::active() const
     return m_active;
 }
 
-mu::async::Channel<bool> AbstractNavigation::activeChanged() const
+async::Channel<bool> AbstractNavigation::activeChanged() const
 {
     return m_activeChanged;
 }
@@ -184,6 +221,27 @@ void AbstractNavigation::onEvent(INavigation::EventPtr e)
 {
     NavigationEvent ev(e);
     emit navigationEvent(QVariant::fromValue(ev));
+}
+
+QWindow* AbstractNavigation::window() const
+{
+    QQuickItem* visualItem = this->visualItem();
+    return visualItem ? visualItem->window() : nullptr;
+}
+
+QQuickItem* AbstractNavigation::visualItem() const
+{
+    QObject* prn = parent();
+    while (prn) {
+        QQuickItem* vitem = qobject_cast<QQuickItem*>(prn);
+        if (vitem) {
+            return vitem;
+        }
+
+        prn = prn->parent();
+    }
+
+    return nullptr;
 }
 
 AccessibleItem* AbstractNavigation::accessible() const
@@ -221,4 +279,9 @@ void AbstractNavigation::setAccessibleParent(AccessibleItem* p)
     if (m_accessible) {
         m_accessible->setAccessibleParent(p);
     }
+}
+
+bool AbstractNavigation::highlight() const
+{
+    return active() && navigationController()->isHighlight();
 }

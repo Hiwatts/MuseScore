@@ -19,41 +19,51 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_SHORTCUTS_SHORTCUTSINSTANCEMODEL_H
-#define MU_SHORTCUTS_SHORTCUTSINSTANCEMODEL_H
+#ifndef MUSE_SHORTCUTS_SHORTCUTSINSTANCEMODEL_H
+#define MUSE_SHORTCUTS_SHORTCUTSINSTANCEMODEL_H
 
 #include <QObject>
 #include <QString>
 #include <QList>
 
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
 #include "ishortcutsregister.h"
 #include "ishortcutscontroller.h"
 
-namespace mu::shortcuts {
-class ShortcutsInstanceModel : public QObject
+namespace muse::shortcuts {
+class ShortcutsInstanceModel : public QObject, public Injectable, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(shortcuts, IShortcutsRegister, shortcutsRegister)
-    INJECT(shortcuts, IShortcutsController, controller)
+    Q_PROPERTY(QVariantMap shortcuts READ shortcuts NOTIFY shortcutsChanged)
+    Q_PROPERTY(bool active READ active NOTIFY activeChanged)
 
-    Q_PROPERTY(QStringList shortcuts READ shortcuts NOTIFY shortcutsChanged)
+public:
+    Inject<IShortcutsRegister> shortcutsRegister = { this };
+    Inject<IShortcutsController> controller = { this };
 
 public:
     explicit ShortcutsInstanceModel(QObject* parent = nullptr);
 
-    QStringList shortcuts() const;
+    QVariantMap shortcuts() const;
+    bool active() const;
 
-    Q_INVOKABLE void load();
-    Q_INVOKABLE void activate(const QString& key);
+    Q_INVOKABLE void init();
+    Q_INVOKABLE void activate(const QString& seq);
 
 signals:
     void shortcutsChanged();
+    void activeChanged();
 
-private:
-    QStringList m_shortcuts;
+protected:
+    virtual void doLoadShortcuts();
+    virtual void doActivate(const QString& seq);
+
+    // Key = sequence (QString), value = autoRepeat (QVariant/bool)
+    QVariantMap m_shortcuts;
 };
 }
 
-#endif // MU_SHORTCUTS_SHORTCUTSINSTANCEMODEL_H
+#endif // MUSE_SHORTCUTS_SHORTCUTSINSTANCEMODEL_H

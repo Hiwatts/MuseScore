@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,17 +20,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Dock 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Dock 1.0
 
+import Muse.Cloud 1.0
+import Muse.Learn 1.0
 import MuseScore.Project 1.0
-import MuseScore.Cloud 1.0
-import MuseScore.Learn 1.0
-
-import "../dockwindow"
+import MuseScore.MuseSounds 1.0
 
 DockPage {
     id: root
@@ -38,8 +36,20 @@ DockPage {
     property string section: "scores"
     property string subSection: ""
 
+    property var window: null
+
     objectName: "Home"
     uri: "musescore://home"
+
+    onSetParamsRequested: function(params) {
+        if (Boolean(params["section"])) {
+            setCurrentCentral(params["section"])
+
+            if (Boolean(params["subSection"])) {
+                subSection = params["subSection"]
+            }
+        }
+    }
 
     onSectionChanged: {
         Qt.callLater(root.setCurrentCentral, section)
@@ -54,28 +64,39 @@ DockPage {
 
         switch (name) {
         case "scores": root.central = scoresComp; break
-        case "add-ons": root.central = addonsComp; break
-        case "audio": root.central = audioComp; break
-        case "feautured": root.central = feauturedComp; break
+        case "plugins": root.central = extensionsComp; break // backward compatibility
+        case "extensions": root.central = extensionsComp; break
+        case "musesounds": root.central = museSoundsComp; break
         case "learn": root.central = learnComp; break
-        case "support": root.central = supportComp; break
         case "account": root.central = accountComp; break
         }
     }
 
     panels: [
         DockPanel {
+            id: menuPanel
+
             objectName: "homeMenu"
 
-            minimumWidth: 76
-            maximumWidth: 292
+            readonly property int maxFixedWidth: 260
+            readonly property int minFixedWidth: 76
+            readonly property bool iconsOnly: root.window
+                                                ? root.window.width < (root.window.minimumWidth + maxFixedWidth - minFixedWidth)
+                                                : false
+            readonly property int currentFixedWidth: iconsOnly ? minFixedWidth : maxFixedWidth
 
-            allowedAreas: Qt.NoDockWidgetArea
+            width: currentFixedWidth
+            minimumWidth: currentFixedWidth
+            maximumWidth: currentFixedWidth
+
+            floatable: false
+            closable: false
 
             HomeMenu {
                 currentPageName: root.section
+                iconsOnly: menuPanel.iconsOnly
 
-                onSelected: {
+                onSelected: function(name) {
                     root.setCurrentCentral(name)
                 }
             }
@@ -97,29 +118,17 @@ DockPage {
     }
 
     Component {
-        id: addonsComp
+        id: extensionsComp
 
-        AddonsContent {
+        PluginsPage {
             section: root.subSection
         }
     }
 
     Component {
-        id: audioComp
+        id: museSoundsComp
 
-        StyledTextLabel {
-            anchors.centerIn: parent
-            text: "Audio & VST"
-        }
-    }
-
-    Component {
-        id: feauturedComp
-
-        StyledTextLabel {
-            anchors.centerIn: parent
-            text: "Feautured"
-        }
+        MuseSoundsPage {}
     }
 
     Component {
@@ -127,15 +136,6 @@ DockPage {
 
         LearnPage {
             section: root.subSection
-        }
-    }
-
-    Component {
-        id: supportComp
-
-        StyledTextLabel {
-            anchors.centerIn: parent
-            text: "Support"
         }
     }
 }

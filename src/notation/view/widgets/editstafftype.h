@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,24 +24,27 @@
 #define MU_NOTATION_EDITSTAFFTYPE_H
 
 #include "ui_editstafftype.h"
-#include "libmscore/mscore.h"
-#include "libmscore/stafftype.h"
+
+#include "modularity/ioc.h"
+#include "engraving/iengravingconfiguration.h"
+
+#include "engraving/dom/stafftype.h"
 
 #include "notation/notationtypes.h"
 
 namespace mu::notation {
-class ScoreView;
-
 //---------------------------------------------------------
 //   EditStaffType
 //---------------------------------------------------------
 
-class EditStaffType : public QDialog, private Ui::EditStaffType
+class EditStaffType : public QDialog, private Ui::EditStaffType, public muse::Injectable
 {
     Q_OBJECT
 
-    Ms::Staff* staff;
-    Ms::StaffType staffType;
+    muse::Inject<engraving::IEngravingConfiguration> engravingConfiguration = { this };
+
+    mu::engraving::Staff* staff;
+    mu::engraving::StaffType staffType;
 
     virtual void hideEvent(QHideEvent*);
     void blockSignals(bool block);
@@ -51,7 +54,7 @@ class EditStaffType : public QDialog, private Ui::EditStaffType
     void tabStemsCompatibility(bool checked);
     void tabMinimShortCompatibility(bool checked);
     void tabStemThroughCompatibility(bool checked);
-    QString createUniqueStaffTypeName(Ms::StaffGroup group);
+    QString createUniqueStaffTypeName(mu::engraving::StaffGroup group);
     void setValues();
 
 private slots:
@@ -72,14 +75,13 @@ private slots:
 public:
     EditStaffType(QWidget* parent = nullptr);
     ~EditStaffType() {}
-    void setStaffType(const Ms::StaffType* staffType);
-    Ms::StaffType getStaffType() const { return staffType; }
+    void setStaffType(const mu::engraving::StaffType* staffType);
+    mu::engraving::StaffType getStaffType() const { return staffType; }
 
     void setInstrument(const Instrument& instrument);
 
 private:
-    mu::Ret loadScore(Ms::MasterScore* score, const io::path& path);
-    mu::Ret doLoadScore(Ms::MasterScore* score, const io::path& path) const;
+    muse::Ret loadScore(mu::engraving::MasterScore* score, const muse::io::path_t& path);
 };
 }
 #endif

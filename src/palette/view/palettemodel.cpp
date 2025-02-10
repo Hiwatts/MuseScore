@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,10 +27,10 @@
 #include "internal/palettetree.h"
 #include "internal/palettecelliconengine.h"
 
-#include "engraving/libmscore/actionicon.h"
-#include "engraving/libmscore/beam.h"
-#include "engraving/libmscore/chordrest.h"
-#include "engraving/libmscore/select.h"
+#include "engraving/dom/actionicon.h"
+#include "engraving/dom/beam.h"
+#include "engraving/dom/chordrest.h"
+#include "engraving/dom/select.h"
 
 #include "commonscene/commonscenetypes.h"
 
@@ -38,8 +38,8 @@
 
 using namespace mu;
 using namespace mu::palette;
+using namespace mu::engraving;
 
-namespace Ms {
 //---------------------------------------------------------
 //   PaletteTreeModel::PaletteTreeModel
 //---------------------------------------------------------
@@ -68,7 +68,7 @@ void PaletteTreeModel::onDataChanged(const QModelIndex& topLeft, const QModelInd
 {
     Q_UNUSED(topLeft);
     Q_UNUSED(bottomRight);
-    static const std::set<int> nonPersistentRoles({ CellActiveRole, PaletteExpandedRole });
+    static const std::set<int> nonPersistentRoles({ CellActiveRole, PaletteExpandedRole, Qt::DecorationRole });
 
     bool treeChanged = false;
     for (int role : roles) {
@@ -355,7 +355,7 @@ QVariant PaletteTreeModel::data(const QModelIndex& index, int role) const
         case MimeDataRole: {
             QVariantMap map;
             if (cell->element) {
-                map[mu::commonscene::MIME_SYMBOL_FORMAT] = cell->element->mimeData(PointF());
+                map[mu::commonscene::MIME_SYMBOL_FORMAT] = cell->element->mimeData().toQByteArray();
             }
             map[PaletteCell::mimeDataFormat] = cell->toMimeData();
             return map;
@@ -416,7 +416,7 @@ bool PaletteTreeModel::setData(const QModelIndex& index, const QVariant& value, 
             if (value.canConvert<bool>()) {
                 const bool val = value.toBool();
                 if (val != pp->isExpanded()) {
-                    const bool singlePalette = configuration()->isSinglePalette();
+                    const bool singlePalette = configuration()->isSinglePalette().val;
 
                     if (singlePalette && val) {
                         for (auto& palette : palettes()) {
@@ -472,7 +472,10 @@ bool PaletteTreeModel::setData(const QModelIndex& index, const QVariant& value, 
             if (!newCell) {
                 return false;
             }
-            *cell = *newCell;
+            cell->element = newCell->element;
+            cell->untranslatedElement = newCell->untranslatedElement;
+            cell->name = newCell->name;
+            cell->id = newCell->id;
             emit dataChanged(index, index);
             return true;
         };
@@ -505,10 +508,20 @@ bool PaletteTreeModel::setData(const QModelIndex& index, const QVariant& value, 
                 if (!newCell) {
                     return false;
                 }
-                *cell = *newCell;
+
+                cell->element = newCell->element;
+                cell->untranslatedElement = newCell->untranslatedElement;
+                cell->name = newCell->name;
+                cell->id = newCell->id;
             } else if (map.contains(mu::commonscene::MIME_SYMBOL_FORMAT)) {
                 const QByteArray elementMimeData = map[mu::commonscene::MIME_SYMBOL_FORMAT].toByteArray();
-                *cell = *PaletteCell::fromElementMimeData(elementMimeData);
+                PaletteCellPtr newCell = PaletteCell::fromElementMimeData(elementMimeData);
+
+                cell->element = newCell->element;
+                cell->untranslatedElement = newCell->untranslatedElement;
+                cell->name = newCell->name;
+                cell->id = newCell->id;
+
                 cell->custom = true;               // mark the updated cell custom
             } else {
                 return false;
@@ -577,7 +590,7 @@ QMimeData* PaletteTreeModel::mimeData(const QModelIndexList& indexes) const
     if (const Palette* pp = findPalette(indexes[0])) {
         mime->setData(Palette::mimeDataFormat, pp->toMimeData());
     } else if (PaletteCellConstPtr cell = findCell(indexes[0])) {
-        mime->setData(mu::commonscene::MIME_SYMBOL_FORMAT, cell->element->mimeData(PointF()));
+        mime->setData(mu::commonscene::MIME_SYMBOL_FORMAT, cell->element->mimeData().toQByteArray());
     }
 
     return mime;
@@ -820,7 +833,7 @@ bool PaletteTreeModel::insertRows(int row, int count, const QModelIndex& parent)
         beginInsertRows(parent, row, row + count - 1);
         for (int i = 0; i < count; ++i) {
             PalettePtr p = std::make_shared<Palette>(Palette::Type::Custom);
-            p->setName(QT_TRANSLATE_NOOP("palette", "Custom"));
+            p->setName(QT_TRANSLATE_NOOP("palette", "Untitled palette"));
             p->setGridSize(QSize(48, 48));
             p->setExpanded(true);
             palettes().insert(palettes().begin() + row, p);
@@ -837,7 +850,7 @@ bool PaletteTreeModel::insertRows(int row, int count, const QModelIndex& parent)
 
         beginInsertRows(parent, row, row + count - 1);
         for (int i = 0; i < count; ++i) {
-            PaletteCellPtr cell = std::make_shared<PaletteCell>();
+            PaletteCellPtr cell = std::make_shared<PaletteCell>(palette);
             palette->insertCell(row, cell);
         }
         endInsertRows();
@@ -869,7 +882,7 @@ bool PaletteTreeModel::insertPalette(PalettePtr pp, int row, const QModelIndex& 
 void PaletteTreeModel::updateCellsState(const Selection& sel)
 {
     const ChordRest* cr = sel.firstChordRest();
-    const Beam::Mode bm = cr ? cr->beamMode() : Beam::Mode::NONE;
+    const BeamMode bm = cr ? cr->beamMode() : BeamMode::NONE;
     const ActionIconType beamActionType = Beam::actionIconTypeForBeamMode(bm);
     bool deactivateAll = !cr;
 
@@ -1137,4 +1150,3 @@ bool PaletteCellFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIn
 
     return false;
 }
-} // namespace Ms

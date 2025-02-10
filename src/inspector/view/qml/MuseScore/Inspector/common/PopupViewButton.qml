@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,33 +20,38 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 FlatButton {
     id: root
 
-    property alias popup: popup
-    property alias popupContent: popup.contentData
+    property bool isOpened: popup.isOpened
+
     property alias popupNavigationPanel: popup.navigationPanel
 
-    property int popupAvailableWidth: 0
+    property Component popupContent
+
+    property int popupAvailableWidth: parent ? parent.width : 0
     property var anchorItem: null
 
     signal ensureContentVisibleRequested(int invisibleContentHeight)
-    signal popupOpened()
+    signal popupOpened(var popup, var control)
 
     Layout.fillWidth: true
     Layout.minimumWidth: (popupAvailableWidth - 4) / 2
 
-    InspectorPopupController {
-        id: popupController
+    function closePopup() {
+        popup.close()
+    }
 
-        visualControl: root
-        popup: popup
+    QtObject {
+        id: prv
+
+        property bool needActiveFirstItem: false
     }
 
     Component.onCompleted: {
@@ -54,6 +59,8 @@ FlatButton {
     }
 
     onClicked: {
+        prv.needActiveFirstItem = root.navigation.highlight
+        contentLoader.active = !contentLoader.active
         popup.toggleOpened()
     }
 
@@ -62,21 +69,46 @@ FlatButton {
 
         anchorItem: root.anchorItem
 
-        navigationParentControl: root.navigation
+        contentWidth: contentLoader.width
+        contentHeight: contentLoader.height
 
-        closePolicy: PopupView.NoAutoClose
+        closePolicies: PopupView.NoAutoClose
+
+        contentData: Loader {
+            id: contentLoader
+
+            active: false
+
+            width: root.popupAvailableWidth - 2 * popup.margins
+            height: implicitHeight
+
+            sourceComponent: root.popupContent
+        }
 
         onContentHeightChanged: {
             checkForInsufficientSpace()
         }
 
         onOpened: {
-            checkForInsufficientSpace()
-            root.popupOpened()
+            Qt.callLater(checkForInsufficientSpace)
+
+            if (prv.needActiveFirstItem) {
+                forceFocusIn()
+            }
+
+            root.popupOpened(popup, root)
         }
 
         onClosed: {
+            contentLoader.active = false
+
             root.ensureContentVisibleRequested(root.anchorItem.height) // reset contentY
+        }
+
+        function forceFocusIn() {
+            if (Boolean(contentLoader.item) && Boolean(contentLoader.item.forceFocusIn)) {
+                contentLoader.item.forceFocusIn()
+            }
         }
 
         function checkForInsufficientSpace() {
@@ -92,7 +124,7 @@ FlatButton {
         }
 
         property NavigationPanel navigationPanel: NavigationPanel {
-            name: "Popup"
+            name: root.navigation.name + " Popup"
             section: popup.navigationSection
             order: 1
             direction: NavigationPanel.Vertical

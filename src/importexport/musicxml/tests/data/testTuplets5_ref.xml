@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <work>
     <work-number>MuseScore testfile</work-number>
     <work-title>Tuplets 5</work-title>
@@ -334,7 +334,7 @@
           </time-modification>
         <stem>up</stem>
         <notations>
-          <tuplet type="start" bracket="yes"/>
+          <tuplet type="start" bracket="no"/>
           <tuplet type="stop"/>
           </notations>
         </note>
@@ -354,7 +354,7 @@
           </time-modification>
         <stem>up</stem>
         <notations>
-          <tuplet type="start" bracket="yes"/>
+          <tuplet type="start" bracket="no"/>
           <tuplet type="stop"/>
           </notations>
         </note>
@@ -396,7 +396,7 @@
           </time-modification>
         <stem>up</stem>
         <notations>
-          <tuplet type="start" bracket="yes"/>
+          <tuplet type="start" bracket="no"/>
           <tuplet type="stop"/>
           </notations>
         </note>
@@ -448,7 +448,7 @@
           </time-modification>
         <stem>up</stem>
         <notations>
-          <tuplet type="start" bracket="yes"/>
+          <tuplet type="start" bracket="no"/>
           <tuplet type="stop"/>
           </notations>
         </note>
@@ -468,7 +468,7 @@
           </time-modification>
         <stem>up</stem>
         <notations>
-          <tuplet type="start" bracket="yes"/>
+          <tuplet type="start" bracket="no"/>
           <tuplet type="stop"/>
           </notations>
         </note>

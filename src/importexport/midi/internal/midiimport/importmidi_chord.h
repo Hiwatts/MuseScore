@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,17 +27,19 @@
 
 #include <map>
 
-namespace Ms {
+namespace mu::engraving {
 class Tie;
 class TimeSigMap;
+}
 
+namespace mu::iex::midi {
 class MidiNote
 {
 public:
     int pitch = 0;
     int velo = 0;
     ReducedFraction offTime;
-    Tie* tie = nullptr;
+    engraving::Tie* tie = nullptr;
     bool staccato = false;
     bool isInTuplet = false;
     // for offTime quantization
@@ -145,7 +147,7 @@ findChordsForTimeRange(
 
 void setBarIndexes(
     std::multimap<ReducedFraction, MidiChord>& chords, const ReducedFraction& basicQuant, const ReducedFraction& lastTick,
-    const TimeSigMap* sigmap);
+    const engraving::TimeSigMap* sigmap);
 
 #ifdef QT_DEBUG
 
@@ -158,6 +160,6 @@ bool areBarIndexesSet(const std::multimap<ReducedFraction, MidiChord>& chords);
 
 #endif
 } // namespace MChord
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_CHORD_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,26 +21,24 @@
  */
 #include "guitarproconfiguration.h"
 
-#include "settings.h"
-
-#include "libmscore/mscore.h"
-
-using namespace mu::framework;
-using namespace mu::iex::guitarpro;
-
-static const Settings::Key IMPORT_GUITARPRO_CHARSET_KEY("iex_guitarpro", "import/guitarpro/charset");
-
-void GuitarProConfiguration::init()
+namespace mu::iex::guitarpro {
+bool GuitarProConfiguration::linkedTabStaffCreated() const
 {
-    settings()->setDefaultValue(IMPORT_GUITARPRO_CHARSET_KEY, Val("UTF-8"));
+    return m_linkedTabStaffCreated ? m_linkedTabStaffCreated.value() : false;
 }
 
-std::string GuitarProConfiguration::importGuitarProCharset() const
+void GuitarProConfiguration::setLinkedTabStaffCreated(std::optional<bool> created)
 {
-    return settings()->value(IMPORT_GUITARPRO_CHARSET_KEY).toString();
+    m_linkedTabStaffCreated = created;
 }
 
-void GuitarProConfiguration::setImportGuitarProCharset(const std::string& charset)
+bool GuitarProConfiguration::experimental() const
 {
-    settings()->setSharedValue(IMPORT_GUITARPRO_CHARSET_KEY, Val(charset));
+    return m_experimental ? m_experimental.value() : false;
+}
+
+void GuitarProConfiguration::setExperimental(std::optional<bool> experimental)
+{
+    m_experimental = experimental;
+}
 }

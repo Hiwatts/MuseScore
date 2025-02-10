@@ -9,7 +9,7 @@
       </Synthesizer>
     <Division>480</Division>
     <Style>
-      <measureSpacing>1</measureSpacing>
+      <measureSpacing>1.5</measureSpacing>
       <showMeasureNumber>0</showMeasureNumber>
       <showFooter>0</showFooter>
       <evenFooterL>&lt;font size=&quot;13&quot;/&gt;&lt;font face=&quot;.Helvetica Neue DeskInterface&quot;/&gt;$p</evenFooterL>
@@ -40,7 +40,6 @@
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
     <metaTag name="platform">Linux</metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -106,7 +105,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -156,7 +155,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -191,7 +190,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -260,7 +259,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -329,7 +328,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -366,7 +365,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -440,7 +439,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>

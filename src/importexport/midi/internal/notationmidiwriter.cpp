@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,13 +22,18 @@
 
 #include "notationmidiwriter.h"
 
-#include "log.h"
+#include <QBuffer>
+
 #include "midiexport/exportmidi.h"
 
+#include "log.h"
+
 using namespace mu::iex::midi;
-using namespace mu::io;
+using namespace muse;
+using namespace muse::io;
 using namespace mu::project;
 using namespace mu::notation;
+using namespace mu::engraving;
 
 std::vector<INotationWriter::UnitType> NotationMidiWriter::supportedUnitTypes() const
 {
@@ -41,43 +46,39 @@ bool NotationMidiWriter::supportsUnitType(UnitType unitType) const
     return std::find(unitTypes.cbegin(), unitTypes.cend(), unitType) != unitTypes.cend();
 }
 
-mu::Ret NotationMidiWriter::write(INotationPtr notation, io::Device& destinationDevice, const Options&)
+Ret NotationMidiWriter::write(INotationPtr notation, io::IODevice& destinationDevice, const Options&)
 {
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
     }
 
-    Ms::Score* score = notation->elements()->msScore();
+    Score* score = notation->elements()->msScore();
 
     IF_ASSERT_FAILED(score) {
         return make_ret(Ret::Code::UnknownError);
     }
 
-    Ms::ExportMidi exportMidi(score);
+    ExportMidi exportMidi(score);
 
-    bool isPlayRepeatsEnabled = notationConfiguration()->isPlayRepeatsEnabled();
+    bool isPlayRepeatsEnabled = midiImportExportConfiguration()->isExpandRepeats();
     bool isMidiExportRpns = midiImportExportConfiguration()->isMidiExportRpns();
-    Ms::SynthesizerState synthesizerState = score->synthesizerState();
+    SynthesizerState synthesizerState = score->synthesizerState();
 
-    bool ok = exportMidi.write(&destinationDevice, isPlayRepeatsEnabled, isMidiExportRpns, synthesizerState);
+    QByteArray qdata;
+    QBuffer buf(&qdata);
+    buf.open(QIODevice::WriteOnly);
+
+    bool ok = exportMidi.write(&buf, isPlayRepeatsEnabled, isMidiExportRpns, synthesizerState);
+    if (ok) {
+        ByteArray data = ByteArray::fromQByteArrayNoCopy(qdata);
+        destinationDevice.write(data);
+    }
 
     return ok ? make_ret(Ret::Code::Ok) : make_ret(Ret::Code::InternalError);
 }
 
-mu::Ret NotationMidiWriter::writeList(const notation::INotationPtrList&, io::Device&, const Options&)
+Ret NotationMidiWriter::writeList(const notation::INotationPtrList&, io::IODevice&, const Options&)
 {
     NOT_SUPPORTED;
     return Ret(Ret::Code::NotSupported);
-}
-
-void NotationMidiWriter::abort()
-{
-    NOT_IMPLEMENTED;
-}
-
-mu::framework::ProgressChannel NotationMidiWriter::progress() const
-{
-    NOT_IMPLEMENTED;
-    static framework::ProgressChannel prog;
-    return prog;
 }

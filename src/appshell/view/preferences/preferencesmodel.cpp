@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,17 +19,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#include <QApplication>
+
 #include "preferencesmodel.h"
 
-#include "log.h"
 #include "translation.h"
 #include "ui/view/iconcodes.h"
 
+#include "log.h"
+
 using namespace mu::appshell;
-using namespace mu::ui;
+using namespace muse::ui;
 
 PreferencesModel::PreferencesModel(QObject* parent)
-    : QAbstractItemModel(parent)
+    : QAbstractItemModel(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
@@ -140,52 +143,61 @@ void PreferencesModel::load(const QString& currentPageId)
     if (!currentPageId.isEmpty()) {
         setCurrentPageId(currentPageId);
     } else {
-        setCurrentPageId("general");
+        const QString& lastOpenedPageId = configuration()->preferencesDialogLastOpenedPageId();
+        if (lastOpenedPageId.isEmpty()) {
+            setCurrentPageId("general");
+        } else {
+            setCurrentPageId(lastOpenedPageId);
+        }
     }
 
     m_rootItem = new PreferencePageItem();
 
-    QList<PreferencePageItem*> generalItems {
-        makeItem("general-start", qtrc("appshell", "Program start"), IconCode::Code::NONE,
-                 "Preferences/ProgrammeStartPreferencesPage.qml"),
-
-        makeItem("general-folders", qtrc("appshell", "Folders"), IconCode::Code::NONE,
-                 "Preferences/FoldersPreferencesPage.qml")
-    };
-
     QList<PreferencePageItem*> items {
-        makeItem("general", qtrc("appshell", "General"), IconCode::Code::SETTINGS_COG,
-                 "Preferences/GeneralPreferencesPage.qml", generalItems),
+        makeItem("general", QT_TRANSLATE_NOOP("appshell/preferences", "General"), IconCode::Code::SETTINGS_COG,
+                 "Preferences/GeneralPreferencesPage.qml"),
 
-        makeItem("appearance", qtrc("appshell", "Appearance"), IconCode::Code::VISIBILITY_ON,
+        makeItem("appearance", QT_TRANSLATE_NOOP("appshell/preferences", "Appearance"), IconCode::Code::EYE_OPEN,
                  "Preferences/AppearancePreferencesPage.qml"),
 
-        makeItem("canvas", qtrc("appshell", "Canvas"), IconCode::Code::NEW_FILE,
+        makeItem("canvas", QT_TRANSLATE_NOOP("appshell/preferences", "Canvas"), IconCode::Code::NEW_FILE,
                  "Preferences/CanvasPreferencesPage.qml"),
 
-        makeItem("note-input", qtrc("appshell", "Note input"), IconCode::Code::EDIT,
+        makeItem("cloud", QT_TRANSLATE_NOOP("appshell/preferences", "Save & publish"), IconCode::Code::CLOUD_FILE,
+                 "Preferences/SaveAndPublishPreferencesPage.qml"),
+
+        makeItem("note-input", QT_TRANSLATE_NOOP("appshell/preferences", "Note input"), IconCode::Code::EDIT,
                  "Preferences/NoteInputPreferencesPage.qml"),
 
-        makeItem("midi-device-mapping", qtrc("appshell", "MIDI device mapping"), IconCode::Code::MIDI_INPUT,
-                 "Preferences/MidiDeviceMappingPreferencesPage.qml"),
-
-        makeItem("score", qtrc("appshell", "Score"), IconCode::Code::SCORE,
+        makeItem("score", QT_TRANSLATE_NOOP("appshell/preferences", "Score"), IconCode::Code::SCORE,
                  "Preferences/ScorePreferencesPage.qml"),
 
-        makeItem("io", qtrc("appshell", "I/O"), IconCode::Code::AUDIO,
-                 "Preferences/IOPreferencesPage.qml"),
+        makeItem("audio-midi", QT_TRANSLATE_NOOP("appshell/preferences", "Audio & MIDI"), IconCode::Code::AUDIO,
+                 "Preferences/AudioMidiPreferencesPage.qml"),
 
-        makeItem("import", qtrc("appshell", "Import"), IconCode::Code::IMPORT,
+        makeItem("midi-device-mapping", QT_TRANSLATE_NOOP("appshell/preferences", "MIDI mappings"), IconCode::Code::MIDI_INPUT,
+                 "Preferences/MidiDeviceMappingPreferencesPage.qml"),
+
+        makeItem("percussion", QT_TRANSLATE_NOOP("appshell/preferences", "Percussion"), IconCode::Code::PERCUSSION,
+                 "Preferences/PercussionPreferencesPage.qml"),
+
+        makeItem("import", QT_TRANSLATE_NOOP("appshell/preferences", "Import"), IconCode::Code::IMPORT,
                  "Preferences/ImportPreferencesPage.qml"),
 
-        makeItem("shortcuts", qtrc("appshell", "Shortcuts"), IconCode::Code::SHORTCUTS,
+        makeItem("shortcuts", QT_TRANSLATE_NOOP("appshell/preferences", "Shortcuts"), IconCode::Code::SHORTCUTS,
                  "Preferences/ShortcutsPreferencesPage.qml"),
 
-        makeItem("update", qtrc("appshell", "Update"), IconCode::Code::UPDATE,
+        makeItem("update", QT_TRANSLATE_NOOP("appshell/preferences", "Update"), IconCode::Code::UPDATE,
                  "Preferences/UpdatePreferencesPage.qml"),
 
-        makeItem("advanced", qtrc("appshell", "Advanced"), IconCode::Code::CONFIGURE,
-                 "Preferences/AdvancedPreferencesPage.qml")
+        makeItem("general-folders", QT_TRANSLATE_NOOP("appshell/preferences", "Folders"), IconCode::Code::OPEN_FILE,
+                 "Preferences/FoldersPreferencesPage.qml"),
+
+        makeItem("advanced", QT_TRANSLATE_NOOP("appshell/preferences", "Advanced"), IconCode::Code::CONFIGURE,
+                 "Preferences/AdvancedPreferencesPage.qml"),
+
+        makeItem("braille", QT_TRANSLATE_NOOP("appshell/preferences", "Braille"), IconCode::Code::BRAILLE,
+                 "Preferences/BraillePreferencesPage.qml")
     };
 
     for (PreferencePageItem* item: items) {
@@ -195,10 +207,35 @@ void PreferencesModel::load(const QString& currentPageId)
     endResetModel();
 }
 
+bool PreferencesModel::askForConfirmationOfPreferencesReset()
+{
+    std::string title = muse::trc("appshell", "Are you sure you want to reset preferences?");
+    std::string question = muse::trc("appshell", "This action will reset all your app preferences and delete all custom shortcuts. "
+                                                 "It will not delete any of your scores.\n\n"
+                                                 "This action cannot be undone.");
+
+    muse::IInteractive::ButtonData cancelBtn = interactive()->buttonData(muse::IInteractive::Button::Cancel);
+    muse::IInteractive::ButtonData resetBtn = interactive()->buttonData(muse::IInteractive::Button::Reset);
+    cancelBtn.accent = true;
+
+    muse::IInteractive::Result result = interactive()->warning(title, question, { cancelBtn, resetBtn }, cancelBtn.btn,
+                                                               { muse::IInteractive::Option::WithIcon },
+                                                               muse::trc("appshell", "Reset preferences"));
+    return result.standardButton() == muse::IInteractive::Button::Reset;
+}
+
 void PreferencesModel::resetFactorySettings()
 {
-    configuration()->revertToFactorySettings();
+    static constexpr bool KEEP_DEFAULT_SETTINGS = true;
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QApplication::processEvents();
+    configuration()->revertToFactorySettings(KEEP_DEFAULT_SETTINGS);
+
+    // Unreset the "First Launch Completed" setting so the first-time launch wizard does not appear.
+    configuration()->setHasCompletedFirstLaunchSetup(true);
+
     configuration()->startEditSettings();
+    QApplication::restoreOverrideCursor();
 }
 
 void PreferencesModel::apply()
@@ -267,11 +304,13 @@ void PreferencesModel::setCurrentPageId(QString currentPageId)
     }
 
     m_currentPageId = currentPageId;
+    configuration()->setPreferencesDialogLastOpenedPageId(currentPageId);
     emit currentPageIdChanged(m_currentPageId);
 }
 
-PreferencePageItem* PreferencesModel::makeItem(const QString& id, const QString& title, mu::ui::IconCode::Code icon,
-                                               const QString& path, const QList<PreferencePageItem*>& children) const
+PreferencePageItem* PreferencesModel::makeItem(const QString& id, const QString& title, muse::ui::IconCode::Code icon,
+                                               const QString& path,
+                                               const QList<PreferencePageItem*>& children) const
 {
     PreferencePageItem* item = new PreferencePageItem();
     item->setId(id);

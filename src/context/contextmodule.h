@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,17 +22,25 @@
 #ifndef MU_CONTEXT_CONTEXTMODULE_H
 #define MU_CONTEXT_CONTEXTMODULE_H
 
+#include <memory>
+
 #include "modularity/imodulesetup.h"
 
 namespace mu::context {
-class ContextModule : public modularity::IModuleSetup
+class GlobalContext;
+class UiContextResolver;
+class ContextModule : public muse::modularity::IModuleSetup
 {
 public:
 
     std::string moduleName() const override;
     void registerExports() override;
-    void onInit(const framework::IApplication::RunMode& mode) override;
+    void onInit(const muse::IApplication::RunMode& mode) override;
     void onDeinit() override;
+
+private:
+    std::shared_ptr<GlobalContext> m_globalContext;
+    std::shared_ptr<UiContextResolver> m_uicontextResolver;
 };
 }
 

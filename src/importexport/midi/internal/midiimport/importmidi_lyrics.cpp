@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,20 +24,21 @@
 #include "importmidi_fraction.h"
 #include "importmidi_chord.h"
 #include "importmidi_operations.h"
+#include "../midishared/midifile.h"
 
-#include "libmscore/factory.h"
-#include "libmscore/box.h"
-#include "libmscore/engravingitem.h"
-#include "libmscore/measurebase.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/staff.h"
-#include "libmscore/text.h"
-
-#include "engraving/compat/midi/midifile.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/box.h"
+#include "engraving/dom/engravingitem.h"
+#include "engraving/dom/measurebase.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/text.h"
 
 #include <set>
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiLyrics {
 const std::string META_PREFIX = "@";
 const std::string TEXT_PREFIX = "@T";
@@ -54,8 +55,7 @@ bool isLyricText(const std::string& text)
 
 bool isLyricEvent(const MidiEvent& e)
 {
-    return e.type() == ME_META && (e.metaType() == META_TEXT
-                                   || e.metaType() == META_LYRIC);
+    return e.type() == ME_META && (e.metaType() == META_TEXT || e.metaType() == META_LYRIC);
 }
 
 std::multimap<ReducedFraction, std::string>
@@ -161,11 +161,11 @@ bool isTitlePrefix(const QString& text)
 
 void addTitleToScore(Score* score, const QString& string, int textCounter)
 {
-    Tid ssid = Tid::DEFAULT;
+    TextStyleType ssid = TextStyleType::DEFAULT;
     if (textCounter == 1) {
-        ssid = Tid::TITLE;
+        ssid = TextStyleType::TITLE;
     } else if (textCounter == 2) {
-        ssid = Tid::COMPOSER;
+        ssid = TextStyleType::COMPOSER;
     }
 
     MeasureBase* measure = score->first();
@@ -173,7 +173,7 @@ void addTitleToScore(Score* score, const QString& string, int textCounter)
     text->setPlainText(string.right(string.size() - int(TEXT_PREFIX.size())));
 
     if (!measure->isVBox()) {
-        measure = new VBox(score->dummy()->system());
+        measure = mu::engraving::Factory::createVBox(score->dummy()->system());
         measure->setTick(Fraction(0, 1));
         measure->setNext(score->first());
         score->measures()->add(measure);
@@ -354,4 +354,4 @@ QList<std::string> makeLyricsListForUI()
     return list;
 }
 } // namespace MidiLyrics
-} // namespace Ms
+} // namespace mu::iex::midi

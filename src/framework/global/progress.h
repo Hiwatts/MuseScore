@@ -19,30 +19,40 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_FRAMEWORK_PROGRESS_H
-#define MU_FRAMEWORK_PROGRESS_H
-
-#include <string>
+#ifndef MUSE_GLOBAL_PROGRESS_H
+#define MUSE_GLOBAL_PROGRESS_H
 
 #include "async/channel.h"
+#include "async/notification.h"
 
-namespace mu::framework {
+#include "types/retval.h"
+#include "types/val.h"
+
+namespace muse {
+using ProgressResult = RetVal<Val>;
+
 struct Progress
 {
-    int64_t current = 0;
-    int64_t total = 0;
-    std::string status;
+    // Communication from the creator of the progress to the clients
+    async::Notification started;
+    async::Channel<int64_t /*current*/, int64_t /*total*/, std::string /*title*/> progressChanged;
+    async::Channel<ProgressResult> finished;
 
-    Progress(int64_t current, int64_t total)
-        : current(current), total(total) {}
+    // Communication from the clients to the creator of the progress that it should cancel its work
+    async::Notification cancelRequested;
 
-    Progress(int64_t current, int64_t total, std::string status)
-        : current(current), total(total), status(std::move(status)) {}
-
-    Progress() = default;
+    void cancel()
+    {
+        cancelRequested.notify();
+        finished.send(make_ret(Ret::Code::Cancel));
+    }
 };
 
-using ProgressChannel = async::Channel<Progress>;
+using ProgressPtr = std::shared_ptr<Progress>;
 }
 
-#endif // MU_FRAMEWORK_PROGRESS_H
+#ifndef NO_QT_SUPPORT
+Q_DECLARE_METATYPE(muse::Progress*)
+#endif
+
+#endif // MUSE_GLOBAL_PROGRESS_H

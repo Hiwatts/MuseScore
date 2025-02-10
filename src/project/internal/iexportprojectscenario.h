@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,10 +22,11 @@
 #ifndef MU_PROJECT_IEXPORTPROJECTSCENARIO_H
 #define MU_PROJECT_IEXPORTPROJECTSCENARIO_H
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 #include "notation/inotation.h"
 #include "inotationwriter.h"
 #include "exporttype.h"
+#include "types/projecttypes.h"
 
 namespace mu::project {
 class IExportProjectScenario : MODULE_EXPORT_INTERFACE
@@ -33,10 +34,18 @@ class IExportProjectScenario : MODULE_EXPORT_INTERFACE
     INTERFACE_ID(IExportProjectScenario)
 
 public:
-    virtual std::vector<project::INotationWriter::UnitType> supportedUnitTypes(const ExportType& exportType) const = 0;
+    virtual std::vector<INotationWriter::UnitType> supportedUnitTypes(const ExportType& exportType) const = 0;
 
-    virtual bool exportScores(const notation::INotationPtrList& notations, const ExportType& exportType,
-                              project::INotationWriter::UnitType unitType) const = 0;
+    virtual muse::RetVal<muse::io::path_t> askExportPath(const notation::INotationPtrList& notations, const ExportType& exportType,
+                                                         INotationWriter::UnitType unitType = INotationWriter::UnitType::PER_PART,
+                                                         muse::io::path_t defaultPath = "") const = 0;
+
+    virtual bool exportScores(const notation::INotationPtrList& notations, const muse::io::path_t destinationPath,
+                              INotationWriter::UnitType unitType = INotationWriter::UnitType::PER_PART,
+                              bool openDestinationFolderOnExport = false) const = 0;
+
+    virtual const ExportInfo& exportInfo() const = 0;
+    virtual void setExportInfo(const ExportInfo& exportInfo) = 0;
 };
 }
 

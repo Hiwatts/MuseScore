@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,27 +22,41 @@
 import QtQuick 2.12
 
 import MuseScore.NotationScene 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 Rectangle {
     id: root
+
+    property int navigationOrderStart: 0
+    property int navigationOrderEnd: navigationPanel.order
 
     visible: false
     height: 50
 
     color: ui.theme.backgroundPrimaryColor
 
+    signal closed()
+
+    property NavigationPanel navigationPanel: NavigationPanel {
+        name: "SearchPopup"
+        enabled: root.visible
+        direction: NavigationPanel.Horizontal
+        order: root.navigationOrderStart
+        accessible.name: titleLabel.text
+    }
+
     QtObject {
         id: privateProperties
 
         function show() {
             visible = true
-            Qt.callLater(textInputField.forceActiveFocus)
+            Qt.callLater(textInputField.navigation.requestActive)
         }
 
         function hide() {
             visible = false
+            root.closed()
         }
     }
 
@@ -60,6 +74,10 @@ Rectangle {
 
     Row {
         anchors.verticalCenter: parent.verticalCenter
+        anchors.left: parent.left
+        anchors.leftMargin: 8
+        anchors.right: parent.right
+        anchors.rightMargin: 8
 
         spacing: 8
 
@@ -68,12 +86,18 @@ Rectangle {
 
             icon: IconCode.CLOSE_X_ROUNDED
 
+            navigation.panel: root.navigationPanel
+            navigation.order: 2
+            navigation.accessible.name: qsTrc("notation", "Close search")
+            navigation.enabled: root.visible
+
             onClicked: {
                 privateProperties.hide()
             }
         }
         
         StyledTextLabel {
+            id: titleLabel
             anchors.verticalCenter: parent.verticalCenter 
             text: qsTrc("notation", "Find / Go to:")
         }
@@ -81,14 +105,21 @@ Rectangle {
         TextInputField {
             id: textInputField
 
-            Component.onCompleted: {
-                forceActiveFocus()
-            }
-
             width: 500
 
-            onCurrentTextEdited: {
+            navigation.panel: root.navigationPanel
+            navigation.order: 1
+
+            onTextChanged: function(newTextValue) {
                 model.search(newTextValue)
+            }
+
+            onAccepted: {
+                Qt.callLater(privateProperties.hide)
+            }
+
+            onEscaped: {
+                Qt.callLater(privateProperties.hide)
             }
         }
     }

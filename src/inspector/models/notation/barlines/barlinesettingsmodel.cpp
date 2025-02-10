@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,54 +23,47 @@
 
 #include "translation.h"
 #include "types/barlinetypes.h"
-#include "barline.h"
+#include "engraving/dom/barline.h"
 
 using namespace mu::inspector;
+using namespace mu::engraving;
 
 BarlineSettingsModel::BarlineSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_BARLINE);
-    setTitle(qtrc("inspector", "Barline"));
-    setIcon(ui::IconCode::Code::SECTION_BREAK);
+    setTitle(muse::qtrc("inspector", "Barline"));
+    setIcon(muse::ui::IconCode::Code::SECTION_BREAK);
     createProperties();
 }
 
 void BarlineSettingsModel::createProperties()
 {
-    m_type = buildPropertyItem(Ms::Pid::BARLINE_TYPE);
-    m_isSpanToNextStaff = buildPropertyItem(Ms::Pid::BARLINE_SPAN);
-    m_spanFrom = buildPropertyItem(Ms::Pid::BARLINE_SPAN_FROM);
-    m_spanTo = buildPropertyItem(Ms::Pid::BARLINE_SPAN_TO);
-    m_hasToShowTips = buildPropertyItem(Ms::Pid::BARLINE_SHOW_TIPS);
+    m_type = buildPropertyItem(Pid::BARLINE_TYPE);
+    m_isSpanToNextStaff = buildPropertyItem(Pid::BARLINE_SPAN);
+    m_spanFrom = buildPropertyItem(Pid::BARLINE_SPAN_FROM);
+    m_spanTo = buildPropertyItem(Pid::BARLINE_SPAN_TO);
+    m_hasToShowTips = buildPropertyItem(Pid::BARLINE_SHOW_TIPS);
 
     connect(m_type, &PropertyItem::valueChanged, this, &BarlineSettingsModel::isRepeatStyleChangingAllowedChanged);
 }
 
 void BarlineSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::BAR_LINE);
+    m_elementList = m_repository->findElementsByType(ElementType::BAR_LINE);
 }
 
 void BarlineSettingsModel::loadProperties()
 {
-    loadPropertyItem(m_type, [](const QVariant& elementPropertyValue) -> QVariant {
-        return elementPropertyValue.toInt();
-    });
+    static const PropertyIdSet propertyIdSet {
+        Pid::BARLINE_TYPE,
+        Pid::BARLINE_SPAN,
+        Pid::BARLINE_SPAN_FROM,
+        Pid::BARLINE_SPAN_TO,
+        Pid::BARLINE_SHOW_TIPS,
+    };
 
-    loadPropertyItem(m_isSpanToNextStaff, [](const QVariant& elementPropertyValue) -> QVariant {
-        return elementPropertyValue.toBool();
-    });
-
-    loadPropertyItem(m_spanFrom, [](const QVariant& elementPropertyValue) -> QVariant {
-        return elementPropertyValue.toInt();
-    });
-
-    loadPropertyItem(m_spanTo, [](const QVariant& elementPropertyValue) -> QVariant {
-        return elementPropertyValue.toInt();
-    });
-
-    loadPropertyItem(m_hasToShowTips);
+    loadProperties(propertyIdSet);
 }
 
 void BarlineSettingsModel::resetProperties()
@@ -80,6 +73,43 @@ void BarlineSettingsModel::resetProperties()
     m_spanFrom->resetToDefault();
     m_spanTo->resetToDefault();
     m_hasToShowTips->resetToDefault();
+}
+
+void BarlineSettingsModel::onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                                             const mu::engraving::StyleIdSet&)
+{
+    loadProperties(changedPropertyIdSet);
+}
+
+void BarlineSettingsModel::loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet)
+{
+    if (muse::contains(propertyIdSet, Pid::BARLINE_TYPE)) {
+        loadPropertyItem(m_type, [](const QVariant& elementPropertyValue) -> QVariant {
+            return elementPropertyValue.toInt();
+        });
+    }
+
+    if (muse::contains(propertyIdSet, Pid::BARLINE_SPAN)) {
+        loadPropertyItem(m_isSpanToNextStaff, [](const QVariant& elementPropertyValue) -> QVariant {
+            return elementPropertyValue.toBool();
+        });
+    }
+
+    if (muse::contains(propertyIdSet, Pid::BARLINE_SPAN_FROM)) {
+        loadPropertyItem(m_spanFrom, [](const QVariant& elementPropertyValue) -> QVariant {
+            return elementPropertyValue.toInt();
+        });
+    }
+
+    if (muse::contains(propertyIdSet, Pid::BARLINE_SPAN_TO)) {
+        loadPropertyItem(m_spanTo, [](const QVariant& elementPropertyValue) -> QVariant {
+            return elementPropertyValue.toInt();
+        });
+    }
+
+    if (muse::contains(propertyIdSet, Pid::BARLINE_SHOW_TIPS)) {
+        loadPropertyItem(m_hasToShowTips);
+    }
 }
 
 void BarlineSettingsModel::applySpanPreset(const int presetType)
@@ -93,27 +123,62 @@ void BarlineSettingsModel::applySpanPreset(const int presetType)
         break;
     case BarlineTypes::SpanPreset::PRESET_TICK_1:
         m_isSpanToNextStaff->setValue(false);
-        m_spanFrom->setValue(Ms::BARLINE_SPAN_TICK1_FROM);
-        m_spanTo->setValue(Ms::BARLINE_SPAN_TICK1_TO);
+        m_spanFrom->setValue(mu::engraving::BARLINE_SPAN_TICK1_FROM);
+        m_spanTo->setValue(mu::engraving::BARLINE_SPAN_TICK1_TO);
         break;
     case BarlineTypes::SpanPreset::PRESET_TICK_2:
         m_isSpanToNextStaff->setValue(false);
-        m_spanFrom->setValue(Ms::BARLINE_SPAN_TICK2_FROM);
-        m_spanTo->setValue(Ms::BARLINE_SPAN_TICK2_TO);
+        m_spanFrom->setValue(mu::engraving::BARLINE_SPAN_TICK2_FROM);
+        m_spanTo->setValue(mu::engraving::BARLINE_SPAN_TICK2_TO);
         break;
     case BarlineTypes::SpanPreset::PRESET_SHORT_1:
         m_isSpanToNextStaff->setValue(false);
-        m_spanFrom->setValue(Ms::BARLINE_SPAN_SHORT1_FROM);
-        m_spanTo->setValue(Ms::BARLINE_SPAN_SHORT1_TO);
+        m_spanFrom->setValue(mu::engraving::BARLINE_SPAN_SHORT1_FROM);
+        m_spanTo->setValue(mu::engraving::BARLINE_SPAN_SHORT1_TO);
         break;
     case BarlineTypes::SpanPreset::PRESET_SHORT_2:
         m_isSpanToNextStaff->setValue(false);
-        m_spanFrom->setValue(Ms::BARLINE_SPAN_SHORT2_FROM);
-        m_spanTo->setValue(Ms::BARLINE_SPAN_SHORT2_TO);
+        m_spanFrom->setValue(mu::engraving::BARLINE_SPAN_SHORT2_FROM);
+        m_spanTo->setValue(mu::engraving::BARLINE_SPAN_SHORT2_TO);
         break;
     default:
         break;
     }
+}
+
+void BarlineSettingsModel::setSpanIntervalAsStaffDefault()
+{
+    undoStack()->prepareChanges(muse::TranslatableString("undoableAction", "Set barline span interval as staff default"));
+
+    std::vector<mu::engraving::EngravingItem*> staves;
+
+    auto undoChangeProperty = [](mu::engraving::EngravingObject* o, mu::engraving::Pid pid, const QVariant& val)
+    {
+        o->undoChangeProperty(pid, PropertyValue::fromQVariant(val, mu::engraving::propertyType(pid)));
+    };
+
+    for (mu::engraving::EngravingItem* item : m_elementList) {
+        if (!item->isBarLine()) {
+            continue;
+        }
+
+        mu::engraving::BarLine* barline = mu::engraving::toBarLine(item);
+        mu::engraving::Staff* staff = barline->staff();
+
+        if (std::find(staves.cbegin(), staves.cend(), staff) == staves.cend()) {
+            undoChangeProperty(staff, mu::engraving::Pid::STAFF_BARLINE_SPAN, m_isSpanToNextStaff->value());
+            undoChangeProperty(staff, mu::engraving::Pid::STAFF_BARLINE_SPAN_FROM, m_spanFrom->value());
+            undoChangeProperty(staff, mu::engraving::Pid::STAFF_BARLINE_SPAN_TO, m_spanTo->value());
+            staves.push_back(staff);
+        }
+
+        if (barline->barLineType() == mu::engraving::BarLineType::NORMAL) {
+            barline->setGenerated(true);
+        }
+    }
+
+    undoStack()->commitChanges();
+    updateNotation();
 }
 
 PropertyItem* BarlineSettingsModel::type() const

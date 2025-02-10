@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,15 +30,17 @@
 #include "project/iprojectcreator.h"
 #include "notation/notationtypes.h"
 #include "context/iglobalcontext.h"
+#include "notation/iinstrumentsrepository.h"
 
 namespace mu::project {
-class NewScoreModel : public QObject
+class NewScoreModel : public QObject, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(scores, IProjectConfiguration, configuration)
-    INJECT(scores, IProjectCreator, notationCreator)
-    INJECT(scores, context::IGlobalContext, globalContext)
+    muse::Inject<IProjectConfiguration> configuration = { this };
+    muse::Inject<IProjectCreator> notationCreator = { this };
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<notation::IInstrumentsRepository> instrumentsRepository = { this };
 
 public:
     explicit NewScoreModel(QObject* parent = nullptr);

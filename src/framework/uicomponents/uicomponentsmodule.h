@@ -20,12 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UICOMPONENTS_UICOMPONENTSMODULE_H
-#define MU_UICOMPONENTS_UICOMPONENTSMODULE_H
+#ifndef MUSE_UICOMPONENTS_UICOMPONENTSMODULE_H
+#define MUSE_UICOMPONENTS_UICOMPONENTSMODULE_H
 
-#include "framework/global/modularity/imodulesetup.h"
+#include "modularity/imodulesetup.h"
 
-namespace mu::uicomponents {
+namespace muse::uicomponents {
 class UiComponentsModule : public modularity::IModuleSetup
 {
 public:
@@ -33,9 +33,10 @@ public:
     std::string moduleName() const override;
 
     void registerExports() override;
+    void resolveImports() override;
     void registerResources() override;
     void registerUiTypes() override;
 };
 }
 
-#endif // MU_UICOMPONENTS_UICOMPONENTSMODULE_H
+#endif // MUSE_UICOMPONENTS_UICOMPONENTSMODULE_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,38 +23,42 @@
 
 #include "engraving/style/defaultstyle.h"
 
-#include "libmscore/masterscore.h"
-#include "libmscore/excerpt.h"
-#include "libmscore/mscore.h"
-#include "libmscore/undo.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/excerpt.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/undo.h"
 
 #include "log.h"
 
 using namespace mu::notation;
-using namespace mu::async;
+using namespace muse::async;
 
 NotationStyle::NotationStyle(IGetScore* getScore, INotationUndoStackPtr undoStack)
     : m_getScore(getScore), m_undoStack(undoStack)
 {
 }
 
-QVariant NotationStyle::styleValue(const StyleId& styleId) const
+PropertyValue NotationStyle::styleValue(const StyleId& styleId) const
 {
-    return m_getScore->score()->styleV(styleId);
+    return score()->style().styleV(styleId);
 }
 
-QVariant NotationStyle::defaultStyleValue(const StyleId& styleId) const
+PropertyValue NotationStyle::defaultStyleValue(const StyleId& styleId) const
 {
     return engraving::DefaultStyle::defaultStyle().value(styleId);
 }
 
-void NotationStyle::setStyleValue(const StyleId& styleId, const QVariant& newValue)
+void NotationStyle::setStyleValue(const StyleId& styleId, const PropertyValue& newValue)
 {
+    if (styleValue(styleId) == newValue) {
+        return;
+    }
+
     if (styleId == StyleId::concertPitch) {
-        m_getScore->score()->cmdConcertPitchChanged(newValue.toBool());
+        score()->cmdConcertPitchChanged(newValue.toBool());
     } else {
-        m_getScore->score()->undoChangeStyleVal(styleId, newValue);
-        m_getScore->score()->update();
+        score()->undoChangeStyleVal(styleId, newValue);
+        score()->update();
     }
 
     m_styleChanged.notify();
@@ -62,13 +66,23 @@ void NotationStyle::setStyleValue(const StyleId& styleId, const QVariant& newVal
 
 void NotationStyle::resetStyleValue(const StyleId& styleId)
 {
-    m_getScore->score()->resetStyles({ styleId });
+    score()->resetStyleValue(styleId);
+    score()->update();
+    m_styleChanged.notify();
+}
+
+void NotationStyle::resetStyleValues(const std::vector<StyleId>& styleIds)
+{
+    for (StyleId id : styleIds) {
+        score()->resetStyleValue(id);
+    }
+    score()->update();
     m_styleChanged.notify();
 }
 
 bool NotationStyle::canApplyToAllParts() const
 {
-    return m_getScore->score()->isMaster();
+    return !score()->isMaster(); // In parts only
 }
 
 void NotationStyle::applyToAllParts()
@@ -77,12 +91,19 @@ void NotationStyle::applyToAllParts()
         return;
     }
 
-    Ms::MStyle style = m_getScore->score()->style();
+    mu::engraving::MStyle style = m_getScore->score()->style();
 
-    for (Ms::Excerpt* excerpt : m_getScore->score()->masterScore()->excerpts()) {
-        excerpt->partScore()->undo(new Ms::ChangeStyle(excerpt->partScore(), style));
-        excerpt->partScore()->update();
+    for (mu::engraving::Excerpt* excerpt : score()->masterScore()->excerpts()) {
+        excerpt->excerptScore()->undo(new mu::engraving::ChangeStyle(excerpt->excerptScore(), style));
+        excerpt->excerptScore()->update();
     }
+}
+
+void NotationStyle::resetAllStyleValues(const StyleIdSet& exceptTheseOnes)
+{
+    score()->cmdResetAllStyles(exceptTheseOnes);
+    score()->update();
+    m_styleChanged.notify();
 }
 
 Notification NotationStyle::styleChanged() const
@@ -90,18 +111,25 @@ Notification NotationStyle::styleChanged() const
     return m_styleChanged;
 }
 
-bool NotationStyle::loadStyle(const mu::io::path& path, bool allowAnyVersion)
+bool NotationStyle::loadStyle(const muse::io::path_t& path, bool allowAnyVersion)
 {
-    m_undoStack->prepareChanges();
-    bool result = m_getScore->score()->loadStyle(path.toQString(), allowAnyVersion);
+    m_undoStack->prepareChanges(muse::TranslatableString("undoableAction", "Load style"));
+    bool result = score()->loadStyle(path.toQString(), allowAnyVersion);
     m_undoStack->commitChanges();
+
     if (result) {
         styleChanged().notify();
     }
+
     return result;
 }
 
-bool NotationStyle::saveStyle(const mu::io::path& path)
+bool NotationStyle::saveStyle(const muse::io::path_t& path)
 {
-    return m_getScore->score()->saveStyle(path.toQString());
+    return score()->saveStyle(path.toQString());
+}
+
+mu::engraving::Score* NotationStyle::score() const
+{
+    return m_getScore->score();
 }
