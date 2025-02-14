@@ -3,8 +3,6 @@
   <programVersion>2.0.1</programVersion>
   <programRevision>4592407</programRevision>
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
       <lyricsMinBottomDistance>4</lyricsMinBottomDistance>
@@ -26,7 +24,6 @@
     <metaTag name="lyricist"></metaTag>
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -180,7 +177,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -260,8 +257,6 @@
         </Measure>
       </Staff>
     <Score>
-      <LayerTag id="0" tag="default"></LayerTag>
-      <currentLayer>0</currentLayer>
       <Division>480</Division>
       <Style>
         <lyricsMinBottomDistance>4</lyricsMinBottomDistance>
@@ -349,7 +344,7 @@
           <bottomGap>6</bottomGap>
           <lid>10</lid>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Bass</text>
             </Text>
           </VBox>

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,17 +21,24 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 StyledPopupView {
     id: root
 
+    property bool needActiveFirstItem: false
+
+    signal replaceInstrumentRequested()
+    signal resetAllFormattingRequested()
+
     contentHeight: contentColumn.childrenRect.height
 
     onOpened: {
-        instrNameField.navigation.requestActive()
+        if (root.needActiveFirstItem) {
+            instrNameField.navigation.requestActive()
+        }
     }
 
     function load(instrument) {
@@ -56,6 +63,7 @@ StyledPopupView {
         spacing: 12
 
         StyledTextLabel {
+            id: nameLabel
             text: settingsModel.isMainScore ? qsTrc("instruments", "Name on main score") :
                                               qsTrc("instruments", "Name on part score")
         }
@@ -67,15 +75,17 @@ StyledPopupView {
 
             navigation.panel: root.navigationPanel
             navigation.row: 1
+            navigation.accessible.name: nameLabel.text + " " + currentText
 
             currentText: settingsModel.instrumentName
 
-            onCurrentTextEdited: {
+            onTextEditingFinished: function(newTextValue) {
                 settingsModel.instrumentName = newTextValue
             }
         }
 
         StyledTextLabel {
+            id: abbreviatureLabel
             text: qsTrc("instruments", "Abbreviated name")
         }
 
@@ -84,28 +94,12 @@ StyledPopupView {
 
             navigation.panel: root.navigationPanel
             navigation.row: 2
+            navigation.accessible.name: abbreviatureLabel.text + " " + currentText
 
             currentText: settingsModel.abbreviature
 
-            onCurrentTextEdited: {
+            onTextEditingFinished: function(newTextValue) {
                 settingsModel.abbreviature = newTextValue
-            }
-        }
-
-        StyledTextLabel {
-            text: qsTrc("instruments", "Part name")
-        }
-
-        TextInputField {
-            objectName: "PartNameField"
-
-            navigation.panel: root.navigationPanel
-            navigation.row: 3
-
-            currentText: settingsModel.partName
-
-            onCurrentTextEdited: {
-                settingsModel.partName = newTextValue
             }
         }
 
@@ -115,15 +109,15 @@ StyledPopupView {
             width: parent.width
 
             navigation.panel: root.navigationPanel
-            navigation.row: 4
+            navigation.row: 3
 
             text: qsTrc("instruments", "Replace instrument")
 
             visible: settingsModel.isMainScore
 
             onClicked: {
+                root.replaceInstrumentRequested()
                 root.close()
-                Qt.callLater(settingsModel.replaceInstrument)
             }
         }
 
@@ -138,8 +132,8 @@ StyledPopupView {
             visible: !settingsModel.isMainScore
 
             onClicked: {
+                root.resetAllFormattingRequested()
                 root.close()
-                Qt.callLater(settingsModel.resetAllFormatting)
             }
         }
     }

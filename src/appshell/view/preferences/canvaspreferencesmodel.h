@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,17 +30,19 @@
 #include "notation/inotationconfiguration.h"
 
 namespace mu::appshell {
-class CanvasPreferencesModel : public QObject, public async::Asyncable
+class CanvasPreferencesModel : public QObject, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
-
-    INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
 
     Q_PROPERTY(QVariantMap defaultZoom READ defaultZoom NOTIFY defaultZoomChanged)
     Q_PROPERTY(int mouseZoomPrecision READ mouseZoomPrecision WRITE setMouseZoomPrecision NOTIFY mouseZoomPrecisionChanged)
 
     Q_PROPERTY(int scrollPagesOrientation READ scrollPagesOrientation WRITE setScrollPagesOrientation NOTIFY scrollPagesOrientationChanged)
     Q_PROPERTY(bool limitScrollArea READ limitScrollArea WRITE setLimitScrollArea NOTIFY limitScrollAreaChanged)
+
+    Q_PROPERTY(int selectionProximity READ selectionProximity WRITE setSelectionProximity NOTIFY selectionProximityChanged)
+
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
 
 public:
     explicit CanvasPreferencesModel(QObject* parent = nullptr);
@@ -57,17 +59,22 @@ public:
     int scrollPagesOrientation() const;
     bool limitScrollArea() const;
 
+    int selectionProximity() const;
+
 public slots:
     void setMouseZoomPrecision(int precision);
 
     void setScrollPagesOrientation(int orientation);
     void setLimitScrollArea(bool limit);
 
+    void setSelectionProximity(int proximity);
+
 signals:
     void defaultZoomChanged();
     void mouseZoomPrecisionChanged();
     void scrollPagesOrientationChanged();
     void limitScrollAreaChanged();
+    void selectionProximityChanged(int selectionProximity);
 
 private:
     void setupConnections();

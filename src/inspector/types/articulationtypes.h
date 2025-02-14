@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,17 +31,9 @@ class ArticulationTypes
 
 public:
     enum class Placement {
-        TYPE_ABOVE_STAFF,
-        TYPE_BELOW_STAFF,
-        TYPE_CHORD_AUTO,
-        TYPE_ABOVE_CHORD,
-        TYPE_BELOW_CHORD
-    };
-
-    enum class Direction {
-        AUTO,
-        DOWN,
-        UP
+        TYPE_TOP,
+        TYPE_BOTTOM,
+        TYPE_AUTO
     };
 
     enum class Style {
@@ -50,7 +42,6 @@ public:
     };
 
     Q_ENUM(Placement)
-    Q_ENUM(Direction)
     Q_ENUM(Style)
 };
 }

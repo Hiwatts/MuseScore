@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,18 +21,20 @@
  */
 #include "tupletdialog.h"
 
-#include "libmscore/tuplet.h"
+#include "engraving/dom/tuplet.h"
 
-#include "widgetstatestore.h"
+#include "ui/view/widgetstatestore.h"
 
 using namespace mu::notation;
+using namespace muse::ui;
+using namespace muse::actions;
 
 //---------------------------------------------------------
 //   TupletDialog
 //---------------------------------------------------------
 
 TupletDialog::TupletDialog(QWidget* parent)
-    : QDialog(parent)
+    : QDialog(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setObjectName("TupletDialog");
     setupUi(this);
@@ -42,11 +44,12 @@ TupletDialog::TupletDialog(QWidget* parent)
     connect(buttonBox, &QDialogButtonBox::clicked, this, &TupletDialog::bboxClicked);
 
     defaultToStyleSettings();
-}
 
-TupletDialog::TupletDialog(const TupletDialog& other)
-    : QDialog(other.parentWidget())
-{
+    numberGroupBox->setAccessibleName(formatGroupBox->title() + " " + numberGroupBox->title());
+    bracketGroupBox->setAccessibleName(formatGroupBox->title() + " " + bracketGroupBox->title());
+
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 //---------------------------------------------------------
@@ -55,15 +58,16 @@ TupletDialog::TupletDialog(const TupletDialog& other)
 
 void TupletDialog::defaultToStyleSettings()
 {
-    Ms::TupletNumberType nt = Ms::TupletNumberType(style()->styleValue(Ms::Sid::tupletNumberType).toInt());
-    number->setChecked(nt == Ms::TupletNumberType::SHOW_NUMBER);
-    relation->setChecked(nt == Ms::TupletNumberType::SHOW_RELATION);
-    noNumber->setChecked(nt == Ms::TupletNumberType::NO_TEXT);
+    mu::engraving::TupletNumberType nt = mu::engraving::TupletNumberType(style()->styleValue(mu::engraving::Sid::tupletNumberType).toInt());
+    number->setChecked(nt == mu::engraving::TupletNumberType::SHOW_NUMBER);
+    relation->setChecked(nt == mu::engraving::TupletNumberType::SHOW_RELATION);
+    noNumber->setChecked(nt == mu::engraving::TupletNumberType::NO_TEXT);
 
-    Ms::TupletBracketType bt = Ms::TupletBracketType(style()->styleValue(Ms::Sid::tupletBracketType).toInt());
-    autoBracket->setChecked(bt == Ms::TupletBracketType::AUTO_BRACKET);
-    bracket->setChecked(bt == Ms::TupletBracketType::SHOW_BRACKET);
-    noBracket->setChecked(bt == Ms::TupletBracketType::SHOW_NO_BRACKET);
+    mu::engraving::TupletBracketType bt = mu::engraving::TupletBracketType(style()->styleValue(
+                                                                               mu::engraving::Sid::tupletBracketType).toInt());
+    autoBracket->setChecked(bt == mu::engraving::TupletBracketType::AUTO_BRACKET);
+    bracket->setChecked(bt == mu::engraving::TupletBracketType::SHOW_BRACKET);
+    noBracket->setChecked(bt == mu::engraving::TupletBracketType::SHOW_NO_BRACKET);
 }
 
 TupletNumberType TupletDialog::numberType() const
@@ -114,26 +118,13 @@ INotationPtr TupletDialog::notation() const
 
 void TupletDialog::apply()
 {
-    auto interaction = notation()->interaction();
-    if (!interaction) {
-        return;
-    }
-
-    auto noteInput = interaction->noteInput();
-    if (!noteInput) {
-        return;
-    }
-
     TupletOptions options;
     options.ratio = Fraction(actualNotes->value(), normalNotes->value());
     options.numberType = numberType();
     options.bracketType = bracketType();
 
-    if (noteInput->isNoteInputMode()) {
-        noteInput->addTuplet(options);
-    } else {
-        interaction->addTupletToSelectedChordRests(options);
-    }
+    ActionData data_ = ActionData::make_arg1<TupletOptions>(options);
+    dispatcher()->dispatch("custom-tuplet", data_);
 }
 
 void TupletDialog::bboxClicked(QAbstractButton* button)

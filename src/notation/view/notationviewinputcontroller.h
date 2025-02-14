@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,6 +22,8 @@
 #ifndef MU_NOTATION_NOTATIONVIEWINPUTCONTROLLER_H
 #define MU_NOTATION_NOTATIONVIEWINPUTCONTROLLER_H
 
+#include <QtEvents>
+
 #include "modularity/ioc.h"
 
 #include "actions/iactionsdispatcher.h"
@@ -36,6 +38,10 @@
 
 #include "playback/iplaybackcontroller.h"
 
+#include "global/iglobalconfiguration.h"
+
+class QQuickItem;
+
 namespace mu::notation {
 class IControlledView
 {
@@ -45,51 +51,83 @@ public:
     virtual qreal width() const = 0;
     virtual qreal height() const = 0;
 
-    virtual void moveCanvas(int dx, int dy) = 0;
-    virtual void moveCanvasHorizontal(int dx) = 0;
-    virtual void moveCanvasVertical(int dy) = 0;
+    virtual muse::PointF viewportTopLeft() const = 0;
 
+    //! muse::Returns true if the canvas has been moved
+    virtual bool moveCanvas(qreal dx, qreal dy) = 0;
+    virtual void moveCanvasHorizontal(qreal dx) = 0;
+    virtual void moveCanvasVertical(qreal dy) = 0;
+
+    virtual muse::RectF notationContentRect() const = 0;
     virtual qreal currentScaling() const = 0;
-    virtual void setScaling(qreal scaling, const QPoint& pos) = 0;
+    virtual void setScaling(qreal scaling, const muse::PointF& pos, bool overrideZoomType = true) = 0;
 
-    virtual PointF toLogical(const QPoint& p) const = 0;
+    virtual muse::PointF toLogical(const muse::PointF& p) const = 0;
+    virtual muse::PointF toLogical(const QPointF& p) const = 0;
+    virtual muse::PointF fromLogical(const muse::PointF& r) const = 0;
+    virtual muse::RectF fromLogical(const muse::RectF& r) const = 0;
 
     virtual bool isNoteEnterMode() const = 0;
-    virtual void showShadowNote(const PointF& pos) = 0;
+    virtual void showShadowNote(const muse::PointF& pos) = 0;
 
-    virtual void showContextMenu(const ElementType& elementType, const QPoint& pos) = 0;
+    virtual void showContextMenu(const ElementType& elementType, const QPointF& pos) = 0;
     virtual void hideContextMenu() = 0;
+
+    virtual void showElementPopup(const ElementType& elementType, const muse::RectF& elementRect) = 0;
+    virtual void hideElementPopup(const ElementType& elementType = ElementType::INVALID) = 0;
+    virtual void toggleElementPopup(const ElementType& elementType, const muse::RectF& elementRect) = 0;
+
+    virtual bool elementPopupIsOpen(const ElementType& elementType) const = 0;
 
     virtual INotationInteractionPtr notationInteraction() const = 0;
     virtual INotationPlaybackPtr notationPlayback() const = 0;
+
+    virtual QQuickItem* asItem() = 0;
 };
 
-class NotationViewInputController : public actions::Actionable, public async::Asyncable
+class NotationViewInputController : public muse::actions::Actionable, public muse::Injectable, public muse::async::Asyncable
 {
-    INJECT(notation, INotationConfiguration, configuration)
-    INJECT(notation, actions::IActionsDispatcher, dispatcher)
-    INJECT(notation, playback::IPlaybackController, playbackController)
-    INJECT(notation, context::IGlobalContext, globalContext)
+public:
+    muse::Inject<INotationConfiguration> configuration = { this };
+    muse::Inject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::Inject<playback::IPlaybackController> playbackController = { this };
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<muse::IGlobalConfiguration> globalConfiguration = { this };
 
 public:
-    NotationViewInputController(IControlledView* view);
+    NotationViewInputController(IControlledView* view, const muse::modularity::ContextPtr& iocCtx);
 
     void init();
 
-    bool isZoomInited();
     void initZoom();
+    void initCanvasPos();
+    void updateZoomAfterSizeChange();
     void zoomIn();
     void zoomOut();
+    void nextScreen();
+    void previousScreen();
+    void nextPage();
+    void previousPage();
+    void startOfScore();
+    void endOfScore();
 
+    bool readonly() const;
     void setReadonly(bool readonly);
 
+    void pinchToZoom(qreal scaleFactor, const QPointF& pos);
     void wheelEvent(QWheelEvent* event);
     void mousePressEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
     void mouseDoubleClickEvent(QMouseEvent* event);
     void hoverMoveEvent(QHoverEvent* event);
+    bool shortcutOverrideEvent(QKeyEvent* event);
     void keyPressEvent(QKeyEvent* event);
+    void keyReleaseEvent(QKeyEvent* event);
+    void inputMethodEvent(QInputMethodEvent* event);
+
+    bool canHandleInputMethodQuery(Qt::InputMethodQuery query) const;
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const;
 
     void dragEnterEvent(QDragEnterEvent* event);
     void dragLeaveEvent(QDragLeaveEvent* event);
@@ -97,40 +135,88 @@ public:
     void dropEvent(QDropEvent* event);
 
     ElementType selectionType() const;
-    mu::PointF hitElementPos() const;
+    muse::PointF selectionElementPos() const;
 
 private:
     INotationPtr currentNotation() const;
     INotationStylePtr notationStyle() const;
     INotationInteractionPtr viewInteraction() const;
-    EngravingItem* hitElement() const;
+    const INotationInteraction::HitElementContext& hitElementContext() const;
+
+    void onNotationChanged();
 
     void zoomToPageWidth();
+    void doZoomToPageWidth();
     void zoomToWholePage();
+    void doZoomToWholePage();
     void zoomToTwoPages();
+    void doZoomToTwoPages();
+    void moveScreen(int direction);
+    void movePage(int direction);
 
     int currentZoomIndex() const;
     int currentZoomPercentage() const;
-    void setZoom(int zoomPercentage, const QPoint& pos = QPoint());
+    muse::PointF findZoomFocusPoint() const;
+    void setScaling(qreal scaling, const muse::PointF& pos = muse::PointF(), bool overrideZoomType = true);
+    void setZoom(int zoomPercentage, const muse::PointF& pos = muse::PointF());
+
+    qreal scalingFromZoomPercentage(int zoomPercentage) const;
+    int zoomPercentageFromScaling(qreal scaling) const;
 
     void setViewMode(const ViewMode& viewMode);
 
-    bool isDragAllowed() const;
-    void startDragElements(ElementType elementsType, const PointF& elementsOffset);
+    void startDragElements(ElementType elementsType, const muse::PointF& elementsOffset);
+
+    void togglePopupForItemIfSupports(const EngravingItem* item);
+    void updateShadowNotePopupVisibility(bool forceHide = false);
 
     float hitWidth() const;
 
-    bool needSelect(const QMouseEvent* event, const PointF& clickLogicPos) const;
+    struct ClickContext {
+        muse::PointF logicClickPos;
+        const QMouseEvent* event = nullptr;
+        mu::engraving::EngravingItem* hitElement = nullptr;
+        mu::engraving::staff_idx_t hitStaff = muse::nidx;
+        bool isHitGrip = false;
+    };
+
+    bool needSelect(const ClickContext& ctx) const;
+    void handleLeftClick(const ClickContext& ctx);
+    void handleRightClick(const ClickContext& ctx);
+    void handleLeftClickRelease(const QPointF& releasePoint);
+
+    bool startTextEditingAllowed() const;
+    void updateTextCursorPosition();
+
+    bool tryPercussionShortcut(QKeyEvent* event);
+
+    EngravingItem* resolveStartPlayableElement() const;
 
     IControlledView* m_view = nullptr;
 
-    QList<int> m_possibleZoomsPercentage;
+    QList<int> m_possibleZoomPercentages;
 
     bool m_readonly = false;
     bool m_isCanvasDragged = false;
+    bool m_tripleClickPending = false;
 
-    bool m_isZoomInited = false;
-    PointF m_beginPoint;
+    struct MouseDownInfo {
+        enum DragAction {
+            DragOutgoingElement,
+            DragOutgoingRange,
+            Other,
+            Nothing
+        } dragAction = Other;
+
+        QPointF physicalBeginPoint;
+        muse::PointF logicalBeginPoint;
+    } m_mouseDownInfo;
+
+    mu::engraving::EngravingItem* m_prevHitElement = nullptr;
+    mu::engraving::EngravingItem* m_prevSelectedElement = nullptr;
+
+    bool m_shouldStartEditOnLeftClickRelease = false;
+    bool m_shouldTogglePopupOnLeftClickRelease = false;
 };
 }
 

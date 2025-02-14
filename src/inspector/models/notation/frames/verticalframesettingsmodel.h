@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -36,14 +36,10 @@ class VerticalFrameSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(PropertyItem * frameRightMargin READ frameRightMargin CONSTANT)
     Q_PROPERTY(PropertyItem * frameTopMargin READ frameTopMargin CONSTANT)
     Q_PROPERTY(PropertyItem * frameBottomMargin READ frameBottomMargin CONSTANT)
+    Q_PROPERTY(PropertyItem * isSizeSpatiumDependent READ isSizeSpatiumDependent CONSTANT)
 
 public:
     explicit VerticalFrameSettingsModel(QObject* parent, IElementRepositoryService* repository);
-
-    void createProperties() override;
-    void requestElements() override;
-    void loadProperties() override;
-    void resetProperties() override;
 
     PropertyItem* frameHeight() const;
     PropertyItem* gapAbove() const;
@@ -52,8 +48,18 @@ public:
     PropertyItem* frameRightMargin() const;
     PropertyItem* frameTopMargin() const;
     PropertyItem* frameBottomMargin() const;
+    PropertyItem* isSizeSpatiumDependent() const;
 
 private:
+    void createProperties() override;
+    void requestElements() override;
+    void loadProperties() override;
+    void resetProperties() override;
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
+
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
+
     PropertyItem* m_frameHeight = nullptr;
     PropertyItem* m_gapAbove = nullptr;
     PropertyItem* m_gapBelow = nullptr;
@@ -61,6 +67,7 @@ private:
     PropertyItem* m_frameRightMargin = nullptr;
     PropertyItem* m_frameTopMargin = nullptr;
     PropertyItem* m_frameBottomMargin = nullptr;
+    PropertyItem* m_isSizeSpatiumDependent = nullptr;
 };
 }
 

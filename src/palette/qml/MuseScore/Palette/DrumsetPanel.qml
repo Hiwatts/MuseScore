@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,19 +22,29 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Palette 1.0
 
-Rectangle {
-    color: ui.theme.backgroundPrimaryColor
+Item {
+    id: root
+
+    property alias navigationSection: navPanel.section
+    property alias contentNavigationPanelOrderStart: navPanel.order
+
+    NavigationPanel {
+        id: navPanel
+        name: "DrumsetSection"
+        direction: NavigationPanel.Vertical
+        enabled: root.enabled && root.visible
+    }
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 26
-        anchors.rightMargin: 26
+        anchors.leftMargin: 12
+        anchors.rightMargin: 8
 
-        spacing: 26
+        spacing: 12
 
         Column {
             Layout.alignment: Qt.AlignVCenter
@@ -45,18 +55,18 @@ Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 height: 20
-                width: editDrumsetButton.width
+                width: customizeKitButton.width
 
                 text: drumsetView.pitchName
             }
 
             FlatButton {
-                id: editDrumsetButton
+                id: customizeKitButton
 
-                text: qsTrc("palette", "Edit drumset")
+                text: qsTrc("palette", "Customize kit")
 
                 onClicked: {
-                    drumsetView.editDrumset()
+                    drumsetView.customizeKit()
                 }
             }
         }

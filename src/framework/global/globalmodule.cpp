@@ -21,36 +21,69 @@
  */
 #include "globalmodule.h"
 
-#include <QTimer>
-#include <QDateTime>
+#include "muse_framework_config.h"
 
 #include "modularity/ioc.h"
 #include "internal/globalconfiguration.h"
 
-#include "log.h"
+#include "logger.h"
 #include "logremover.h"
-#include "thirdparty/haw_logger/logger/logdefdest.h"
-#include "version.h"
+#include "profiler.h"
 
-#include "internal/application.h"
+#include "internal/baseapplication.h"
+#include "internal/invoker.h"
+#include "internal/cryptographichash.h"
+#include "internal/process.h"
+#include "internal/systeminfo.h"
+
+#ifdef MUSE_MODULE_UI
 #include "internal/interactive.h"
-#include "invoker.h"
+#endif
 
 #include "runtime.h"
 #include "async/processevents.h"
 
 #include "settings.h"
 
+#include "io/internal/filesystem.h"
+
+#include "api/internal/apiregister.h"
+#include "api/iapiregister.h"
+#include "api/logapi.h"
+#include "api/interactiveapi.h"
+#include "api/filesystemapi.h"
+#include "api/processapi.h"
+
+#ifdef MUSE_MODULE_DIAGNOSTICS
 #include "diagnostics/idiagnosticspathsregister.h"
+#endif
 
-#include "config.h"
+#ifdef Q_OS_WIN
+#include "platform/win/waitabletimer.h"
+#endif
 
-using namespace mu::framework;
-using namespace mu::modularity;
+#include "log.h"
 
-static std::shared_ptr<GlobalConfiguration> s_globalConf = std::make_shared<GlobalConfiguration>();
+using namespace muse;
+using namespace muse::modularity;
+using namespace muse::io;
 
-static Invoker s_asyncInvoker;
+std::shared_ptr<Invoker> GlobalModule::s_asyncInvoker = {};
+
+class ApplicationStub : public BaseApplication
+{
+public:
+
+    ApplicationStub()
+        : BaseApplication(std::make_shared<modularity::Context>()) {}
+
+    void perform() override {}
+    void finish() override {}
+};
+
+GlobalModule::GlobalModule()
+{
+}
 
 std::string GlobalModule::moduleName() const
 {
@@ -59,67 +92,119 @@ std::string GlobalModule::moduleName() const
 
 void GlobalModule::registerExports()
 {
-    ioc()->registerExport<IApplication>(moduleName(), new Application());
-    ioc()->registerExport<IGlobalConfiguration>(moduleName(), s_globalConf);
-    ioc()->registerExport<IInteractive>(moduleName(), new Interactive());
+    if (!m_application) {
+        m_application = std::make_shared<ApplicationStub>();
+    }
+
+    m_configuration = std::make_shared<GlobalConfiguration>(iocContext());
+    s_asyncInvoker = std::make_shared<Invoker>();
+    m_systemInfo = std::make_shared<SystemInfo>();
+
+    ioc()->registerExport<IApplication>(moduleName(), m_application);
+    ioc()->registerExport<IGlobalConfiguration>(moduleName(), m_configuration);
+    ioc()->registerExport<ISystemInfo>(moduleName(), m_systemInfo);
+    ioc()->registerExport<IFileSystem>(moduleName(), new FileSystem());
+    ioc()->registerExport<ICryptographicHash>(moduleName(), new CryptographicHash());
+    ioc()->registerExport<IProcess>(moduleName(), new Process());
+    ioc()->registerExport<api::IApiRegister>(moduleName(), new api::ApiRegister());
+
+#ifdef MUSE_MODULE_UI
+    ioc()->registerExport<IInteractive>(moduleName(), new Interactive(iocContext()));
+#endif
 }
 
-void GlobalModule::onInit(const IApplication::RunMode&)
+void GlobalModule::registerApi()
 {
-    mu::runtime::mainThreadId(); //! NOTE Needs only call
-    mu::runtime::setThreadName("main");
+    using namespace muse::api;
+
+    auto api = ioc()->resolve<IApiRegister>(moduleName());
+    if (api) {
+        api->regApiCreator(moduleName(), "api.log", new ApiCreator<LogApi>());
+        api->regApiCreator(moduleName(), "api.interactive", new api::ApiCreator<InteractiveApi>());
+        api->regApiCreator(moduleName(), "api.process", new ApiCreator<ProcessApi>());
+        api->regApiCreator(moduleName(), "api.filesystem", new ApiCreator<FileSystemApi>());
+    }
+}
+
+void GlobalModule::onPreInit(const IApplication::RunMode& mode)
+{
+    muse::runtime::mainThreadId(); //! NOTE Needs only call
+    muse::runtime::setThreadName("main");
 
     //! NOTE: settings must be inited before initialization of any module
     //! because modules can use settings at the moment of their initialization
     settings()->load();
 
     //! --- Setup logger ---
-    using namespace haw::logger;
+    using namespace muse::logger;
     Logger* logger = Logger::instance();
     logger->clearDests();
 
     //! Console
-    logger->addDest(new ConsoleLogDest(LogLayout("${time} | ${type|5} | ${thread} | ${tag|10} | ${message}")));
+    if (mode == IApplication::RunMode::GuiApp || muse::runtime::isDebug()) {
+        logger->addDest(new ConsoleLogDest(LogLayout("${time} | ${type|5} | ${thread|15} | ${tag|15} | ${message}")));
+    }
 
-    io::path logPath = s_globalConf->userAppDataPath() + "/logs";
+    io::path_t logPath = m_configuration->userAppDataPath() + "/logs";
     fileSystem()->makePath(logPath);
 
-    //! Remove old logs
-    LogRemover::removeLogs(logPath, 7, "MuseScore_yyMMdd_HHmmss.log");
+    io::path_t logFilePath = logPath;
+    String logFileNamePattern;
 
-    //! File, this creates a file named "data/logs/MuseScore_yyMMdd_HHmmss.log"
-    io::path logFilePath = logPath + "/MuseScore_"
-                           + QDateTime::currentDateTime().toString("yyMMdd_HHmmss")
-                           + ".log";
+    if (mode == IApplication::RunMode::AudioPluginRegistration) {
+        logFileNamePattern = u"audiopluginregistration_yyMMdd.log";
+
+        //! This creates a file named "data/logs/audiopluginregistration_yyMMdd.log"
+        logFilePath += "/audiopluginregistration_"
+                       + QDateTime::currentDateTime().toString("yyMMdd")
+                       + ".log";
+    } else {
+        logFileNamePattern = BaseApplication::appName() + u"_yyMMdd_HHmmss.log";
+
+        //! This creates a file named "data/logs/AppName_yyMMdd_HHmmss.log"
+        logFilePath += u"/" + BaseApplication::appName() + u"_"
+                       + String::fromQString(QDateTime::currentDateTime().toString("yyMMdd_HHmmss"))
+                       + u".log";
+    }
+
+    //! Remove old logs
+    LogRemover::removeLogs(logPath, 7, logFileNamePattern);
 
     FileLogDest* logFile = new FileLogDest(logFilePath.toStdString(),
-                                           LogLayout("${datetime} | ${type|5} | ${thread} | ${tag|10} | ${message}"));
+                                           LogLayout("${datetime} | ${type|5} | ${thread|15} | ${tag|15} | ${message}"));
 
-    LOGI() << "log path: " << logFile->filePath();
     logger->addDest(logFile);
 
-#ifdef LOGGER_DEBUGLEVEL_ENABLED
-    logger->setLevel(haw::logger::Debug);
+    if (m_loggerLevel) {
+        logger->setLevel(m_loggerLevel.value());
+    } else {
+#ifdef MUSE_MODULE_GLOBAL_LOGGER_DEBUGLEVEL
+        logger->setLevel(muse::logger::Level::Debug);
 #else
-    logger->setLevel(haw::logger::Normal);
+        logger->setLevel(muse::logger::Level::Normal);
 #endif
+    }
 
-    LOGI() << "=== Started MuseScore " << framework::Version::fullVersion() << " ===";
+    LOGI() << "log path: " << logFilePath;
+    LOGI() << "=== Started " << m_application->title()
+           << " " << m_application->fullVersion().toString()
+           << ", build: " << m_application->build() << " ===";
 
     //! --- Setup profiler ---
-    using namespace haw::profiler;
+    using namespace muse::profiler;
     struct MyPrinter : public Profiler::Printer
     {
-        void printDebug(const std::string& str) override { LOG_STREAM(Logger::DEBG, "Profiler") << str; }
-        void printInfo(const std::string& str) override { LOG_STREAM(Logger::INFO, "Profiler") << str; }
+        void printDebug(const std::string& str) override { LOG_STREAM(Logger::DEBG, "Profiler", Color::Magenta)() << str; }
+        void printInfo(const std::string& str) override { LOG_STREAM(Logger::INFO, "Profiler", Color::Magenta)() << str; }
     };
 
     Profiler::Options profOpt;
     profOpt.stepTimeEnabled = true;
+    profOpt.timersEnabled = true;
     profOpt.funcsTimeEnabled = true;
     profOpt.funcsTraceEnabled = false;
     profOpt.funcsMaxThreadCount = 100;
-    profOpt.dataTopCount = 150;
+    profOpt.statTopCount = 150;
 
     Profiler* profiler = Profiler::instance();
     profiler->setup(profOpt, new MyPrinter());
@@ -128,20 +213,65 @@ void GlobalModule::onInit(const IApplication::RunMode&)
 
     Invoker::setup();
 
-    mu::async::onMainThreadInvoke([](const std::function<void()>& f, bool isAlwaysQueued) {
-        s_asyncInvoker.invoke(f, isAlwaysQueued);
+    async::onMainThreadInvoke([](const std::function<void()>& f, bool isAlwaysQueued) {
+        s_asyncInvoker->invoke(f, isAlwaysQueued);
     });
 
     //! --- Diagnostics ---
-    auto pr = ioc()->resolve<diagnostics::IDiagnosticsPathsRegister>(moduleName());
+#ifdef MUSE_MODULE_DIAGNOSTICS
+    auto pr = ioc()->resolve<muse::diagnostics::IDiagnosticsPathsRegister>(moduleName());
     if (pr) {
-        pr->reg("appBinPath", s_globalConf->appBinPath());
-        pr->reg("appDataPath", s_globalConf->appDataPath());
-        pr->reg("appConfigPath", s_globalConf->appConfigPath());
-        pr->reg("userAppDataPath", s_globalConf->userAppDataPath());
-        pr->reg("userBackupPath", s_globalConf->userBackupPath());
-        pr->reg("userDataPath", s_globalConf->userDataPath());
-        pr->reg("log file", logFile->filePath());
+        pr->reg("appBinPath", m_configuration->appBinPath());
+        pr->reg("appBinDirPath", m_configuration->appBinDirPath());
+        pr->reg("appDataPath", m_configuration->appDataPath());
+        pr->reg("appConfigPath", m_configuration->appConfigPath());
+        pr->reg("userAppDataPath", m_configuration->userAppDataPath());
+        pr->reg("userBackupPath", m_configuration->userBackupPath());
+        pr->reg("userDataPath", m_configuration->userDataPath());
+        pr->reg("log file", logFilePath);
         pr->reg("settings file", settings()->filePath());
     }
+#endif
+}
+
+void GlobalModule::onInit(const IApplication::RunMode&)
+{
+    m_configuration->init();
+    m_systemInfo->init();
+
+    m_endTimePeriod = false;
+
+#ifdef Q_OS_WIN
+    WaitableTimer timer;
+    if (m_configuration->highResolutionTimers() || !timer.init()) {
+        // Improves the accuracy of Sleep() on Windows
+        // Without it, errors up to 15 ms are possible, which is critical for the audio thread
+        // and can significantly degrade sound quality
+        // However, this approach may result in higher CPU usage as a trade-off
+        LOGI() << "Use timeBeginPeriod(1)";
+        timeBeginPeriod(1);
+        m_endTimePeriod = true;
+    }
+#endif
+}
+
+void GlobalModule::onDeinit()
+{
+    invokeQueuedCalls();
+
+#ifdef Q_OS_WIN
+    if (m_endTimePeriod) {
+        timeEndPeriod(1);
+    }
+#endif
+}
+
+void GlobalModule::invokeQueuedCalls()
+{
+    s_asyncInvoker->invokeQueuedCalls();
+}
+
+void GlobalModule::setLoggerLevel(const muse::logger::Level& level)
+{
+    m_loggerLevel = level;
 }

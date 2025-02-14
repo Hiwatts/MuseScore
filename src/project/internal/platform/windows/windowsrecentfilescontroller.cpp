@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -26,15 +26,8 @@
 
 using namespace mu::project;
 
-void WindowsRecentFilesController::addRecentFile(const io::path& path)
+void WindowsRecentFilesController::prependPlatformRecentFile(const muse::io::path_t& path)
 {
     std::wstring pathString = path.toStdWString();
     SHAddToRecentDocs(SHARD_PATHW, pathString.c_str());
-}
-
-void WindowsRecentFilesController::clearRecentFiles()
-{
-    // The "docs" seem to say that this should clear the recent files list
-    // But in practice it's not sure if that's the case
-    SHAddToRecentDocs(0, NULL);
 }

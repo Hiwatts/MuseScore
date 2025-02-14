@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,203 +20,113 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQml.Models 2.3
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
-import "common"
-import "general"
-import "notation"
-import "text"
-import "score"
+import "."
 
 Rectangle {
     id: root
 
-    property alias model: inspectorRepeater.model
+    property alias model: sectionList.model
+    property alias notationView: popupController.notationView
 
     property NavigationSection navigationSection: null
+    property int navigationOrderStart: 1
 
     color: ui.theme.backgroundPrimaryColor
 
+    onVisibleChanged: {
+        inspectorListModel.setInspectorVisible(root.visible)
+    }
+
     function focusFirstItem() {
-        var item = inspectorRepeater.itemAt(0)
+        var item = sectionList.itemAtIndex(0)
         if (item) {
             item.navigation.requestActive()
         }
     }
 
-    InspectorListModel {
-        id: inspectorListModel
+    QtObject {
+        id: prv
+
+        function closePreviousOpenedPopup(newOpenedPopup, visualControl) {
+            if (Boolean(popupController.popup) && popupController.popup !== newOpenedPopup) {
+                popupController.popup.close()
+            }
+
+            popupController.visualControl = visualControl
+            popupController.popup = newOpenedPopup
+        }
     }
 
-    StyledScrollBar {
-        id: scrollBar
-
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-
-        visible: flickableArea.contentHeight > flickableArea.height
-        z: 1
+    InspectorPopupController {
+        id: popupController
     }
 
-    Flickable {
-        id: flickableArea
-
+    StyledListView {
+        id: sectionList
         anchors.fill: parent
-        anchors.margins: 12
+
+        topMargin: 12
+        leftMargin: 12
+        rightMargin: 12
+        bottomMargin: 12
+
+        spacing: 12
+
+        cacheBuffer: Math.max(0, contentHeight)
 
         function ensureContentVisible(invisibleContentHeight) {
-            if (flickableArea.contentY + invisibleContentHeight > 0) {
-                flickableArea.contentY += invisibleContentHeight
+            if (sectionList.contentY + invisibleContentHeight > 0) {
+                sectionList.contentY += invisibleContentHeight
             } else {
-                flickableArea.contentY = 0
+                sectionList.contentY = 0
             }
         }
-
-        clip: true
-        flickableDirection: Flickable.VerticalFlick
-        boundsBehavior: Flickable.StopAtBounds
-        maximumFlickVelocity: 1000
-
-        contentHeight: contentItem.childrenRect.height
 
         Behavior on contentY {
             NumberAnimation { duration: 250 }
         }
 
-        ScrollBar.vertical: scrollBar
+        model: InspectorListModel {
+            id: inspectorListModel
+        }
 
-        Column {
-            anchors.left: parent.left
-            anchors.right: parent.right
+        onContentHeightChanged: {
+            returnToBounds()
+        }
 
-            spacing: 6
+        delegate: Column {
+            width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
 
-            Repeater {
-                id: inspectorRepeater
+            spacing: sectionList.spacing
 
-                model: inspectorListModel
+            property var navigationPanel: _item.navigationPanel
 
-                delegate: ExpandableBlank {
-                    id: expandableDelegate
+            SeparatorLine {
+                anchors.margins: -12
 
-                    property var contentHeight: implicitHeight
+                visible: model.index !== 0
+            }
 
-                    NavigationPanel {
-                        id: navPanel
-                        name: expandableDelegate.title
-                        section: root.navigationSection
-                        direction: NavigationPanel.Vertical
-                        accessible.name: expandableDelegate.title
-                        enabled: root.visible
-                        order: model.index + 2
-                    }
+            InspectorSectionDelegate {
+                id: _item
 
-                    navigation.panel: navPanel
-                    navigation.row: 0
+                sectionModel: model.inspectorSectionModel
+                anchorItem: root
+                navigationPanel.section: root.navigationSection
+                navigationPanel.order: root.navigationOrderStart + model.index
 
-                    function viewBySectionType() {
-                        flickableArea.contentY = 0
+                onEnsureContentVisibleRequested: function(invisibleContentHeight) {
+                    sectionList.ensureContentVisible(invisibleContentHeight)
+                }
 
-                        switch (inspectorData.sectionType) {
-                        case Inspector.SECTION_GENERAL: return generalInspector
-                        case Inspector.SECTION_TEXT: return textInspector
-                        case Inspector.SECTION_NOTATION:
-                            if (inspectorData.isMultiModel()) {
-                                return notationInspectorMultiElements
-                            } else {
-                                return notationInspectorSingleElement
-                            }
-                        case Inspector.SECTION_SCORE_DISPLAY: return scoreInspector
-                        case Inspector.SECTION_SCORE_APPEARANCE: return scoreAppearanceInspector
-                        }
-                    }
-
-                    contentItemComponent: viewBySectionType()
-
-                    Component.onCompleted: {
-                        title = inspectorData.title
-                    }
-
-                    Component {
-                        id: generalInspector
-
-                        GeneralInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                            anchorItem: root
-
-                            onEnsureContentVisibleRequested: {
-                                flickableArea.ensureContentVisible(-invisibleContentHeight)
-                            }
-                        }
-                    }
-
-                    Component {
-                        id: textInspector
-
-                        TextInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                            anchorItem: root
-
-                            onEnsureContentVisibleRequested: {
-                                flickableArea.ensureContentVisible(-invisibleContentHeight)
-                            }
-                        }
-                    }
-
-                    Component {
-                        id: notationInspectorMultiElements
-
-                        NotationMultiElementView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                            anchorItem: root
-
-                            onEnsureContentVisibleRequested: {
-                                flickableArea.ensureContentVisible(-invisibleContentHeight)
-                            }
-                        }
-                    }
-
-                    Component {
-                        id: notationInspectorSingleElement
-
-                        NotationSingleElementView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                        }
-                    }
-
-                    Component {
-                        id: scoreInspector
-
-                        ScoreDisplayInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                        }
-                    }
-
-                    Component {
-                        id: scoreAppearanceInspector
-
-                        ScoreAppearanceInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                        }
-                    }
+                onPopupOpened: function(openedPopup, visualControl) {
+                    prv.closePreviousOpenedPopup(openedPopup, visualControl)
                 }
             }
         }

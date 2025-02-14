@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,19 +24,20 @@
 
 #include "modularity/ioc.h"
 #include "project/iprojectcreator.h"
-#include "notation/view/notationpaintview.h"
+#include "notation/view/abstractnotationpaintview.h"
 #include "shortcuts/ishortcutsregister.h"
 
 namespace mu::project {
-class TemplatePaintView : public notation::NotationPaintView
+class TemplatePaintView : public notation::AbstractNotationPaintView
 {
     Q_OBJECT
 
-    INJECT(project, IProjectCreator, notationCreator)
-    INJECT(project, shortcuts::IShortcutsRegister, shortcutsRegister)
+    INJECT(IProjectCreator, notationCreator)
+    INJECT(muse::shortcuts::IShortcutsRegister, shortcutsRegister)
 
 public:
     explicit TemplatePaintView(QQuickItem* parent = nullptr);
+    ~TemplatePaintView() override;
 
     Q_INVOKABLE void load(const QString& templatePath);
 
@@ -49,10 +50,16 @@ private slots:
 private:
     void onNotationSetup() override;
 
+    void resetNotation();
+
+    QString shortcutsTitleByActionCode(const muse::actions::ActionCode& code) const;
+
     void adjustCanvas();
     qreal resolveDefaultScaling() const;
 
     QString m_templatePath;
+
+    INotationProjectPtr m_notationProject = nullptr;
 };
 }
 

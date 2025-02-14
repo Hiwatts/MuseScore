@@ -1,4 +1,4 @@
 #include "gpnote.h"
 
-namespace Ms {
-}
+namespace mu::iex::guitarpro {
+} // namespace mu::iex::guitarpro

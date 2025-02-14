@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,15 +28,17 @@
 #include "importmidi_chord.h"
 #include "importmidi_meter.h"
 #include "importmidi_operations.h"
-#include "libmscore/sig.h"
-#include "libmscore/mscore.h"
-#include "libmscore/durationtype.h"
+#include "engraving/dom/sig.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/durationtype.h"
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiVoice {
 // no more than VOICES
 
-int toIntVoiceCount(MidiOperations::VoiceCount value)
+size_t toIntVoiceCount(MidiOperations::VoiceCount value)
 {
     switch (value) {
     case MidiOperations::VoiceCount::V_1:
@@ -55,13 +57,13 @@ int voiceLimit()
 {
     const auto& opers = midiImportOperations.data()->trackOpers;
     const int currentTrack = midiImportOperations.currentTrack();
-    const int allowedVoiceCount = toIntVoiceCount(opers.maxVoiceCount.value(currentTrack));
+    const size_t allowedVoiceCount = toIntVoiceCount(opers.maxVoiceCount.value(currentTrack));
 
     Q_ASSERT_X(allowedVoiceCount <= VOICES,
                "MidiVoice::voiceLimit",
-               "Allowed voice count exceeds MuseScore voice limit");
+               "Allowed voice count exceeds MuseScore Studio voice limit");
 
-    return allowedVoiceCount;
+    return static_cast<int>(allowedVoiceCount);
 }
 
 #ifdef QT_DEBUG
@@ -1074,13 +1076,13 @@ bool separateVoices(std::multimap<int, MTrack>& tracks, const TimeSigMap* sigmap
         if (chords.empty()) {
             continue;
         }
-        const int userVoiceCount = toIntVoiceCount(
+        const auto userVoiceCount = toIntVoiceCount(
             opers.data()->trackOpers.maxVoiceCount.value(mtrack.indexOfOperation));
         // pass current track index through MidiImportOperations
         // for further usage
         MidiOperations::CurrentTrackSetter setCurrentTrack{ opers, mtrack.indexOfOperation };
 
-        if (userVoiceCount > 1 && userVoiceCount <= voiceLimit()) {
+        if (userVoiceCount > 1 && static_cast<int>(userVoiceCount) <= voiceLimit()) {
 #ifdef QT_DEBUG
             Q_ASSERT_X(MidiTuplet::areAllTupletsReferenced(mtrack.chords, mtrack.tuplets),
                        "MidiVoice::separateVoices",
@@ -1118,4 +1120,4 @@ bool separateVoices(std::multimap<int, MTrack>& tracks, const TimeSigMap* sigmap
     return changed;
 }
 } // namespace MidiVoice
-} // namespace Ms
+} // namespace mu::iex::midi

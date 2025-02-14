@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,13 +24,13 @@
 #include <QQueue>
 
 #include "importmidi_fraction.h"
-#include "libmscore/durationtype.h"
-#include "libmscore/mscore.h"
+#include "engraving/dom/durationtype.h"
+#include "engraving/dom/mscore.h"
 #include "importmidi_tuplet.h"
 #include "importmidi_chord.h"
 #include "importmidi_inner.h"
 
-namespace Ms {
+namespace mu::iex::midi {
 namespace Meter {
 bool isSimple(const ReducedFraction& barFraction)       // 2/2, 3/4, 4/4, ...
 {
@@ -313,7 +313,7 @@ bool isPowerOfTwo(unsigned int x)
 
 bool isSimpleNoteDuration(const ReducedFraction& duration)
 {
-    const auto division = ReducedFraction::fromTicks(MScore::division);
+    const auto division = ReducedFraction::fromTicks(engraving::Constants::DIVISION);
     auto div = (duration > division) ? duration / division : division / duration;
     if (div > ReducedFraction(0, 1)) {
         div.reduce();
@@ -400,13 +400,13 @@ ReducedFraction findTupletRatio(const ReducedFraction& startPos,
     return tupletRatio;
 }
 
-QList<std::pair<ReducedFraction, TDuration> >
+QList<std::pair<ReducedFraction, engraving::TDuration> >
 collectDurations(const std::map<ReducedFraction, Node>& nodes,
                  const std::vector<MidiTuplet::TupletData>& tupletsInBar,
                  bool useDots,
                  bool printRestRemains)
 {
-    QList<std::pair<ReducedFraction, TDuration> > resultDurations;
+    QList<std::pair<ReducedFraction, engraving::TDuration> > resultDurations;
 
     for (auto it1 = nodes.begin(); it1 != nodes.end(); ++it1) {
         auto it2 = it1;
@@ -416,7 +416,7 @@ collectDurations(const std::map<ReducedFraction, Node>& nodes,
         }
         const auto tupletRatio = findTupletRatio(it1->first, it2->first, tupletsInBar);
         const auto duration = tupletRatio * (it2->first - it1->first);
-        auto list = toDurationList(duration.fraction(), useDots, 1, printRestRemains);
+        auto list = mu::engraving::toDurationList(duration.fraction(), useDots, 1, printRestRemains);
         for (const auto& dur : list) {
             resultDurations.push_back({ tupletRatio, dur });
         }
@@ -433,7 +433,7 @@ bool badLevelCondition(int startLevelDiff, int endLevelDiff, int tol)
 int noteCount(const ReducedFraction& duration,
               bool useDots)
 {
-    return int(toDurationList(duration.fraction(), useDots, 1, false).size());
+    return int(mu::engraving::toDurationList(duration.fraction(), useDots, 1, false).size());
 }
 
 bool isLessNoteCount(const ReducedFraction& t1,
@@ -505,7 +505,7 @@ int adjustEdgeLevelIfTuplet(const Meter::MaxLevel& splitPoint,
 // tol - max allowed difference between start/end level of duration and split point level
 //    1 for notes, 0 for rests
 
-QList<std::pair<ReducedFraction, TDuration> >
+QList<std::pair<ReducedFraction, engraving::TDuration> >
 toDurationList(const ReducedFraction& startTickInBar,
                const ReducedFraction& endTickInBar,
                const ReducedFraction& barFraction,
@@ -516,10 +516,10 @@ toDurationList(const ReducedFraction& startTickInBar,
 {
     if (startTickInBar < ReducedFraction(0, 1)
         || endTickInBar <= startTickInBar || endTickInBar > barFraction) {
-        return QList<std::pair<ReducedFraction, TDuration> >();
+        return QList<std::pair<ReducedFraction, engraving::TDuration> >();
     }
 
-    const auto divInfo = divisionInfo(barFraction, tupletsInBar);    // mectric structure of bar
+    const auto divInfo = divisionInfo(barFraction, tupletsInBar);    // metric structure of bar
     const auto minDuration = MChord::minAllowedDuration() * 2;    // >= minAllowedDuration() after subdivision
 
     std::map<ReducedFraction, Node> nodes;      // <onTime, Node>
@@ -568,4 +568,4 @@ toDurationList(const ReducedFraction& startTickInBar,
     return collectDurations(nodes, tupletsInBar, useDots, printRestRemains);
 }
 } // namespace Meter
-} // namespace Ms
+} // namespace mu::iex::midi

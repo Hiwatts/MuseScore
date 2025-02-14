@@ -19,12 +19,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_SAMPLERATECONVERTOR_H
-#define MU_AUDIO_SAMPLERATECONVERTOR_H
+#ifndef MUSE_AUDIO_SAMPLERATECONVERTOR_H
+#define MUSE_AUDIO_SAMPLERATECONVERTOR_H
 
 #include <vector>
 #include <deque>
-namespace mu::audio {
+
+namespace muse::audio {
 class SampleRateConvertor
 {
 public:
@@ -46,7 +47,7 @@ public:
 
 private:
 
-    //! return value of sinc function (LPF) with considaration of used sampleRates
+    //! return value of sinc function (LPF) with consideration of used sampleRates
     double sinc(double value) const;
 
     //! output sample value
@@ -54,7 +55,7 @@ private:
     float ySinc(unsigned int sample, unsigned int channel) const;
     float yFIR(unsigned int sample, unsigned int channel) const;
 
-    //! return true if there are samples in input buffer for convertion
+    //! return true if there are samples in input buffer for conversion
     bool availableSamples(unsigned int sample) const;
 
     //! calculate window function values
@@ -76,4 +77,4 @@ private:
 };
 }
 
-#endif // MU_AUDIO_SAMPLERATECONVERTOR_H
+#endif // MUSE_AUDIO_SAMPLERATECONVERTOR_H

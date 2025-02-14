@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,34 +22,27 @@
 #ifndef MU_NOTATION_NOTEINPUTCURSOR_H
 #define MU_NOTATION_NOTEINPUTCURSOR_H
 
-#include <QRect>
 #include <QColor>
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "notation/inotationconfiguration.h"
 
-class QPainter;
-
 namespace mu::notation {
-class NoteInputCursor
+class NoteInputCursor : public muse::Injectable
 {
-    INJECT(notation, context::IGlobalContext, globalContext)
-    INJECT(notation, INotationConfiguration, configuration)
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<INotationConfiguration> configuration = { this };
 
 public:
+    NoteInputCursor(bool isThinLine = false);
 
-    NoteInputCursor() = default;
-
-    void paint(draw::Painter* painter);
+    void paint(muse::draw::Painter* painter);
 
 private:
     INotationNoteInputPtr currentNoteInput() const;
 
-    bool isNoteInputMode() const;
-    QRectF rect() const;
-    QColor cursorColor() const;
-    QColor fillColor() const;
+    bool m_isThinLine = false;
 };
 }
 

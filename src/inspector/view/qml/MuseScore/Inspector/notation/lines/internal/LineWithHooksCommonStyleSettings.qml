@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 import MuseScore.Inspector 1.0
 
 import "../../../common"
@@ -45,67 +45,56 @@ Column {
 
         spacing: 6
 
-        CheckBox {
-            id: showLineCheckBox
-
-            isIndeterminate: root.model && root.model.isLineVisible.isUndefined
-            checked: root.model && !isIndeterminate && root.model.isLineVisible.value
-            visible: root.model && root.model.isLineVisible.isVisible
-
+        PropertyCheckBox {
             text: qsTrc("inspector", "Show line")
+            propertyItem: root.model ? root.model.isLineVisible : null
 
             navigation.name: "ShowLineCheckBox"
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 1
-            navigation.enabled: root.enabled && visible
-
-            onClicked: {
-                root.model.isLineVisible.value = !checked
-            }
         }
 
-        CheckBox {
-            isIndeterminate: root.model && root.model.allowDiagonal.isUndefined
-            checked: root.model && !isIndeterminate && root.model.allowDiagonal.value
-            visible: root.model && root.model.allowDiagonal.isVisible
-
+        PropertyCheckBox {
             text: qsTrc("inspector", "Allow diagonal")
+            propertyItem: root.model ? root.model.allowDiagonal : null
 
             navigation.name: "AllowDiagonalCheckBox"
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 2
-            navigation.enabled: root.enabled && visible
-
-            onClicked: {
-                root.model.allowDiagonal.value = !checked
-            }
         }
     }
 
-    LineTypeSection {
-        id: lineTypeSection
+    HooksSection {
+        id: hooksSection
+
+        startHookType: root.model ? root.model.startHookType : null
         endHookType: root.model ? root.model.endHookType : null
-        thickness: root.model ? root.model.thickness : null
-        hookHeight: root.model ? root.model.hookHeight : null
+        startHookHeight: root.model ? root.model.startHookHeight : null
+        endHookHeight: root.model ? root.model.endHookHeight : null
+
+        possibleStartHookTypes: root.model ? root.model.possibleStartHookTypes() : null
         possibleEndHookTypes: root.model ? root.model.possibleEndHookTypes() : null
 
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart + 3
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12; visible: hooksSection.visible }
 
     LineStyleSection {
         id: lineStyleSection
+
+        thickness: root.model ? root.model.thickness : null
+
         lineStyle: root.model ? root.model.lineStyle : null
         dashLineLength: root.model ? root.model.dashLineLength : null
         dashGapLength: root.model ? root.model.dashGapLength : null
 
         navigationPanel: root.navigationPanel
-        navigationRowStart: lineTypeSection.navigationRowEnd + 1
+        navigationRowStart: hooksSection.navigationRowEnd + 1
     }
 
-    SeparatorLine { anchors.margins: -10; visible: placementSection.visible }
+    SeparatorLine { anchors.margins: -12; visible: placementSection.visible }
 
     PlacementSection {
         id: placementSection

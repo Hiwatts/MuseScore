@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,48 +22,51 @@
 #ifndef MU_ENGRAVING_DUMMYELEMENT_H
 #define MU_ENGRAVING_DUMMYELEMENT_H
 
-#include <list>
-#include <QVariant>
-#include "libmscore/engravingitem.h"
-
-namespace Ms {
-enum class Pid : int;
-}
+#include "../dom/engravingitem.h"
 
 namespace mu::engraving {
+enum class Pid : int;
+
 class RootItem;
 }
 
 namespace mu::engraving::compat {
-class DummyElement : public Ms::EngravingItem
+class DummyElement : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, DummyElement)
 public:
     DummyElement(EngravingObject* parent);
     ~DummyElement();
 
     void init();
 
-    Ms::Page* page();
-    Ms::System* system();
-    Ms::Measure* measure();
-    Ms::Segment* segment();
-    Ms::Chord* chord();
-    Ms::Note* note();
+    RootItem* rootItem();
+    Page* page();
+    System* system();
+    Measure* measure();
+    Segment* segment();
+    Chord* chord();
+    Note* note();
+    BracketItem* bracketItem();
 
-    Ms::EngravingItem* clone() const override;
+    EngravingItem* clone() const override;
 
-    QVariant getProperty(Ms::Pid) const override { return QVariant(); }
-    bool setProperty(Ms::Pid, const QVariant&) override { return false; }
+    PropertyValue getProperty(Pid) const override { return PropertyValue(); }
+    bool setProperty(Pid, const PropertyValue&) override { return false; }
 
 private:
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+    AccessibleItemPtr createAccessible() override;
+#endif
+
     RootItem* m_root = nullptr;
-    Ms::Page* m_page = nullptr;
-    Ms::System* m_system = nullptr;
-    Ms::Measure* m_measure = nullptr;
-    Ms::Segment* m_segment = nullptr;
-    Ms::Chord* m_chord = nullptr;
-    Ms::Note* m_note = nullptr;
-    std::list<Ms::EngravingObject*> m_elements;
+    Page* m_page = nullptr;
+    System* m_system = nullptr;
+    Measure* m_measure = nullptr;
+    Segment* m_segment = nullptr;
+    Chord* m_chord = nullptr;
+    Note* m_note = nullptr;
+    BracketItem* m_bracketItem = nullptr;
 };
 }
 

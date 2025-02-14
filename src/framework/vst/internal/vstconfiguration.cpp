@@ -21,14 +21,47 @@
  */
 
 #include "vstconfiguration.h"
+
 #include "settings.h"
 
-using namespace mu::vst;
-using namespace mu::framework;
+using namespace muse;
+using namespace muse::vst;
 
-static const Settings::Key CUSTOM_SEARCH_PATH_KEY = Settings::Key("vst", "custom_search_path");
+static const std::string module_name("vst");
 
-mu::io::path VstConfiguration::customSearchPath() const
+static const Settings::Key USER_VST_PATHS = Settings::Key(module_name, "application/paths/myVSTs");
+static const Settings::Key USED_VST_VIEW = Settings::Key(module_name, "dev/vst/view");
+
+void VstConfiguration::init()
 {
-    return mu::io::path(settings()->value(CUSTOM_SEARCH_PATH_KEY).toString());
+    settings()->setDefaultValue(USER_VST_PATHS, Val(""));
+    settings()->valueChanged(USER_VST_PATHS).onReceive(nullptr, [this](const Val&) {
+        m_userVstDirsChanged.send(userVstDirectories());
+    });
+}
+
+io::paths_t VstConfiguration::userVstDirectories() const
+{
+    std::string pathsStr = settings()->value(USER_VST_PATHS).toString();
+    return io::pathsFromString(pathsStr);
+}
+
+void VstConfiguration::setUserVstDirectories(const io::paths_t& paths)
+{
+    settings()->setSharedValue(USER_VST_PATHS, Val(io::pathsToString(paths)));
+}
+
+async::Channel<io::paths_t> VstConfiguration::userVstDirectoriesChanged() const
+{
+    return m_userVstDirsChanged;
+}
+
+std::string VstConfiguration::usedVstView() const
+{
+    return settings()->value(USED_VST_VIEW).toString();
+}
+
+void VstConfiguration::setUsedVstView(const std::string& code)
+{
+    settings()->setSharedValue(USED_VST_VIEW, Val(code));
 }

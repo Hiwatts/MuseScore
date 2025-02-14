@@ -19,50 +19,51 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UICOMPONENTS_FILEPICKERMODEL_H
-#define MU_UICOMPONENTS_FILEPICKERMODEL_H
+#ifndef MUSE_UICOMPONENTS_FILEPICKERMODEL_H
+#define MUSE_UICOMPONENTS_FILEPICKERMODEL_H
 
 #include <QObject>
 
 #include "modularity/ioc.h"
 #include "iinteractive.h"
 
-namespace mu::uicomponents {
-class FilePickerModel : public QObject
+namespace muse::uicomponents {
+class FilePickerModel : public QObject, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(uicomponents, framework::IInteractive, interactive)
-
     Q_PROPERTY(QString title READ title WRITE setTitle NOTIFY titleChanged)
     Q_PROPERTY(QString dir READ dir WRITE setDir NOTIFY dirChanged)
-    Q_PROPERTY(QString filter READ filter WRITE setFilter NOTIFY filterChanged)
+    Q_PROPERTY(QStringList filter READ filter WRITE setFilter NOTIFY filterChanged)
+
+    muse::Inject<IInteractive> interactive = { this };
 
 public:
     explicit FilePickerModel(QObject* parent = nullptr);
 
     QString title() const;
     QString dir() const;
-    QString filter() const;
+    QStringList filter() const;
 
     Q_INVOKABLE QString selectFile();
     Q_INVOKABLE QString selectDirectory();
+    Q_INVOKABLE QString selectMultipleDirectories(const QString& selectedDirectoriesStr);
 
 public slots:
     void setTitle(const QString& title);
     void setDir(const QString& dir);
-    void setFilter(const QString& filter);
+    void setFilter(const QStringList& filter);
 
 signals:
     void titleChanged(const QString& title);
     void dirChanged(const QString& dir);
-    void filterChanged(const QString& filter);
+    void filterChanged(const QStringList& filter);
 
 private:
     QString m_title;
     QString m_dir;
-    QString m_filter;
+    QStringList m_filter;
 };
 }
 
-#endif // MU_UICOMPONENTS_FILEPICKERMODEL_H
+#endif // MUSE_UICOMPONENTS_FILEPICKERMODEL_H

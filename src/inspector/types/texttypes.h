@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,6 +24,8 @@
 
 #include "qobjectdefs.h"
 
+#include "engraving/types/types.h"
+
 namespace mu::inspector {
 class TextTypes
 {
@@ -31,10 +33,12 @@ class TextTypes
 
 public:
     enum class FontStyle {
+        //FONT_STYLE_UNDEFINED = -1,
         FONT_STYLE_NORMAL = 0,
-        FONT_STYLE_BOLD = 1,
-        FONT_STYLE_ITALIC = 2,
-        FONT_STYLE_UNDERLINE = 4
+        FONT_STYLE_BOLD = 1 << 0,
+        FONT_STYLE_ITALIC = 1 << 1,
+        FONT_STYLE_UNDERLINE = 1 << 2,
+        FONT_STYLE_STRIKE = 1 << 3
     };
 
     enum class FontHorizontalAlignment {
@@ -45,9 +49,9 @@ public:
 
     enum class FontVerticalAlignment {
         FONT_ALIGN_V_TOP = 0,
-        FONT_ALIGN_V_BOTTOM = 4,
-        FONT_ALIGN_V_CENTER = 8,
-        FONT_ALIGN_V_BASELINE = 16
+        FONT_ALIGN_V_CENTER = 1,
+        FONT_ALIGN_V_BOTTOM = 2,
+        FONT_ALIGN_V_BASELINE = 3
     };
 
     enum class FrameType {
@@ -55,7 +59,7 @@ public:
         FRAME_TYPE_SQUARE,
         FRAME_TYPE_CIRCLE
     };
-    // must match Ms::Tid
+    // must match mu::engraving::Tid
     enum class TextType {
         TEXT_TYPE_DEFAULT,
         TEXT_TYPE_TITLE,
@@ -70,9 +74,12 @@ public:
         TEXT_TYPE_INSTRUMENT_CHANGE,
         TEXT_TYPE_HEADER,
         TEXT_TYPE_FOOTER,
+        TEXT_TYPE_COPYRIGHT,
+        TEXT_TYPE_PAGE_NUMBER,
         TEXT_TYPE_MEASURE_NUMBER,
         TEXT_TYPE_MMREST_RANGE,
         TEXT_TYPE_TEMPO,
+        TEXT_TYPE_TEMPO_CHANGE,
         TEXT_TYPE_METRONOME,
         TEXT_TYPE_REPEAT_LEFT,       // align to start of measure
         TEXT_TYPE_REPEAT_RIGHT,      // align to end of measure
@@ -94,6 +101,8 @@ public:
         TEXT_TYPE_LH_GUITAR_FINGERING,
         TEXT_TYPE_RH_GUITAR_FINGERING,
         TEXT_TYPE_STRING_NUMBER,
+        TEXT_TYPE_HARP_PEDAL_DIAGRAM,
+        TEXT_TYPE_HARP_PEDAL_TEXT_DIAGRAM,
         TEXT_TYPE_TEXTLINE,
         TEXT_TYPE_VOLTA,
         TEXT_TYPE_OTTAVA,
@@ -132,26 +141,30 @@ public:
     Q_ENUM(FontVerticalAlignment)
 };
 
-static const QList<Ms::ElementType> TEXT_ELEMENT_TYPES = {
-    Ms::ElementType::TEXT,
-    Ms::ElementType::TEXTLINE,
-    Ms::ElementType::TEXTLINE_BASE,
-    Ms::ElementType::TEXTLINE_SEGMENT,
-    Ms::ElementType::STAFF_TEXT,
-    Ms::ElementType::SYSTEM_TEXT,
-    Ms::ElementType::DYNAMIC,
-    Ms::ElementType::FIGURED_BASS,
-    Ms::ElementType::FINGERING,
-    Ms::ElementType::HARMONY,
-    Ms::ElementType::INSTRUMENT_CHANGE,
-    Ms::ElementType::INSTRUMENT_NAME,
-    Ms::ElementType::JUMP,
-    Ms::ElementType::LYRICS,
-    Ms::ElementType::MARKER,
-    Ms::ElementType::MEASURE_NUMBER,
-    Ms::ElementType::REHEARSAL_MARK,
-    Ms::ElementType::STICKING,
-    Ms::ElementType::TEMPO_TEXT
+static const QList<mu::engraving::ElementType> TEXT_ELEMENT_TYPES = {
+    mu::engraving::ElementType::TEXT,
+    mu::engraving::ElementType::STAFF_TEXT,
+    mu::engraving::ElementType::SYSTEM_TEXT,
+    mu::engraving::ElementType::TRIPLET_FEEL,
+    mu::engraving::ElementType::DYNAMIC,
+    mu::engraving::ElementType::EXPRESSION,
+    mu::engraving::ElementType::FIGURED_BASS,
+    mu::engraving::ElementType::FINGERING,
+    mu::engraving::ElementType::HARMONY,
+    mu::engraving::ElementType::INSTRUMENT_CHANGE,
+    mu::engraving::ElementType::JUMP,
+    mu::engraving::ElementType::LYRICS,
+    mu::engraving::ElementType::MARKER,
+    mu::engraving::ElementType::MEASURE_NUMBER,
+    mu::engraving::ElementType::REHEARSAL_MARK,
+    mu::engraving::ElementType::STICKING,
+    mu::engraving::ElementType::TEMPO_TEXT,
+    mu::engraving::ElementType::TUPLET,
+    mu::engraving::ElementType::PLAYTECH_ANNOTATION,
+    mu::engraving::ElementType::CAPO,
+    mu::engraving::ElementType::STRING_TUNINGS,
+    mu::engraving::ElementType::HARP_DIAGRAM,
+    mu::engraving::ElementType::SOUND_FLAG
 };
 }
 

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,49 +21,31 @@
  */
 import QtQuick 2.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Character set used when importing binary files")
+    title: qsTrc("appshell/preferences", "Character set used when importing binary files")
 
     property var charsets: null
-    property string currentGuitarProCharset: ""
-    property string currentOvertuneCharset: ""
+    property string currentOvertureCharset: ""
 
-    signal guitarProCharsetChangeRequested(string charset)
-    signal overtuneCharsetChangeRequested(string charset)
+    signal overtureCharsetChangeRequested(string charset)
 
     ComboBoxWithTitle {
-        title: qsTrc("appshell", "Guitar Pro import character set:")
-        titleWidth: 220
+        title: qsTrc("appshell/preferences", "Overture import character set:")
+        columnWidth: root.columnWidth
 
-        currentIndex: control.indexOfValue(root.currentGuitarProCharset)
-        model: root.charsets
-
-        navigation.name: "GuitarProBox"
-        navigation.panel: root.navigation
-        navigation.row: 0
-
-        onValueEdited: {
-            root.guitarProCharsetChangeRequested(newValue)
-        }
-    }
-
-    ComboBoxWithTitle {
-        title: qsTrc("appshell", "Overture import character set:")
-        titleWidth: 220
-
-        currentIndex: control.indexOfValue(root.currentOvertuneCharset)
+        currentIndex: control.indexOfValue(root.currentOvertureCharset)
         model: root.charsets
 
         navigation.name: "OvertureBox"
         navigation.panel: root.navigation
         navigation.row: 1
 
-        onValueEdited: {
-            root.overtuneCharsetChangeRequested(newValue)
+        onValueEdited: function(newIndex, newValue) {
+            root.overtureCharsetChangeRequested(newValue)
         }
     }
 }

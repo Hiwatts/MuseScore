@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,23 +24,26 @@
 
 #include <map>
 
-namespace Ms {
-class ReducedFraction;
+namespace mu::engraving {
 class DurationElement;
 class Staff;
+}
+
+namespace mu::iex::midi {
+class ReducedFraction;
 
 namespace MidiTuplet {
 struct TupletData;
 
-void addElementToTuplet(int voice, const ReducedFraction& onTime, const ReducedFraction& len, DurationElement* el,
+void addElementToTuplet(int voice, const ReducedFraction& onTime, const ReducedFraction& len, engraving::DurationElement* el,
                         std::multimap<ReducedFraction, TupletData>& tuplets);
 
-void createTupletNotes(Staff* staff, const std::multimap<ReducedFraction, TupletData>& tuplets);
+void createTupletNotes(engraving::Staff* staff, const std::multimap<ReducedFraction, TupletData>& tuplets);
 
 #ifdef QT_DEBUG
-bool haveTupletsEnoughElements(const Staff* staff);
+bool haveTupletsEnoughElements(const engraving::Staff* staff);
 #endif
 } // namespace MidiTuplet
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_TUPLET_TONOTES_H

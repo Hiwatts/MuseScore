@@ -35,7 +35,6 @@
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
     <metaTag name="platform">Linux</metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -101,7 +100,7 @@
           <actualNotes>5</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>5</text>
             </Number>
           </Tuplet>
@@ -155,7 +154,7 @@
           <actualNotes>5</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>5</text>
             </Number>
           </Tuplet>

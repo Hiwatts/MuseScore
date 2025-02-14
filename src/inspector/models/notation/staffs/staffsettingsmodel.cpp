@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,20 +29,20 @@ StaffSettingsModel::StaffSettingsModel(QObject* parent, IElementRepositoryServic
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_STAFF);
-    setTitle(qtrc("inspector", "Staff"));
-    setIcon(ui::IconCode::Code::STAFF_TYPE_CHANGE);
+    setTitle(muse::qtrc("inspector", "Staff"));
+    setIcon(muse::ui::IconCode::Code::STAFF_TYPE_CHANGE);
     createProperties();
 }
 
 void StaffSettingsModel::createProperties()
 {
-    m_barlinesSpanFrom = buildPropertyItem(Ms::Pid::STAFF_BARLINE_SPAN_FROM);
-    m_barlinesSpanTo = buildPropertyItem(Ms::Pid::STAFF_BARLINE_SPAN_TO);
+    m_barlinesSpanFrom = buildPropertyItem(mu::engraving::Pid::STAFF_BARLINE_SPAN_FROM);
+    m_barlinesSpanTo = buildPropertyItem(mu::engraving::Pid::STAFF_BARLINE_SPAN_TO);
 }
 
 void StaffSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::STAFF);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::STAFF);
 }
 
 void StaffSettingsModel::loadProperties()

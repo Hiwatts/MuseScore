@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,15 +21,13 @@
  */
 import QtQuick 2.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Preferences 1.0
 
 import "internal"
 
 PreferencesPage {
     id: root
-
-    contentHeight: content.height
 
     Component.onCompleted: {
         importPreferencesModel.load()
@@ -40,14 +38,11 @@ PreferencesPage {
     }
 
     Column {
-        id: content
-
         width: parent.width
-        height: childrenRect.height
-
         spacing: root.sectionsSpacing
 
         ImportStyleSection {
+            id: importStyleSection
             styleFileImportPath: importPreferencesModel.styleFileImportPath
             fileChooseTitle: importPreferencesModel.styleChooseTitle()
             filePathFilter: importPreferencesModel.stylePathFilter()
@@ -56,7 +51,7 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
 
-            onStyleFileImportPathChangeRequested: {
+            onStyleFileImportPathChangeRequested: function(path) {
                 importPreferencesModel.styleFileImportPath = path
             }
 
@@ -71,18 +66,13 @@ PreferencesPage {
 
         CharsetsSection {
             charsets: importPreferencesModel.charsets()
-            currentGuitarProCharset: importPreferencesModel.currentGuitarProCharset
-            currentOvertuneCharset: importPreferencesModel.currentOvertuneCharset
+            currentOvertureCharset: importPreferencesModel.currentOvertureCharset
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 2
 
-            onGuitarProCharsetChangeRequested: {
-                importPreferencesModel.currentGuitarProCharset = charset
-            }
-
-            onOvertuneCharsetChangeRequested: {
-                importPreferencesModel.currentOvertuneCharset = charset
+            onOvertureCharsetChangeRequested: function(charset) {
+                importPreferencesModel.currentOvertureCharset = charset
             }
 
             onFocusChanged: {
@@ -98,20 +88,25 @@ PreferencesPage {
             importLayout: importPreferencesModel.importLayout
             importBreaks: importPreferencesModel.importBreaks
             needUseDefaultFont: importPreferencesModel.needUseDefaultFont
+            inferTextType: importPreferencesModel.inferTextType
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 3
 
-            onImportLayoutChangeRequested: {
+            onImportLayoutChangeRequested: function(importLayout) {
                 importPreferencesModel.importLayout = importLayout
             }
 
-            onImportBreaksChangeRequested: {
+            onImportBreaksChangeRequested: function(importBreaks) {
                 importPreferencesModel.importBreaks = importBreaks
             }
 
-            onUseDefaultFontChangeRequested: {
+            onUseDefaultFontChangeRequested: function(use) {
                 importPreferencesModel.needUseDefaultFont = use
+            }
+
+            onInferTextTypeChangeRequested: function (inferTextType) {
+                importPreferencesModel.inferTextType = inferTextType
             }
 
             onFocusChanged: {
@@ -130,7 +125,7 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 4
 
-            onCurrentShortestNoteChangeRequested: {
+            onCurrentShortestNoteChangeRequested: function(note) {
                 importPreferencesModel.currentShortestNote = note
             }
 
@@ -140,5 +135,19 @@ PreferencesPage {
                 }
             }
         }
+
+        SeparatorLine { }
+
+        MeiSection {
+            meiImportLayout: importPreferencesModel.meiImportLayout
+
+            onMeiImportLayoutChangeRequested: function(meiImportLayout) {
+                importPreferencesModel.meiImportLayout = meiImportLayout
+            }
+        }
+    }
+
+    function reset() {
+        importStyleSection.reset()
     }
 }

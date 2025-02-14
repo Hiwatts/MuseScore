@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,42 +20,45 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import QtQuick 2.8
-import QtQuick.Controls 2.1
-import QtQuick.Layouts 1.12
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
 import MuseScore.Palette 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property PaletteProvider paletteProvider: null
+    property alias model: palettesList.model
     property int maxHeight: 400
 
-    height: contentColumn.implicitHeight + topPadding + bottomPadding
+    property int popupAvailableWidth: 0
 
-    navigation.direction: NavigationPanel.Vertical
-    navigation.name: "AddPalettesPopup"
+    contentWidth: contentColumn.width
+    contentHeight: contentColumn.height
 
-    onAboutToShow: {
-        palettesList.model = paletteProvider.availableExtraPalettesModel()
+    property NavigationPanel navigationPanel: NavigationPanel {
+        name: "AddPalettesPopup"
+        section: root.navigationSection
+        order: 1
+        direction: NavigationPanel.Vertical
     }
 
     onOpened: {
         createCustomPaletteButton.navigation.requestActive()
     }
 
-    onClosed: {
-        palettesList.model = null
-    }
-
     signal addCustomPaletteRequested()
 
     Column {
         id: contentColumn
-        width: parent.width
+
+        width: root.popupAvailableWidth - 2 * root.margins
+        height: childrenRect.height
+
         spacing: 12
 
         StyledTextLabel {
@@ -69,7 +72,8 @@ StyledPopup {
             width: parent.width
             text: qsTrc("palette", "Create custom palette")
 
-            navigation.panel: root.navigation
+            objectName: "CreateCustomPalette"
+            navigation.panel: root.navigationPanel
             navigation.row: 0
 
             onClicked: {
@@ -85,32 +89,27 @@ StyledPopup {
             wrapMode: Text.WordWrap
         }
 
-        ListView {
+        StyledListView {
             id: palettesList
-            spacing: 8
+            height: Math.min(availableHeight, contentHeight)
+            width: parent.width + root.margins
 
             readonly property int availableHeight:
                 root.maxHeight - header.height - createCustomPaletteButton.height - 2 * contentColumn.spacing
-            height: Math.min(availableHeight, contentHeight)
-            width: parent.width
 
+            scrollBarThickness: 6
+
+            spacing: 8
             visible: count > 0
-
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-
-            ScrollBar.vertical: StyledScrollBar {}
 
             delegate: Item {
                 id: morePalettesDelegate
 
-                width: parent.width
+                width: parent.width - root.margins
                 height: addButton.height
 
                 property bool added: false
                 property bool removed: false
-
-                Accessible.name: model.display
 
                 RowLayout {
                     anchors.fill: parent
@@ -137,7 +136,8 @@ StyledPopup {
                         icon: IconCode.PLUS
                         toolTipTitle: qsTrc("palette", "Add %1 palette").arg(model.display)
 
-                        navigation.panel: root.navigation
+                        objectName: "Add"+model.display+"Palette"
+                        navigation.panel: root.navigationPanel
                         navigation.row: model.index + 1
                         navigation.onActiveChanged: {
                             if (navigation.active) {

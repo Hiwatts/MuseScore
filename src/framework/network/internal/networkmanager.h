@@ -19,16 +19,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_NETWORK_NETWORKMANAGER_H
-#define MU_NETWORK_NETWORKMANAGER_H
+#ifndef MUSE_NETWORK_NETWORKMANAGER_H
+#define MUSE_NETWORK_NETWORKMANAGER_H
 
 #include "inetworkmanager.h"
+
+#include <QIODevice>
 
 class QNetworkAccessManager;
 class QNetworkRequest;
 class QNetworkReply;
 
-namespace mu::network {
+namespace muse::network {
 class NetworkManager : public QObject, public INetworkManager
 {
     Q_OBJECT
@@ -37,20 +39,19 @@ public:
     explicit NetworkManager(QObject* parent = nullptr);
     ~NetworkManager() override;
 
-    Ret get(const QUrl& url, IncomingDevice* incommingData, const RequestHeaders& headers = RequestHeaders()) override;
+    Ret get(const QUrl& url, IncomingDevice* incomingData, const RequestHeaders& headers = RequestHeaders()) override;
     Ret head(const QUrl& url, const RequestHeaders& headers = RequestHeaders()) override;
-    Ret post(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incommingData,
+    Ret post(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incomingData,
              const RequestHeaders& headers = RequestHeaders()) override;
-    Ret put(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incommingData,
+    Ret put(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incomingData,
             const RequestHeaders& headers = RequestHeaders()) override;
-    Ret del(const QUrl& url, IncomingDevice* incommingData, const RequestHeaders& headers = RequestHeaders()) override;
+    Ret patch(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incomingData,
+              const RequestHeaders& headers = RequestHeaders()) override;
+    Ret del(const QUrl& url, IncomingDevice* incomingData, const RequestHeaders& headers = RequestHeaders()) override;
 
-    framework::ProgressChannel progressChannel() const override;
+    Progress progress() const override;
 
     void abort() override;
-
-signals:
-    void aborted();
 
 private:
     enum RequestType {
@@ -58,33 +59,34 @@ private:
         HEAD_REQUEST,
         POST_REQUEST,
         PUT_REQUEST,
+        PATCH_REQUEST,
         DELETE_REQUEST
     };
 
-    Ret execRequest(RequestType requestType, const QUrl& url, IncomingDevice* incommingData = nullptr,
+    Ret execRequest(RequestType requestType, const QUrl& url, IncomingDevice* incomingData = nullptr,
                     OutgoingDevice* outgoingData = nullptr, const RequestHeaders& headers = RequestHeaders());
 
     QNetworkReply* receiveReply(RequestType requestType, const QNetworkRequest& request, OutgoingDevice* outgoingData = nullptr);
 
-    bool openDevice(io::Device* device, QIODevice::OpenModeFlag flags);
-    void closeDevice(io::Device* device);
+    bool openDevice(QIODevice* device, QIODevice::OpenModeFlag flags);
+    void closeDevice(QIODevice* device);
 
     bool isAborted() const;
 
-    void prepareReplyReceive(QNetworkReply* reply, IncomingDevice* incommingData);
+    void prepareReplyReceive(QNetworkReply* reply, IncomingDevice* incomingData);
     void prepareReplyTransmit(QNetworkReply* reply);
 
     Ret waitForReplyFinished(QNetworkReply* reply, int timeoutMs);
-    Ret errorFromReply(int err);
+    Ret errorFromReply(const QNetworkReply* reply) const;
 
 private:
     QNetworkAccessManager* m_manager = nullptr;
-    IncomingDevice* m_incommingData = nullptr;
+    IncomingDevice* m_incomingData = nullptr;
     QNetworkReply* m_reply = nullptr;
-    framework::ProgressChannel m_progressCh;
+    Progress m_progress;
 
     bool m_isAborted = false;
 };
 }
 
-#endif // MU_NETWORK_NETWORKMANAGER_H
+#endif // MUSE_NETWORK_NETWORKMANAGER_H

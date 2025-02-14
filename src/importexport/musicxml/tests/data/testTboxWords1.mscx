@@ -3,8 +3,6 @@
   <programVersion>3.4.0</programVersion>
   <programRevision>3543170</programRevision>
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
       <pageWidth>8.27</pageWidth>
@@ -25,7 +23,6 @@
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
     <metaTag name="platform">Apple Macintosh</metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -98,11 +95,11 @@
       <VBox>
         <height>10</height>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Title on page 1</text>
           </Text>
         <Text>
-          <style>Composer</style>
+          <style>composer</style>
           <text>Composer on page 1</text>
           </Text>
         <Text>
@@ -143,7 +140,7 @@
       <VBox>
         <height>10</height>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Title in vbox on page 2</text>
           </Text>
         <Text>
@@ -200,11 +197,11 @@
         <height>10</height>
         <bottomGap>22.5</bottomGap>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Title in vbox on page 3</text>
           </Text>
         <Text>
-          <style>Instrument Name (Part)</style>
+          <style>instrument_excerpt</style>
           <text>Part name on page 3</text>
           </Text>
         </VBox>

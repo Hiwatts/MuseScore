@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,7 +22,7 @@
 
 #include "hairpinlinesettingsmodel.h"
 
-#include "libmscore/hairpin.h"
+#include "engraving/dom/hairpin.h"
 
 #include "translation.h"
 
@@ -30,51 +30,74 @@
 
 using namespace mu::inspector;
 
-using IconCode = mu::ui::IconCode::Code;
+using IconCode = muse::ui::IconCode::Code;
 
 HairpinLineSettingsModel::HairpinLineSettingsModel(QObject* parent, IElementRepositoryService* repository, HairpinLineType lineType)
-    : LineSettingsModel(parent, repository)
+    : TextLineSettingsModel(parent, repository)
 {
-    QString title = qtrc("inspector", "Crescendo");
-    InspectorModelType type = InspectorModelType::TYPE_CRESCENDO;
-
     if (lineType == Diminuendo) {
-        title = qtrc("inspector", "Diminuendo");
-        type = InspectorModelType::TYPE_DIMINUENDO;
+        setModelType(InspectorModelType::TYPE_DIMINUENDO);
+        setTitle(muse::qtrc("inspector", "Diminuendo"));
+        setIcon(muse::ui::IconCode::Code::DIMINUENDO);
+    } else {
+        setModelType(InspectorModelType::TYPE_CRESCENDO);
+        setTitle(muse::qtrc("inspector", "Crescendo"));
+        setIcon(muse::ui::IconCode::Code::CRESCENDO);
     }
 
-    setModelType(type);
-    setTitle(title);
-    setIcon(ui::IconCode::Code::CRESCENDO_LINE);
-
-    static const QList<HookTypeInfo> hookTypes {
-        { Ms::HookType::NONE, IconCode::LINE_NORMAL, qtrc("inspector", "Normal") },
-        { Ms::HookType::HOOK_90, IconCode::LINE_WITH_END_HOOK, qtrc("inspector", "Hooked 90") },
-        { Ms::HookType::HOOK_45, IconCode::LINE_WITH_ANGLED_END_HOOK, qtrc("inspector", "Hooked 45") },
-        { Ms::HookType::HOOK_90T, IconCode::LINE_WITH_T_LIKE_END_HOOK, qtrc("inspector", "Hoocked 90 T-style") }
-    };
-
-    setPossibleEndHookTypes(hookTypes);
+    m_hairpinType = lineType == Crescendo ? engraving::HairpinType::CRESC_LINE : engraving::HairpinType::DECRESC_LINE;
 
     createProperties();
 }
 
+PropertyItem* HairpinLineSettingsModel::snapBefore() const
+{
+    return m_snapBefore;
+}
+
+PropertyItem* HairpinLineSettingsModel::snapAfter() const
+{
+    return m_snapAfter;
+}
+
 void HairpinLineSettingsModel::createProperties()
 {
-    LineSettingsModel::createProperties();
+    TextLineSettingsModel::createProperties();
 
+    m_snapBefore = buildPropertyItem(mu::engraving::Pid::SNAP_BEFORE);
+    m_snapAfter = buildPropertyItem(mu::engraving::Pid::SNAP_AFTER);
+
+    isLineVisible()->setIsVisible(true);
     allowDiagonal()->setIsVisible(false);
+    placement()->setIsVisible(true);
+}
+
+void HairpinLineSettingsModel::loadProperties()
+{
+    TextLineSettingsModel::loadProperties();
+
+    loadPropertyItem(m_snapBefore);
+    loadPropertyItem(m_snapAfter);
+}
+
+void HairpinLineSettingsModel::resetProperties()
+{
+    TextLineSettingsModel::resetProperties();
+
+    m_snapBefore->resetToDefault();
+    m_snapAfter->resetToDefault();
 }
 
 void HairpinLineSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::HAIRPIN, [](const Ms::EngravingItem* element) -> bool {
-        const Ms::Hairpin* hairpin = Ms::toHairpin(element);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::HAIRPIN, [this](const mu::engraving::EngravingItem* element) -> bool {
+        const mu::engraving::Hairpin* hairpin = mu::engraving::toHairpin(
+            element);
 
         if (!hairpin) {
             return false;
         }
 
-        return hairpin->hairpinType() == Ms::HairpinType::CRESC_LINE || hairpin->hairpinType() == Ms::HairpinType::DECRESC_LINE;
+        return hairpin->hairpinType() == m_hairpinType;
     });
 }

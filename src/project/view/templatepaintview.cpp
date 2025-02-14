@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,16 +21,27 @@
  */
 
 #include "templatepaintview.h"
+
+#include "stringutils.h"
+
 #include "notation/imasternotation.h"
+
 #include "log.h"
 
 using namespace mu::project;
 using namespace mu::notation;
+using namespace muse;
+using namespace muse::actions;
 
 TemplatePaintView::TemplatePaintView(QQuickItem* parent)
-    : NotationPaintView(parent)
+    : AbstractNotationPaintView(parent)
 {
     setReadonly(true);
+}
+
+TemplatePaintView::~TemplatePaintView()
+{
+    resetNotation();
 }
 
 void TemplatePaintView::load(const QString& templatePath)
@@ -43,21 +54,21 @@ void TemplatePaintView::load(const QString& templatePath)
         return;
     }
 
+    m_notationProject = notationCreator()->newProject(iocContext());
+
     m_templatePath = templatePath;
 
-    NotationPaintView::load();
+    AbstractNotationPaintView::load();
 }
 
 QString TemplatePaintView::zoomInSequence() const
 {
-    shortcuts::Shortcut shortcut = shortcutsRegister()->shortcut("zoomin");
-    return QString::fromStdString(shortcut.sequence);
+    return shortcutsTitleByActionCode("zoomin");
 }
 
 QString TemplatePaintView::zoomOutSequence() const
 {
-    shortcuts::Shortcut shortcut = shortcutsRegister()->shortcut("zoomout");
-    return QString::fromStdString(shortcut.sequence);
+    return shortcutsTitleByActionCode("zoomout");
 }
 
 void TemplatePaintView::adjustCanvas()
@@ -68,7 +79,7 @@ void TemplatePaintView::adjustCanvas()
         return;
     }
 
-    setScaling(scaling, QPoint());
+    setScaling(scaling, PointF());
     moveCanvasToCenter();
 }
 
@@ -77,10 +88,10 @@ qreal TemplatePaintView::resolveDefaultScaling() const
     //! NOTE: this value was found experimentally
     constexpr qreal PROPORTION_FACTOR = 1.2;
 
-    QRectF notationRect = notationContentRect();
+    RectF notationRect = notationContentRect();
 
-    qreal widthScaling = width() * guiScaling() / notationRect.width() / PROPORTION_FACTOR;
-    qreal heightScaling = height() * guiScaling() / notationRect.height() / PROPORTION_FACTOR;
+    qreal widthScaling = width() / notationRect.width() / PROPORTION_FACTOR;
+    qreal heightScaling = height() / notationRect.height() / PROPORTION_FACTOR;
 
     return std::min(widthScaling, heightScaling);
 }
@@ -92,17 +103,33 @@ void TemplatePaintView::onViewSizeChanged()
 
 void TemplatePaintView::onNotationSetup()
 {
-    INotationProjectPtr notationProject = notationCreator()->newProject();
-    Ret ret = notationProject->load(m_templatePath);
+    resetNotation();
+
+    m_notationProject = notationCreator()->newProject(iocContext());
+
+    Ret ret = m_notationProject->load(m_templatePath);
 
     if (!ret) {
         LOGE() << ret.toString();
         return;
     }
 
-    setNotation(notationProject->masterNotation()->notation());
+    setNotation(m_notationProject->masterNotation()->notation());
 
-    if (notationProject) {
+    if (m_notationProject) {
         adjustCanvas();
     }
+}
+
+void TemplatePaintView::resetNotation()
+{
+    setNotation(nullptr);
+
+    m_notationProject = nullptr;
+}
+
+QString TemplatePaintView::shortcutsTitleByActionCode(const ActionCode& code) const
+{
+    muse::shortcuts::Shortcut shortcut = shortcutsRegister()->shortcut(code);
+    return muse::shortcuts::sequencesToNativeText(shortcut.sequences);
 }

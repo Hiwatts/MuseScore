@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,43 +22,66 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.Shortcuts 1.0
+import Muse.Ui 1.0
+import Muse.Shortcuts 1.0
 import MuseScore.AppShell 1.0
+
+import Muse.Tours 1.0
 
 ApplicationWindow {
     id: root
 
+    default property alias windowContent: windowContentItem.data
+
+    objectName: "ApplicationWindow"
+
+    title: titleProvider.title
+
     width: 1150
     height: 800
 
-    minimumWidth: 1150
-    minimumHeight: 600
+    minimumWidth: 1050
+    minimumHeight: 500
 
-    visible: true
+    visible: false
+
+    color: ui.theme.backgroundPrimaryColor
+
+    Component.onCompleted: {
+        ui.rootItem = root.contentItem
+        titleProvider.load()
+    }
 
     MainWindowTitleProvider {
         id: titleProvider
     }
 
-    MainWindowProvider {
+    MainWindowBridge {
+        id: bridge
+
         window: root
 
         //! NOTE These properties of QWindow (of which ApplicationWindow is derived)
-        //!      are not available in QML, so we access them via MainWindowProvider
+        //!      are not available in QML, so we access them via MainWindowBridge
         filePath: titleProvider.filePath
         fileModified: titleProvider.fileModified
     }
 
-    title: titleProvider.title
+    GraphicsTestObject {}
 
     ToolTipProvider { }
+
+    ToursProvider { }
 
     //! NOTE Need only create
     Shortcuts { }
 
-    Component.onCompleted: {
-        ui.rootItem = root.contentItem
-        titleProvider.load()
+    Item {
+        id: windowContentItem
+        anchors.fill: parent
+    }
+
+    function showMinimizedWithSavePreviousState() {
+        bridge.showMinimizedWithSavePreviousState()
     }
 }

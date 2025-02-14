@@ -19,12 +19,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_ACCESSIBILITY_IACCESSIBILITYCONFIGURATION_H
-#define MU_ACCESSIBILITY_IACCESSIBILITYCONFIGURATION_H
+#ifndef MUSE_ACCESSIBILITY_IACCESSIBILITYCONFIGURATION_H
+#define MUSE_ACCESSIBILITY_IACCESSIBILITYCONFIGURATION_H
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 
-namespace mu::accessibility {
+namespace muse::accessibility {
 class IAccessibilityConfiguration : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IAccessibilityConfiguration)
@@ -32,7 +32,8 @@ public:
     virtual ~IAccessibilityConfiguration() = default;
 
     virtual bool enabled() const = 0;
+    virtual bool active() const = 0;
 };
 }
 
-#endif // MU_ACCESSIBILITY_IACCESSIBILITYCONFIGURATION_H
+#endif // MUSE_ACCESSIBILITY_IACCESSIBILITYCONFIGURATION_H

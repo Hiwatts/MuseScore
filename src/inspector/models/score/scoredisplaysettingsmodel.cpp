@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,19 +31,24 @@ ScoreSettingsModel::ScoreSettingsModel(QObject* parent, IElementRepositoryServic
     : AbstractInspectorModel(parent, repository)
 {
     setSectionType(InspectorSectionType::SECTION_SCORE_DISPLAY);
-    setTitle(qtrc("inspector", "Show"));
+    setTitle(muse::qtrc("inspector", "Show"));
     createProperties();
+}
 
-    m_shouldShowInvisible = isNotationExisting() ? scoreConfig().isShowInvisibleElements : true;
-    m_shouldShowFormatting = isNotationExisting() ? scoreConfig().isShowUnprintableElements : true;
-    m_shouldShowFrames = isNotationExisting() ? scoreConfig().isShowFrames : true;
-    m_shouldShowPageMargins = isNotationExisting() ? scoreConfig().isShowPageMargins : false;
+void ScoreSettingsModel::onCurrentNotationChanged()
+{
+    updateAll();
 
-    setupConnections();
+    if (auto notation = currentNotation()) {
+        notation->interaction()->scoreConfigChanged().onReceive(this, [this](ScoreConfigType configType) {
+            updateFromConfig(configType);
+        });
+    }
 }
 
 void ScoreSettingsModel::createProperties()
 {
+    updateAll();
 }
 
 void ScoreSettingsModel::requestElements()
@@ -58,10 +63,7 @@ bool ScoreSettingsModel::isEmpty() const
 
 void ScoreSettingsModel::loadProperties()
 {
-    emit shouldShowInvisibleChanged(shouldShowInvisible());
-    emit shouldShowFormattingChanged(shouldShowFormatting());
-    emit shouldShowFramesChanged(shouldShowFrames());
-    emit shouldShowPageMarginsChanged(shouldShowPageMargins());
+    updateAll();
 }
 
 void ScoreSettingsModel::resetProperties()
@@ -74,28 +76,11 @@ void ScoreSettingsModel::resetProperties()
 
 ScoreConfig ScoreSettingsModel::scoreConfig() const
 {
-    IF_ASSERT_FAILED(context()) {
+    if (!currentNotation()) {
         return ScoreConfig();
     }
 
-    if (!context()->currentNotation()) {
-        return ScoreConfig();
-    }
-
-    return context()->currentNotation()->interaction()->scoreConfig();
-}
-
-mu::async::Channel<ScoreConfigType> ScoreSettingsModel::scoreConfigChanged() const
-{
-    IF_ASSERT_FAILED(context()) {
-        return mu::async::Channel<ScoreConfigType>();
-    }
-
-    if (!context()->currentNotation()) {
-        return mu::async::Channel<ScoreConfigType>();
-    }
-
-    return context()->currentNotation()->interaction()->scoreConfigChanged();
+    return currentNotation()->interaction()->scoreConfig();
 }
 
 bool ScoreSettingsModel::shouldShowInvisible() const
@@ -116,6 +101,11 @@ bool ScoreSettingsModel::shouldShowFrames() const
 bool ScoreSettingsModel::shouldShowPageMargins() const
 {
     return m_shouldShowPageMargins;
+}
+
+bool ScoreSettingsModel::shouldShowSoundFlags() const
+{
+    return m_shouldShowSoundFlags;
 }
 
 void ScoreSettingsModel::setShouldShowInvisible(bool shouldShowInvisible)
@@ -158,6 +148,16 @@ void ScoreSettingsModel::setShouldShowPageMargins(bool shouldShowPageMargins)
     updateShouldShowPageMargins(shouldShowPageMargins);
 }
 
+void ScoreSettingsModel::setShouldShowSoundFlags(bool shouldShowSoundFlags)
+{
+    if (m_shouldShowSoundFlags == shouldShowSoundFlags) {
+        return;
+    }
+
+    dispatcher()->dispatch("show-soundflags");
+    updateShouldShowSoundFlags(shouldShowSoundFlags);
+}
+
 void ScoreSettingsModel::updateShouldShowInvisible(bool isVisible)
 {
     if (isVisible == m_shouldShowInvisible) {
@@ -198,6 +198,16 @@ void ScoreSettingsModel::updateShouldShowPageMargins(bool isVisible)
     emit shouldShowPageMarginsChanged(isVisible);
 }
 
+void ScoreSettingsModel::updateShouldShowSoundFlags(bool isVisible)
+{
+    if (isVisible == m_shouldShowSoundFlags) {
+        return;
+    }
+
+    m_shouldShowSoundFlags = isVisible;
+    emit shouldShowSoundFlagsChanged(isVisible);
+}
+
 void ScoreSettingsModel::updateFromConfig(ScoreConfigType configType)
 {
     switch (configType) {
@@ -213,6 +223,9 @@ void ScoreSettingsModel::updateFromConfig(ScoreConfigType configType)
     case notation::ScoreConfigType::ShowPageMargins:
         updateShouldShowPageMargins(scoreConfig().isShowPageMargins);
         break;
+    case notation::ScoreConfigType::ShowSoundFlags:
+        updateShouldShowSoundFlags(scoreConfig().isShowSoundFlags);
+        break;
     default:
         break;
     }
@@ -220,27 +233,11 @@ void ScoreSettingsModel::updateFromConfig(ScoreConfigType configType)
 
 void ScoreSettingsModel::updateAll()
 {
-    updateShouldShowInvisible(scoreConfig().isShowInvisibleElements);
-    updateShouldShowFormatting(scoreConfig().isShowUnprintableElements);
-    updateShouldShowFrames(scoreConfig().isShowFrames);
-    updateShouldShowPageMargins(scoreConfig().isShowPageMargins);
-}
+    auto config = scoreConfig();
 
-void ScoreSettingsModel::setupConnections()
-{
-    if (isNotationExisting()) {
-        updateAll();
-
-        scoreConfigChanged().onReceive(this, [this](ScoreConfigType configType) {
-            updateFromConfig(configType);
-        });
-    }
-
-    currentNotationChanged().onNotify(this, [this]() {
-        updateAll();
-
-        scoreConfigChanged().onReceive(this, [this](ScoreConfigType configType) {
-            updateFromConfig(configType);
-        });
-    });
+    updateShouldShowInvisible(config.isShowInvisibleElements);
+    updateShouldShowFormatting(config.isShowUnprintableElements);
+    updateShouldShowFrames(config.isShowFrames);
+    updateShouldShowSoundFlags(config.isShowSoundFlags);
+    updateShouldShowPageMargins(config.isShowPageMargins);
 }

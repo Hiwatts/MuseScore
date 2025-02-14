@@ -19,52 +19,82 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_OSXAUDIODRIVER_H
-#define MU_AUDIO_OSXAUDIODRIVER_H
+#ifndef MUSE_AUDIO_OSXAUDIODRIVER_H
+#define MUSE_AUDIO_OSXAUDIODRIVER_H
 
-#include <memory>
 #include <map>
+#include <memory>
+#include <mutex>
+
 #include <MacTypes.h>
+
 #include "iaudiodriver.h"
 
 struct AudioTimeStamp;
 struct AudioQueueBuffer;
 struct OpaqueAudioQueue;
 
-namespace mu::audio {
+namespace muse::audio {
 class OSXAudioDriver : public IAudioDriver
 {
 public:
     OSXAudioDriver();
     ~OSXAudioDriver();
-    const static std::string DEFAULT_DEVICE_NAME;
+
+    void init() override;
 
     std::string name() const override;
     bool open(const Spec& spec, Spec* activeSpec) override;
     void close() override;
     bool isOpened() const override;
+
+    const Spec& activeSpec() const override;
+
     void resume() override;
     void suspend() override;
 
-    std::string outputDevice() const override;
-    bool selectOutputDevice(const std::string& name) override;
-    std::vector<std::string> availableOutputDevices() const override;
+    AudioDeviceID outputDevice() const override;
+    bool selectOutputDevice(const AudioDeviceID& deviceId) override;
+    bool resetToDefaultOutputDevice() override;
+    async::Notification outputDeviceChanged() const override;
+
+    AudioDeviceList availableOutputDevices() const override;
     async::Notification availableOutputDevicesChanged() const override;
     void updateDeviceMap();
+
+    unsigned int outputDeviceBufferSize() const override;
+    bool setOutputDeviceBufferSize(unsigned int bufferSize) override;
+    async::Notification outputDeviceBufferSizeChanged() const override;
+
+    std::vector<unsigned int> availableOutputDeviceBufferSizes() const override;
+
+    unsigned int outputDeviceSampleRate() const override;
+    bool setOutputDeviceSampleRate(unsigned int sampleRate) override;
+    async::Notification outputDeviceSampleRateChanged() const override;
+
+    std::vector<unsigned int> availableOutputDeviceSampleRates() const override;
 
 private:
     static void OnFillBuffer(void* context, OpaqueAudioQueue* queue, AudioQueueBuffer* buffer);
     static void logError(const std::string message, OSStatus error);
 
     void initDeviceMapListener();
-    bool audioQueueSetDeviceName(const std::string& deviceName);
+    bool audioQueueSetDeviceName(const AudioDeviceID& deviceId);
+
+    AudioDeviceID defaultDeviceId() const;
+    UInt32 osxDeviceId() const;
 
     struct Data;
 
     std::shared_ptr<Data> m_data = nullptr;
     std::map<unsigned int, std::string> m_outputDevices = {}, m_inputDevices = {};
+    mutable std::mutex m_devicesMutex;
+    async::Notification m_outputDeviceChanged;
     async::Notification m_availableOutputDevicesChanged;
-    std::string m_deviceName = DEFAULT_DEVICE_NAME;
+    AudioDeviceID m_deviceId;
+
+    async::Notification m_bufferSizeChanged;
+    async::Notification m_sampleRateChanged;
 };
 }
-#endif // MU_AUDIO_OSXAUDIODRIVER_H
+#endif // MUSE_AUDIO_OSXAUDIODRIVER_H

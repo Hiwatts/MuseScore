@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,6 +32,10 @@ class BracketSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(PropertyItem * bracketColumnPosition READ bracketColumnPosition CONSTANT)
     Q_PROPERTY(PropertyItem * bracketSpanStaves READ bracketSpanStaves CONSTANT)
 
+    Q_PROPERTY(bool areSettingsAvailable READ areSettingsAvailable NOTIFY selectionChanged)
+    Q_PROPERTY(int maxBracketColumnPosition READ maxBracketColumnPosition NOTIFY maxBracketColumnPositionChanged)
+    Q_PROPERTY(int maxBracketSpanStaves READ maxBracketSpanStaves NOTIFY selectionChanged)
+
 public:
 
     explicit BracketSettingsModel(QObject* parent, IElementRepositoryService* repository);
@@ -44,7 +48,20 @@ public:
     PropertyItem* bracketColumnPosition() const;
     PropertyItem* bracketSpanStaves() const;
 
+    bool areSettingsAvailable() const;
+    int maxBracketColumnPosition() const;
+    int maxBracketSpanStaves() const;
+
+signals:
+    void selectionChanged();
+    void maxBracketColumnPositionChanged();
+
 private:
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
+
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
+
     PropertyItem* m_bracketColumnPosition = nullptr;
     PropertyItem* m_bracketSpanStaves = nullptr;
 };

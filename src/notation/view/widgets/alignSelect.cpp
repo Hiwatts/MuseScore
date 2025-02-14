@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,13 +24,13 @@
 
 #include <QButtonGroup>
 
-#include "ui/view/iconcodes.h"
+#include "ui/view/widgetutils.h"
 
 using namespace mu::notation;
-using namespace mu::ui;
+using namespace muse::ui;
 
 AlignSelect::AlignSelect(QWidget* parent)
-    : QWidget(parent)
+    : QWidget(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setupUi(this);
 
@@ -45,18 +45,16 @@ AlignSelect::AlignSelect(QWidget* parent)
     g2->addButton(alignBaseline);
     g2->addButton(alignBottom);
 
-    alignLeft->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_LEFT));
-    alignRight->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_RIGHT));
-    alignHCenter->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_CENTER));
-    alignVCenter->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_MIDDLE));
-    alignTop->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_ABOVE));
-    alignBaseline->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_BASELINE));
-    alignBottom->setText(iconCodeToChar(IconCode::Code::TEXT_ALIGN_UNDER));
+    WidgetUtils::setWidgetIcon(alignLeft, IconCode::Code::TEXT_ALIGN_LEFT);
+    WidgetUtils::setWidgetIcon(alignRight, IconCode::Code::TEXT_ALIGN_RIGHT);
+    WidgetUtils::setWidgetIcon(alignHCenter, IconCode::Code::TEXT_ALIGN_CENTER);
+    WidgetUtils::setWidgetIcon(alignVCenter, IconCode::Code::TEXT_ALIGN_MIDDLE);
+    WidgetUtils::setWidgetIcon(alignTop, IconCode::Code::TEXT_ALIGN_TOP);
+    WidgetUtils::setWidgetIcon(alignBaseline, IconCode::Code::TEXT_ALIGN_BASELINE);
+    WidgetUtils::setWidgetIcon(alignBottom, IconCode::Code::TEXT_ALIGN_BOTTOM);
 
-    connect(g1, QOverload<QAbstractButton*, bool>::of(&QButtonGroup::buttonToggled),
-            this, &AlignSelect::_alignChanged);
-    connect(g2, QOverload<QAbstractButton*, bool>::of(&QButtonGroup::buttonToggled),
-            this, &AlignSelect::_alignChanged);
+    connect(g1, &QButtonGroup::buttonToggled, this, &AlignSelect::_alignChanged);
+    connect(g2, &QButtonGroup::buttonToggled, this, &AlignSelect::_alignChanged);
 }
 
 void AlignSelect::_alignChanged()
@@ -64,39 +62,39 @@ void AlignSelect::_alignChanged()
     emit alignChanged(align());
 }
 
-Ms::Align AlignSelect::align() const
+mu::engraving::Align AlignSelect::align() const
 {
-    Ms::Align a = Ms::Align::LEFT;
+    mu::engraving::Align a = { mu::engraving::AlignH::LEFT, mu::engraving::AlignV::TOP };
     if (alignHCenter->isChecked()) {
-        a = a | Ms::Align::HCENTER;
+        a = mu::engraving::AlignH::HCENTER;
     } else if (alignRight->isChecked()) {
-        a = a | Ms::Align::RIGHT;
+        a = mu::engraving::AlignH::RIGHT;
     }
     if (alignVCenter->isChecked()) {
-        a = a | Ms::Align::VCENTER;
+        a = mu::engraving::AlignV::VCENTER;
     } else if (alignBottom->isChecked()) {
-        a = a | Ms::Align::BOTTOM;
+        a = mu::engraving::AlignV::BOTTOM;
     } else if (alignBaseline->isChecked()) {
-        a = a | Ms::Align::BASELINE;
+        a = mu::engraving::AlignV::BASELINE;
     }
     return a;
 }
 
-void AlignSelect::setAlign(Ms::Align a)
+void AlignSelect::setAlign(mu::engraving::Align a)
 {
     blockAlign(true);
-    if (a & Ms::Align::HCENTER) {
+    if (a == mu::engraving::AlignH::HCENTER) {
         alignHCenter->setChecked(true);
-    } else if (a & Ms::Align::RIGHT) {
+    } else if (a == mu::engraving::AlignH::RIGHT) {
         alignRight->setChecked(true);
     } else {
         alignLeft->setChecked(true);
     }
-    if (a & Ms::Align::VCENTER) {
+    if (a == mu::engraving::AlignV::VCENTER) {
         alignVCenter->setChecked(true);
-    } else if (a & Ms::Align::BOTTOM) {
+    } else if (a == mu::engraving::AlignV::BOTTOM) {
         alignBottom->setChecked(true);
-    } else if (a & Ms::Align::BASELINE) {
+    } else if (a == mu::engraving::AlignV::BASELINE) {
         alignBaseline->setChecked(true);
     } else {
         alignTop->setChecked(true);

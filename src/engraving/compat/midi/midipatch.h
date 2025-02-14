@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,16 +23,18 @@
 #ifndef __MIDIPATCH_H__
 #define __MIDIPATCH_H__
 
-namespace Ms {
+#include "types/string.h"
+
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MidiPatch
 //---------------------------------------------------------
 
 struct MidiPatch {
     bool drum;
-    QString synti;
+    String synti;
     int bank, prog, sfid;
-    QString name;
+    String name;
 };
 }
 #endif

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 RowLayout {
     id: root
@@ -41,10 +41,14 @@ RowLayout {
     signal moveSelectionDownRequested()
 
     property NavigationPanel navigationPanel: NavigationPanel {
-        name: "CostomiseControlPanel"
+        name: "CustomiseControlPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
-        accessible.name: qsTrc("notation", "Costomise control")
-        onActiveChanged: {
+
+        //: Accessibility description of the button group at the top of the "Customize toolbar" popup
+        accessible.name: qsTrc("notation", "Customization actions")
+
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
@@ -68,7 +72,6 @@ RowLayout {
     }
 
     FlatButton {
-        Layout.alignment: Qt.AlignRight
         Layout.preferredWidth: 30
 
         icon: IconCode.DELETE_TANK
@@ -77,7 +80,7 @@ RowLayout {
         navigation.name: text
         navigation.panel: root.navigationPanel
         navigation.column: 1
-        navigation.accessible.name: qsTrc("uicomponents", "Delete")
+        navigation.accessible.name: qsTrc("notation", "Delete")
 
         onClicked: {
             root.removeSelectionRequested()
@@ -85,7 +88,6 @@ RowLayout {
     }
 
     FlatButton {
-        Layout.alignment: Qt.AlignRight
         Layout.preferredWidth: 30
 
         icon: IconCode.ARROW_UP
@@ -94,7 +96,7 @@ RowLayout {
         navigation.name: text
         navigation.panel: root.navigationPanel
         navigation.column: 2
-        navigation.accessible.name: qsTrc("uicomponents", "Up")
+        navigation.accessible.name: qsTrc("notation", "Move up")
 
         onClicked: {
             root.moveSelectionUpRequested()
@@ -102,7 +104,6 @@ RowLayout {
     }
 
     FlatButton {
-        Layout.alignment: Qt.AlignRight
         Layout.preferredWidth: 30
 
         icon: IconCode.ARROW_DOWN
@@ -111,7 +112,7 @@ RowLayout {
         navigation.name: text
         navigation.panel: root.navigationPanel
         navigation.column: 3
-        navigation.accessible.name: qsTrc("uicomponents", "Down")
+        navigation.accessible.name: qsTrc("notation", "Move down")
 
         onClicked: {
             root.moveSelectionDownRequested()

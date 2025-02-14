@@ -22,14 +22,15 @@
 
 #include "environment.h"
 
-#include "framework/global/globalmodule.h"
-#include "framework/system/systemmodule.h"
+#include "global/globalmodule.h"
+#include "global/iapplication.h"
 
-using namespace mu::testing;
+using namespace muse::testing;
 
 Environment::Modules Environment::m_dependencyModules;
 Environment::PreInit Environment::m_preInit;
 Environment::PostInit Environment::m_postInit;
+Environment::PostInit Environment::m_deInit;
 
 void Environment::setDependency(const Modules& modules)
 {
@@ -46,54 +47,70 @@ void Environment::setPostInit(const PostInit& postInit)
     m_postInit = postInit;
 }
 
+void Environment::setDeInit(const DeInit& deInit)
+{
+    m_deInit = deInit;
+}
+
 void Environment::setup()
 {
-    static mu::framework::GlobalModule globalModule;
+    static muse::GlobalModule globalModule;
 
-    framework::IApplication::RunMode runMode = framework::IApplication::RunMode::Editor;
+    IApplication::RunMode runMode = IApplication::RunMode::GuiApp;
 
     globalModule.registerResources();
     globalModule.registerExports();
     globalModule.registerUiTypes();
 
-    m_dependencyModules.push_back(new mu::system::SystemModule());
-
-    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
+        m->setApplication(globalModule.application());
         m->registerResources();
     }
 
-    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
         m->registerExports();
     }
 
     globalModule.resolveImports();
-    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
         m->registerUiTypes();
         m->resolveImports();
     }
 
-    globalModule.onInit(runMode);
+    globalModule.onPreInit(runMode);
     //! NOTE Now we can use logger and profiler
+
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
+        m->onPreInit(runMode);
+    }
 
     if (m_preInit) {
         m_preInit();
     }
 
-    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+    globalModule.onInit(runMode);
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
         m->onInit(runMode);
     }
 
     globalModule.onAllInited(runMode);
-    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
         m->onAllInited(runMode);
     }
 
     globalModule.onStartApp();
-    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+    for (modularity::IModuleSetup* m : m_dependencyModules) {
         m->onStartApp();
     }
 
     if (m_postInit) {
         m_postInit();
+    }
+}
+
+void Environment::deinit()
+{
+    if (m_deInit) {
+        m_deInit();
     }
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,50 +24,49 @@
 #define __TIMEDIALOG_H__
 
 #include "ui_timedialog.h"
-#include "libmscore/fraction.h"
 
 #include "modularity/ioc.h"
 #include "ipaletteconfiguration.h"
+#include "internal/ipaletteprovider.h"
+#include "engraving/rendering/isinglerenderer.h"
 
 namespace mu::palette {
 class PaletteWidget;
 class PaletteScrollArea;
-}
-
-namespace Ms {
-class TimeSig;
-class Score;
-class Chord;
 
 class TimeDialog : public QWidget, Ui::TimeDialogBase
 {
     Q_OBJECT
 
-    INJECT(palette, mu::palette::IPaletteConfiguration, configuration)
+    Q_PROPERTY(bool showTimePalette READ showTimePalette WRITE setShowTimePalette)
 
-    mu::palette::PaletteScrollArea* _timePalette = nullptr;
-    mu::palette::PaletteWidget* sp = nullptr;
-    bool _dirty = false;
-
-    int denominator() const;
-    int denominator2Idx(int) const;
-
-private slots:
-    void addClicked();
-    void zChanged(int);
-    void nChanged(int);
-    void paletteChanged(int idx);
-    void textChanged();
-    void setDirty() { _dirty = true; }
-
-signals:
-    void timeSigAdded(const std::shared_ptr<TimeSig>);
+    INJECT(IPaletteConfiguration, configuration)
+    INJECT(IPaletteProvider, paletteProvider)
+    INJECT(engraving::rendering::ISingleRenderer, engravingRender)
 
 public:
     TimeDialog(QWidget* parent = 0);
-    bool dirty() const { return _dirty; }
-    void showTimePalette(bool val);
+
+    bool dirty() const;
+    bool showTimePalette() const;
     void save();
+
+private slots:
+    void addClicked();
+    void zChanged();
+    void nChanged(int);
+    void paletteChanged(int idx);
+    void textChanged();
+    void setDirty();
+    void setShowTimePalette(bool val);
+
+private:
+    int denominator() const;
+    int denominator2Idx(int) const;
+
+    PaletteScrollArea* _timePalette = nullptr;
+    PaletteWidget* sp = nullptr;
+    bool _dirty = false;
 };
 }
 

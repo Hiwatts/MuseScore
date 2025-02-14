@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,91 +22,94 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 StyledDialogView {
     id: root
 
-    contentWidth: 534
-    contentHeight: 146
+    contentWidth: content.implicitWidth
+    contentHeight: content.implicitHeight
     margins: 16
 
     modal: true
 
-    property string operation: ""
     property int measuresCount: 1
 
-    QtObject {
-        id: privateProperties
-
-        function capitalizeFirstLetter(string) {
-            return string.charAt(0).toUpperCase() + string.slice(1);
-        }
-    }
-
     ColumnLayout {
+        id: content
         anchors.fill: parent
         spacing: 20
 
-        Column {
+        RowLayout {
             Layout.fillWidth: true
             spacing: 12
 
-            StyledTextLabel {
-                text: privateProperties.capitalizeFirstLetter(root.operation) + " " + qsTrc("notation", "empty measures")
-                font: ui.theme.bodyBoldFont
+            NavigationPanel {
+                id: measuresCountNavigationPanel
+                name: "MeasuresCountNavigationPanel"
+                enabled: content && content.enabled && content.visible
+                section: root.navigationSection
+                order: 1
+                direction: NavigationPanel.Horizontal
             }
 
-            RowLayout {
+            StyledTextLabel {
+                id: hintLabel
                 Layout.fillWidth: true
+                text: qsTrc("notation", "Number of measures to insert:")
+                font: ui.theme.bodyBoldFont
+                horizontalAlignment: Text.AlignLeft
+            }
 
-                spacing: 12
+            IncrementalPropertyControl {
+                id: countMeasuresInputField
 
-                StyledTextLabel {
-                    Layout.fillWidth: true
-                    text: qsTrc("notation", "Number of measures to ") + root.operation.toLowerCase() + ":"
-                }
+                Layout.alignment: Qt.AlignRight
+                Layout.preferredWidth: 132
 
-                IncrementalPropertyControl {
-                    id: countMeasuresInputField
+                navigation.name: "MeasuresCountInputField"
+                navigation.panel: measuresCountNavigationPanel
+                navigation.order: 0
+                navigation.accessible.name: hintLabel.text + " " + currentValue
 
-                    Layout.alignment: Qt.AlignRight
-                    Layout.preferredWidth: 100
+                currentValue: root.measuresCount
+                step: 1
+                decimals: 0
+                minValue: 1
+                maxValue: 999
 
-                    currentValue: root.measuresCount
-                    step: 1
-                    decimals: 0
-                    maxValue: 1000
-                    minValue: 1
-
-                    onValueEdited: {
-                        root.measuresCount = newValue
-                    }
+                onValueEdited: function(newValue) {
+                    root.measuresCount = newValue
                 }
             }
         }
 
-        Row {
-            Layout.preferredHeight: childrenRect.height
+        ButtonBox {
+            Layout.fillWidth: true
             Layout.alignment: Qt.AlignRight | Qt.AlignBottom
 
-            spacing: 12
+            buttons: [ ButtonBoxModel.Cancel ]
 
-            FlatButton {
-                text: qsTrc("global", "Cancel")
-
-                onClicked: {
-                    root.reject()
-                }
-            }
+            navigationPanel.section: root.navigationSection
+            navigationPanel.order: 2
 
             FlatButton {
                 text: qsTrc("global", "OK")
+                buttonRole: ButtonBoxModel.AcceptRole
+                buttonId: ButtonBoxModel.Ok
+                enabled: root.measuresCount > 0
+                accentButton: true
 
                 onClicked: {
-                    root.ret = {errcode: 0, value: root.measuresCount}
+                    root.ret = { errcode: 0, value: root.measuresCount }
                     root.hide()
+                }
+            }
+
+            onStandardButtonClicked: function(buttonId) {
+                if (buttonId === ButtonBoxModel.Cancel) {
+                    root.reject()
                 }
             }
         }

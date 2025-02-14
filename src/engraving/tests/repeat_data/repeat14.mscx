@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <museScore version="4.00">
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
       <minSystemDistance>9.2</minSystemDistance>
@@ -1407,7 +1405,6 @@
     <metaTag name="lyricist"></metaTag>
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -1417,7 +1414,7 @@
         <StaffType group="pitched">
           <name>stdNormal</name>
           </StaffType>
-        <bracket type="-1" span="1" col="0"/>
+        <bracket type="-1" span="1" col="0" visible="1"/>
         </Staff>
       <trackName>Piano</trackName>
       <Instrument>
@@ -1479,11 +1476,11 @@
       <VBox>
         <height>10</height>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>repeat14: Play It Again, Sam</text>
           </Text>
         <Text>
-          <style>Subtitle</style>
+          <style>subtitle</style>
           <text>More complex roadmap, combining voltas and D.S. al Coda</text>
           </Text>
         </VBox>
@@ -1497,7 +1494,7 @@
         <bottomMargin>1</bottomMargin>
         <Text>
           <style>Frame</style>
-          <text>1,2,3,4,5,6,7,8,9,10   2,3,4,5,6,7,8   11,12   2,3,4,5,6,7,8   13,14,15,16,17,18   16,17,18   10,20,21,22,23
+          <text>1,2,3,4,5,6,7,8,9,10   2,3,4,5,6,7,8   11,12   2,3,4,5,6,7,8   13,14,15,16,17,18   16,17,18   19,20,21,22,23
 5,6,7   24,25,26
 </text>
           </Text>

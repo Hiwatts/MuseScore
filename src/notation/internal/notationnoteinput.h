@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,67 +30,99 @@
 #include "inotationinteraction.h"
 #include "inotationundostack.h"
 
-namespace Ms {
+#include "draw/types/geometry.h"
+
+namespace mu::engraving {
 class Score;
 }
 
 namespace mu::notation {
 class ScoreCallbacks;
-class NotationNoteInput : public INotationNoteInput, public async::Asyncable
+class NotationNoteInput : public INotationNoteInput, public muse::Injectable, public muse::async::Asyncable
 {
-    INJECT(notation, INotationConfiguration, configuration)
+    muse::Inject<INotationConfiguration> configuration = { this };
 
 public:
-    NotationNoteInput(const IGetScore* getScore, INotationInteraction* interaction, INotationUndoStackPtr undoStack);
+    NotationNoteInput(const IGetScore* getScore, INotationInteraction* interaction, INotationUndoStackPtr undoStack,
+                      const muse::modularity::ContextPtr& iocCtx);
     ~NotationNoteInput() override;
 
     bool isNoteInputMode() const override;
 
-    NoteInputState state() const override;
+    const NoteInputState& state() const override;
 
-    void startNoteInput() override;
-    void endNoteInput() override;
-    void toggleNoteInputMethod(NoteInputMethod method) override;
-    void addNote(NoteName noteName, NoteAddingMode addingMode) override;
+    void startNoteInput(NoteInputMethod method = NoteInputMethod::BY_NOTE_NAME, bool focusNotation = true) override;
+    void endNoteInput(bool resetState = false) override;
+
+    muse::async::Channel</*focusNotation*/ bool> noteInputStarted() const override;
+    muse::async::Notification noteInputEnded() const override;
+
+    bool usingNoteInputMethod(NoteInputMethod method) const override;
+    void setNoteInputMethod(NoteInputMethod method) override;
+
+    void addNote(const NoteInputParams& params, NoteAddingMode addingMode) override;
     void padNote(const Pad& pad) override;
-    void putNote(const QPointF& pos, bool replace, bool insert) override;
+    muse::Ret putNote(const muse::PointF& pos, bool replace, bool insert) override;
+    void removeNote(const muse::PointF& pos) override;
+
+    void addTuplet(const TupletOptions& options) override;
+
+    void addSlur(mu::engraving::Slur* slur) override;
+    void resetSlur() override;
+    void addTie() override;
+    void addLaissezVib() override;
+
+    void doubleNoteInputDuration() override;
+    void halveNoteInputDuration() override;
+
+    // Used in the input-by-duration mode
+    void setInputNote(const NoteInputParams& params) override;
+    void setInputNotes(const NoteValList& notes) override;
+    void moveInputNotes(bool up, PitchMode mode) override;
+
     void setAccidental(AccidentalType accidentalType) override;
     void setArticulation(SymbolId articulationSymbolId) override;
     void setDrumNote(int note) override;
-    void addTuplet(const TupletOptions& options) override;
+    void setCurrentVoice(voice_idx_t voiceIndex) override;
+    void setCurrentTrack(track_idx_t trackIndex) override;
 
-    void addSlur(Ms::Slur* slur) override;
-    void resetSlur() override;
+    muse::RectF cursorRect() const override;
 
-    void addTie() override;
+    muse::async::Notification noteAdded() const override;
+    muse::async::Notification stateChanged() const override;
 
-    void setCurrentVoiceIndex(int voiceIndex) override;
-
-    QRectF cursorRect() const override;
-
-    async::Notification noteAdded() const override;
-    async::Notification stateChanged() const override;
+    void setGetViewRectFunc(const std::function<muse::RectF()>& func);
 
 private:
-    Ms::Score* score() const;
+    mu::engraving::Score* score() const;
 
-    void startEdit();
+    EngravingItem* resolveNoteInputStartPosition() const;
+
+    bool shouldSetupInputNote() const;
+    void setupInputNote();
+
+    NoteVal noteValForLine(int line) const;
+
+    void startEdit(const muse::TranslatableString& actionName);
     void apply();
 
     void updateInputState();
     void notifyAboutStateChanged();
     void notifyNoteAddedChanged();
-
-    std::set<SymbolId> articulationIds() const;
+    void notifyAboutNoteInputStarted(bool focusNotation = true);
+    void notifyAboutNoteInputEnded();
 
     const IGetScore* m_getScore = nullptr;
     INotationInteraction* m_interaction = nullptr;
     INotationUndoStackPtr m_undoStack;
 
-    async::Notification m_stateChanged;
-    async::Notification m_noteAdded;
+    muse::async::Notification m_stateChanged;
+    muse::async::Notification m_noteAdded;
+    muse::async::Channel</*focusNotation*/ bool> m_noteInputStarted;
+    muse::async::Notification m_noteInputEnded;
 
     ScoreCallbacks* m_scoreCallbacks = nullptr;
+    std::function<muse::RectF()> m_getViewRectFunc;
 };
 }
 

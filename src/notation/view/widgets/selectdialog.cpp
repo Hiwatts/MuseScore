@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -26,67 +26,45 @@
  Implementation of class Selection plus other selection related functions.
 */
 
-#include "libmscore/system.h"
+#include "engraving/dom/system.h"
 
 #include "notationtypes.h"
 
-#include "widgetstatestore.h"
+#include "ui/view/widgetstatestore.h"
 
 using namespace mu::notation;
+using namespace muse::ui;
 
 //---------------------------------------------------------
 //   SelectDialog
 //---------------------------------------------------------
 
 SelectDialog::SelectDialog(QWidget* parent)
-    : QDialog(parent)
+    : QDialog(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setObjectName("SelectDialog");
     setupUi(this);
     setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
-    m_element = globalContext()->currentNotation()->interaction()->selection()->element();
-    type->setText(qApp->translate("elementName", m_element->userName().toUtf8()));
+    m_element = contextItem(globalContext()->currentNotation()->interaction());
+    type->setText(m_element->translatedTypeUserName().toQString());
+    subtype->setText(m_element->translatedSubtypeUserName().toQString());
 
-    switch (m_element->type()) {
-    case ElementType::ACCIDENTAL:
-        subtype->setText(qApp->translate("accidental", m_element->subtypeName().toUtf8()));
-        break;
-    case ElementType::SLUR_SEGMENT:
-        subtype->setText(qApp->translate("elementName", m_element->subtypeName().toUtf8()));
-        break;
-    case ElementType::FINGERING:
-    case ElementType::STAFF_TEXT:
-        subtype->setText(qApp->translate("TextStyle", m_element->subtypeName().toUtf8()));
-        break;
-    case ElementType::ARTICULATION: { // comes translated, but from a different method
-        const Articulation* artic = dynamic_cast<const Articulation*>(m_element);
-        subtype->setText(artic->userName());
-        break;
-    }
-    // other come translated or don't need any or are too difficult to implement
-    default:
-        subtype->setText(m_element->subtypeName());
-        break;
-    }
     sameSubtype->setEnabled(m_element->subtype() != -1);
     subtype->setEnabled(m_element->subtype() != -1);
-    inSelection->setEnabled(m_element->score()->selection().isRange());
+
+    const auto isSingleSelection = m_element->score()->selection().isSingle();
+    inSelection->setCheckState(isSingleSelection ? Qt::CheckState::Unchecked : Qt::CheckState::Checked);
+    inSelection->setEnabled(!isSingleSelection);
+
     sameDuration->setEnabled(m_element->isRest());
 
     connect(buttonBox, &QDialogButtonBox::clicked, this, &SelectDialog::buttonClicked);
 
     WidgetStateStore::restoreGeometry(this);
-}
 
-SelectDialog::SelectDialog(const SelectDialog& other)
-    : QDialog(other.parentWidget())
-{
-}
-
-int SelectDialog::metaTypeId()
-{
-    return QMetaType::type("SelectDialog");
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 //---------------------------------------------------------
@@ -98,17 +76,13 @@ FilterElementsOptions SelectDialog::elementOptions() const
     FilterElementsOptions options;
     options.elementType = m_element->type();
     options.subtype = m_element->subtype();
-    if (m_element->isSlurSegment()) {
-        const SlurSegment* slurSegment = dynamic_cast<const SlurSegment*>(m_element);
-        options.subtype = static_cast<int>(slurSegment->spanner()->type());
-    }
 
     if (sameStaff->isChecked()) {
-        options.staffStart = m_element->staffIdx();
-        options.staffEnd = m_element->staffIdx() + 1;
+        options.staffStart = static_cast<int>(m_element->staffIdx());
+        options.staffEnd = static_cast<int>(m_element->staffIdx() + 1);
     } else if (inSelection->isChecked()) {
-        options.staffStart = m_element->score()->selection().staffStart();
-        options.staffEnd = m_element->score()->selection().staffEnd();
+        options.staffStart = static_cast<int>(m_element->score()->selection().staffStart());
+        options.staffEnd = static_cast<int>(m_element->score()->selection().staffEnd());
     } else {
         options.staffStart = -1;
         options.staffEnd = -1;
@@ -121,7 +95,31 @@ FilterElementsOptions SelectDialog::elementOptions() const
         options.durationTicks = Fraction(-1, 1);
     }
 
-    options.voice = sameVoice->isChecked() ? m_element->voice() : -1;
+    if (sameBeat->isChecked()) {
+        options.beat = m_element->beat();
+    } else {
+        options.beat = Fraction(0, 0);
+    }
+
+    if (sameMeasure->isChecked()) {
+        auto m = m_element->findMeasure();
+        if (!m && m_element->isSpannerSegment()) {
+            if (auto ss = toSpannerSegment(m_element)) {
+                if (auto s = ss->spanner()) {
+                    if (auto se = s->startElement()) {
+                        if (auto mse = se->findMeasure()) {
+                            m = mse;
+                        }
+                    }
+                }
+            }
+        }
+        options.measure = m;
+    } else {
+        options.measure = nullptr;
+    }
+
+    options.voice = sameVoice->isChecked() ? static_cast<int>(m_element->voice()) : -1;
     options.bySubtype = sameSubtype->isChecked();
 
     if (sameSystem->isChecked()) {
@@ -131,12 +129,12 @@ FilterElementsOptions SelectDialog::elementOptions() const
     return options;
 }
 
-Ms::System* SelectDialog::elementSystem(const EngravingItem* element) const
+mu::engraving::System* SelectDialog::elementSystem(const EngravingItem* element) const
 {
     EngravingItem* _element = const_cast<EngravingItem*>(element);
     do {
         if (_element->type() == ElementType::SYSTEM) {
-            return dynamic_cast<Ms::System*>(_element);
+            return dynamic_cast<mu::engraving::System*>(_element);
         }
         _element = _element->parentItem();
     } while (element);
@@ -227,7 +225,7 @@ void SelectDialog::apply() const
         return;
     }
 
-    EngravingItem* selectedElement = interaction->selection()->element();
+    EngravingItem* selectedElement = contextItem(interaction);
     if (!selectedElement) {
         return;
     }
@@ -238,28 +236,27 @@ void SelectDialog::apply() const
     if (elements.empty()) {
         return;
     }
+    if (isInSelection()) {
+        const auto& selectedElements = interaction->selection()->elements();
+        elements.erase(std::remove_if(elements.begin(), elements.end(), [selectedElements](const auto& e) {
+            return std::find(selectedElements.begin(), selectedElements.end(), e) == selectedElements.end();
+        }), elements.end());
+    }
 
     if (doReplace()) {
         interaction->clearSelection();
         interaction->select(elements, SelectType::ADD);
     } else if (doSubtract()) {
-        std::vector<EngravingItem*> selesctionElements = interaction->selection()->elements();
+        std::vector<EngravingItem*> selectionElements = interaction->selection()->elements();
         for (EngravingItem* element: elements) {
-            selesctionElements.erase(std::remove(selesctionElements.begin(), selesctionElements.end(), element), selesctionElements.end());
+            selectionElements.erase(std::remove(selectionElements.begin(), selectionElements.end(), element), selectionElements.end());
         }
 
         interaction->clearSelection();
-        interaction->select(selesctionElements, SelectType::ADD);
+        interaction->select(selectionElements, SelectType::ADD);
     } else if (doAdd()) {
-        std::vector<EngravingItem*> selesctionElements = interaction->selection()->elements();
-
-        std::vector<EngravingItem*> elementsToSelect;
-        for (EngravingItem* element: elements) {
-            if (std::find(selesctionElements.begin(), selesctionElements.end(), element) == selesctionElements.end()) {
-                elementsToSelect.push_back(element);
-            }
-        }
-
-        interaction->select(elementsToSelect, SelectType::ADD);
+        std::vector<EngravingItem*> selectionElements = interaction->selection()->elements();
+        std::copy(selectionElements.begin(), selectionElements.end(), back_inserter(elements));
+        interaction->select(elements, SelectType::ADD);
     }
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,8 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../common"
@@ -43,60 +43,31 @@ Column {
         numberVisibilityCheckBox.focusOnFirst()
     }
 
-    Column {
-        spacing: 8
+    PropertyCheckBox {
+        id: numberVisibilityCheckBox
+        text: qsTrc("inspector", "Show number")
+        propertyItem: root.model ? root.model.isNumberVisible : null
+        enabled: root.model ? root.model.areNumberOptionsEnabled : true
 
-        height: childrenRect.height
-        width: parent.width
+        navigation.name: "NumberVisibilityCheckBox"
+        navigation.panel: root.navigationPanel
+        navigation.row: root.navigationRowStart + 1
+    }
 
-        Item {
-            height: childrenRect.height
-            width: parent.width
+    SpinBoxPropertyView {
+        enabled: (root.model ? root.model.areNumberOptionsEnabled : true) && numberVisibilityCheckBox.checked
+        titleText: qsTrc("inspector", "Number offset")
+        propertyItem: root.model ? root.model.numberPosition : null
 
-            InspectorPropertyView {
-                id: numberVisibilitySection
-                titleText: qsTrc("inspector", "Number visible")
-                propertyItem: root.model ? root.model.isNumberVisible : null
+        icon: IconCode.VERTICAL
 
-                anchors.left: parent.left
-                anchors.right: parent.horizontalCenter
-                anchors.rightMargin: 2
+        minValue: -99.0
+        maxValue: 99.0
+        step: 0.5
+        decimals: 2
+        measureUnitsSymbol: qsTrc("global", "sp")
 
-                navigationPanel: root.navigationPanel
-                navigationRowStart: root.navigationRowStart + 1
-                navigationRowEnd: numberVisibilityCheckBox.navigation.row
-
-                CheckBox {
-                    id: numberVisibilityCheckBox
-
-                    isIndeterminate: root.model ? root.model.isNumberVisible.isUndefined : false
-                    checked: root.model && !isIndeterminate ? root.model.isNumberVisible.value : false
-                    onClicked: { root.model.isNumberVisible.value = !checked }
-
-                    navigation.name: "NumberVisibilityCheckBox"
-                    navigation.panel: root.navigationPanel
-                    navigation.row: numberVisibilitySection.navigationRowStart + 1
-                }
-            }
-
-            SpinBoxPropertyView {
-                titleText: qsTrc("inspector", "Number position")
-                propertyItem: root.model ? root.model.numberPosition : null
-
-                anchors.left: parent.horizontalCenter
-                anchors.leftMargin: 2
-                anchors.right: parent.right
-
-                icon: IconCode.VERTICAL
-
-                step: 0.5
-                decimals: 2
-                maxValue: 99.00
-                minValue: -99.00
-
-                navigationPanel: root.navigationPanel
-                navigationRowStart: numberVisibilitySection.navigationRowEnd + 1
-            }
-        }
+        navigationPanel: root.navigationPanel
+        navigationRowStart: root.navigationRowStart + 2
     }
 }

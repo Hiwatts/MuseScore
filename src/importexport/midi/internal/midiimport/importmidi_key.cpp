@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,13 +24,14 @@
 #include "importmidi_chord.h"
 #include "importmidi_inner.h"
 
-#include "libmscore/factory.h"
-#include "libmscore/key.h"
-#include "libmscore/keysig.h"
-#include "libmscore/keylist.h"
-#include "libmscore/measure.h"
-#include "libmscore/staff.h"
-#include "libmscore/masterscore.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/key.h"
+#include "engraving/dom/keysig.h"
+#include "engraving/dom/keylist.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/part.h"
 #include "importmidi_operations.h"
 
 // This simple key detection algorithm is from thesis
@@ -39,7 +40,7 @@
 
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::iex::midi {
 namespace MidiKey {
 class KeyData
 {
@@ -69,13 +70,13 @@ private:
 void assignKeyListToStaff(const KeyList& kl, Staff* staff)
 {
     Score* score = staff->score();
-    const int track = staff->idx() * VOICES;
+    const track_idx_t track = staff->idx() * VOICES;
     Key pkey = Key::C;
 
     for (auto it = kl.begin(); it != kl.end(); ++it) {
         const int tick = it->first;
         Key key  = it->second.key();
-        if ((key == Key::C) && (key == pkey)) {       // don’t insert unnecessary C key
+        if ((key == Key::C) && (key == pkey)) {       // don’t insert unnecessary C key // really?
             continue;
         }
         pkey = key;
@@ -88,7 +89,7 @@ void assignKeyListToStaff(const KeyList& kl, Staff* staff)
         ks->setTrack(track);
         ks->setGenerated(false);
         ks->setKey(key);
-        ks->setMag(staff->staffMag(Fraction::fromTicks(tick)));
+        ks->mutldata()->setMag(staff->staffMag(Fraction::fromTicks(tick)));
         seg->add(ks);
     }
 }
@@ -175,7 +176,13 @@ void recognizeMainKeySig(QList<MTrack>& tracks)
 
         if (!track.hasKey || isHuman) {
             KeySigEvent ke;
-            ke.setKey(key);
+            Interval v = track.staff->part()->instrument()->transpose();
+            Score* score = track.staff->score();
+            ke.setConcertKey(key);
+            if (!v.isZero() && !score->style().styleB(Sid::concertPitch)) {
+                v.flip();
+                ke.setKey(transposeKey(key, v));
+            }
 
             KeyList& staffKeyList = *track.staff->keyList();
             staffKeyList[0] = ke;
@@ -184,4 +191,4 @@ void recognizeMainKeySig(QList<MTrack>& tracks)
     }
 }
 } // namespace MidiKey
-} // namespace Ms
+} // namespace mu::iex::midi

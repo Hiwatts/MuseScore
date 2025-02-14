@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,16 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "libmscore/note.h"
-#include "libmscore/harmony.h"
-#include "libmscore/sig.h"
 #include "event.h"
-#include "libmscore/staff.h"
-#include "libmscore/instrument.h"
-#include "libmscore/part.h"
-#include "libmscore/masterscore.h"
 
-namespace Ms {
+#include "dom/note.h"
+#include "dom/sig.h"
+
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Event::Event
 //---------------------------------------------------------
@@ -181,91 +177,9 @@ void Event::dump() const
     printf(" 0x%02x 0x%02x\n", _a, _b);
 }
 
-//---------------------------------------------------------
-//   isChannelEvent
-//---------------------------------------------------------
-
-bool MidiCoreEvent::isChannelEvent() const
-{
-    switch (_type) {
-    case ME_NOTEOFF:
-    case ME_NOTEON:
-    case ME_POLYAFTER:
-    case ME_CONTROLLER:
-    case ME_PROGRAM:
-    case ME_AFTERTOUCH:
-    case ME_PITCHBEND:
-    case ME_NOTE:
-    case ME_CHORD:
-        return true;
-    default:
-        return false;
-    }
-
-    // Prevent "unreachable code" warning.
-    // return false;
-}
-
 bool Event::operator==(const Event&) const
 {
     return false;             // TODO
-}
-
-//---------------------------------------------------------
-//    midi_meta_name
-//---------------------------------------------------------
-
-QString midiMetaName(int meta)
-{
-    const char* s = "";
-    switch (meta) {
-    case 0:     s = "Sequence Number";
-        break;
-    case 1:     s = "Text Event";
-        break;
-    case 2:     s = "Copyright";
-        break;
-    case 3:     s = "Sequence/Track Name";
-        break;
-    case 4:     s = "Instrument Name";
-        break;
-    case 5:     s = "Lyric";
-        break;
-    case 6:     s = "Marker";
-        break;
-    case 7:     s = "Cue Point";
-        break;
-    case 8:
-    case 9:
-    case 0x0a:
-    case 0x0b:
-    case 0x0c:
-    case 0x0d:
-    case 0x0e:
-    case 0x0f:  s = "Text";
-        break;
-    case 0x20:  s = "Channel Prefix";
-        break;
-    case 0x21:  s = "Port Change";
-        break;
-    case 0x2f:  s = "End of Track";
-        break;
-    case META_TEMPO:  s = "Tempo";
-        break;
-    case 0x54:  s = "SMPTE Offset";
-        break;
-    case META_TIME_SIGNATURE:  s = "Time Signature";
-        break;
-    case META_KEY_SIGNATURE:   s = "Key Signature";
-        break;
-    case 0x74:                 s = "Sequencer-Specific1";
-        break;
-    case 0x7f:                 s = "Sequencer-Specific2";
-        break;
-    default:
-        break;
-    }
-    return QString(s);
 }
 
 //---------------------------------------------------------
@@ -275,22 +189,78 @@ QString midiMetaName(int meta)
 void EventList::insert(const Event& e)
 {
     int ontime = e.ontime();
-    if (!isEmpty() && last().ontime() > ontime) {
+    if (!empty() && back().ontime() > ontime) {
         for (auto i = begin(); i != end(); ++i) {
             if (i->ontime() > ontime) {
-                QList<Event>::insert(i, e);
+                std::vector<Event>::insert(i, e);
                 return;
             }
         }
     }
-    append(e);
+    push_back(e);
+}
+
+EventsHolder::events_multimap_t& EventsHolder::operator[](std::size_t idx)
+{
+    if (size() == 0) {
+        _channels.emplace_back();
+    }
+    if (idx >= size()) {
+        auto diff = idx - size();
+        do {
+            _channels.emplace_back();
+        } while (diff-- != 0);
+    }
+    return _channels[idx];
+}
+
+const EventsHolder::events_multimap_t& EventsHolder::operator[](std::size_t idx) const
+{
+    // Since EventsHolder acts more like a vector
+    // Using const subscript operator for a nonexistent element is UB
+    /*
+     * cppreference.com
+     * Unlike std::map::operator[], this operator never inserts a new element into the container.
+     * Accessing a nonexistent element through this operator is undefined behavior.
+     */
+    assert(idx < size());
+    return _channels[idx];
+}
+
+void EventsHolder::mergePitchWheelEvents(EventsHolder& pitchWheelEvents)
+{
+    for (size_t i = 0; i < size(); ++i) {
+        for (const auto& eventPair : _channels[i]) {
+            const auto& event = eventPair.second;
+            const auto& tick = eventPair.first;
+            if (event.type() == ME_NOTEON && event.velo() != 0) {
+                const auto& pwEvent = muse::findLess(pitchWheelEvents[i], tick);
+                if (pwEvent != pitchWheelEvents[i].end()
+                    && pwEvent->second.type() == ME_PITCHBEND) {
+                    PitchWheelSpecs specs;
+                    NPlayEvent pwReset(ME_PITCHBEND, (uint8_t)i, specs.mLimit % 128, specs.mLimit / 128);
+                    pwReset.setOriginatingStaff(pwEvent->second.getOriginatingStaff());
+
+                    int tickForPwReset = 0;
+                    if (tick - specs.mStep > pwEvent->first) {
+                        tickForPwReset = tick - specs.mStep;
+                    } else {
+                        tickForPwReset = (tick + pwEvent->first) / 2;
+                    }
+
+                    _channels[i].insert(std::pair<int, NPlayEvent>(tickForPwReset, pwReset));
+                }
+            }
+        }
+        _channels[i].merge(pitchWheelEvents[i]);
+    }
 }
 
 //---------------------------------------------------------
-//   class EventMap::fixupMIDI
+//   class EventsHolder::fixupMIDI
 //---------------------------------------------------------
 
-void EventMap::fixupMIDI()
+void EventsHolder::fixupMIDI()
 {
     /* track info for each of the 128 possible MIDI notes */
     struct channelInfo {
@@ -301,33 +271,35 @@ void EventMap::fixupMIDI()
     };
 
     /* track info for each channel (on the heap, 0-initialised) */
-    struct channelInfo* info = (struct channelInfo*)calloc(_highestChannel + 1, sizeof(struct channelInfo));
+    auto* info = (struct channelInfo*)calloc(size() + 1, sizeof(struct channelInfo));
 
-    auto it = begin();
-    while (it != end()) {
-        NPlayEvent& event = it->second;
-        /* ME_NOTEOFF is never emitted, no need to check for it */
-        if (event.type() == ME_NOTEON && !event.isMuted()) {
-            unsigned short np = info[event.channel()].nowPlaying[event.pitch()];
-            if (event.velo() == 0) {
-                /* already off (should not happen) or still playing? */
-                if (np == 0 || --np > 0) {
-                    event.setDiscard(1);
+    for (auto& mm : _channels) {
+        auto it = mm.begin();
+        while (it != mm.end()) {
+            NPlayEvent& event = it->second;
+            /* ME_NOTEOFF is never emitted, no need to check for it */
+            if (event.type() == ME_NOTEON) {
+                uint8_t np = info[event.channel()].nowPlaying[event.pitch()];
+                if (event.velo() == 0) {
+                    /* already off (should not happen) or still playing? */
+                    if (np == 0 || --np > 0) {
+                        event.setDiscard(1);
+                    } else {
+                        /* hoist NOTEOFF to same track as NOTEON */
+                        event.setOriginatingStaff(info[event.channel()].event[event.pitch()]->getOriginatingStaff());
+                    }
                 } else {
-                    /* hoist NOTEOFF to same track as NOTEON */
-                    event.setOriginatingStaff(info[event.channel()].event[event.pitch()]->getOriginatingStaff());
+                    if (++np > 1) {
+                        /* restrike, possibly on different track */
+                        event.setDiscard(info[event.channel()].event[event.pitch()]->getOriginatingStaff() + 1);
+                    }
+                    info[event.channel()].event[event.pitch()] = &event;
                 }
-            } else {
-                if (++np > 1) {
-                    /* restrike, possibly on different track */
-                    event.setDiscard(info[event.channel()].event[event.pitch()]->getOriginatingStaff() + 1);
-                }
-                info[event.channel()].event[event.pitch()] = &event;
+                info[event.channel()].nowPlaying[event.pitch()] = np;
             }
-            info[event.channel()].nowPlaying[event.pitch()] = np;
-        }
 
-        ++it;
+            ++it;
+        }
     }
 
     free((void*)info);

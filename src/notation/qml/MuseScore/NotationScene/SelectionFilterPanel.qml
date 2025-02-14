@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,37 +23,36 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 
 import MuseScore.NotationScene 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
-Rectangle {
+Item {
     id: root
-    color: ui.theme.backgroundPrimaryColor
     enabled: selectionFilterModel.enabled
 
-    property NavigationSection navigationSection: null
+    property alias navigationSection: navPanel.section
+    property alias navigationOrderStart: navPanel.order
 
     NavigationPanel {
         id: navPanel
         name: "SelectionFilter"
-        section: root.navigationSection
         direction: NavigationPanel.Vertical
-        enabled: root.visible && root.enabled
-        order: 2
+        enabled: root.enabled && root.visible
     }
 
     Component.onCompleted: {
         selectionFilterModel.load()
     }
 
-    ListView {
+    StyledListView {
         anchors.fill: parent
-        anchors.margins: 12
-        boundsBehavior: Flickable.StopAtBounds
-        clip: true
-        spacing: 12
 
-        ScrollBar.vertical: StyledScrollBar {}
+        topMargin: 12
+        leftMargin: topMargin
+        rightMargin: topMargin
+        bottomMargin: topMargin
+
+        spacing: 12
 
         model: SelectionFilterModel {
             id: selectionFilterModel

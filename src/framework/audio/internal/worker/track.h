@@ -20,24 +20,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_TRACK_H
-#define MU_AUDIO_TRACK_H
+#ifndef MUSE_AUDIO_TRACK_H
+#define MUSE_AUDIO_TRACK_H
 
-#include <unordered_map>
 #include <memory>
-#include <vector>
 
-#include "async/asyncable.h"
-#include "async/channel.h"
+#include "global/async/asyncable.h"
+#include "global/async/channel.h"
 
-#include "iaudiosource.h"
-#include "audiotypes.h"
+#include "../../iaudiosource.h"
+#include "../../audiotypes.h"
 
-namespace mu::audio {
+namespace muse::audio {
 enum TrackType {
     Undefined = -1,
-    Midi,
-    Audio
+    Event_track,
+    Sound_track
 };
 
 class ITrackAudioInput : public IAudioSource
@@ -60,7 +58,7 @@ public:
     virtual void applyOutputParams(const AudioOutputParams& requiredParams) = 0;
     virtual async::Channel<AudioOutputParams> outputParamsChanged() const = 0;
 
-    virtual async::Channel<audioch_t, AudioSignalVal> audioSignalChanges() const = 0;
+    virtual AudioSignalChanges audioSignalChanges() const = 0;
 };
 
 using ITrackAudioInputPtr = std::shared_ptr<ITrackAudioInput>;
@@ -152,39 +150,39 @@ public:
     async::Channel<PlaybackData> playbackDataChanged;
 };
 
-struct MidiTrack : public Track
+struct EventTrack : public Track
 {
 public:
-    MidiTrack()
-        : Track(Midi) {}
+    EventTrack()
+        : Track(Event_track) {}
 
     PlaybackData playbackData() const override
     {
-        return m_midiData;
+        return m_data;
     }
 
     bool setPlaybackData(const PlaybackData& data) override
     {
-        midi::MidiData newMidiData = std::get<midi::MidiData>(data);
+        mpe::PlaybackData newData = std::get<mpe::PlaybackData>(data);
 
-        if (m_midiData == newMidiData) {
+        if (m_data == newData) {
             return false;
         }
 
-        m_midiData = newMidiData;
-        playbackDataChanged.send(std::move(newMidiData));
+        m_data = newData;
+        playbackDataChanged.send(std::move(newData));
 
         return true;
     }
 
 private:
-    midi::MidiData m_midiData;
+    mpe::PlaybackData m_data;
 };
 
-struct AudioTrack : public Track
+struct SoundTrack : public Track
 {
-    AudioTrack()
-        : Track(Audio) {}
+    SoundTrack()
+        : Track(Sound_track) {}
 
     PlaybackData playbackData() const override
     {
@@ -193,7 +191,7 @@ struct AudioTrack : public Track
 
     bool setPlaybackData(const PlaybackData& data) override
     {
-        io::Device* newDevice = std::get<io::Device*>(data);
+        io::IODevice* newDevice = std::get<io::IODevice*>(data);
 
         if (m_ioDevice == newDevice) {
             return false;
@@ -207,14 +205,14 @@ struct AudioTrack : public Track
     }
 
 private:
-    io::Device* m_ioDevice = nullptr;
+    io::IODevice* m_ioDevice = nullptr;
 };
 
 using TrackPtr = std::shared_ptr<Track>;
-using MidiTrackPtr = std::shared_ptr<MidiTrack>;
-using AudioTrackPtr = std::shared_ptr<AudioTrack>;
+using EventTrackPtr = std::shared_ptr<EventTrack>;
+using SoundTrackPtr = std::shared_ptr<SoundTrack>;
 
-using TracksMap = std::unordered_map<TrackId, TrackPtr>;
+using TracksMap = std::map<TrackId, TrackPtr>;
 }
 
-#endif // MU_AUDIO_TRACK_H
+#endif // MUSE_AUDIO_TRACK_H

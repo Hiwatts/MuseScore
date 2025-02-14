@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -26,36 +26,35 @@
 #include <QDialog>
 
 #include "ui_editstaff.h"
-#include "libmscore/stafftype.h"
+#include "engraving/dom/stafftype.h"
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "global/iinteractive.h"
+#include "engraving/iengravingconfiguration.h"
 #include "iselectinstrumentscenario.h"
 
 namespace mu::notation {
 class EditStaffType;
 
-class EditStaff : public QDialog, private Ui::EditStaffBase
+class EditStaff : public QDialog, private Ui::EditStaffBase, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(notation, context::IGlobalContext, globalContext)
-    INJECT(notation, framework::IInteractive, interactive)
-    INJECT(notation, ISelectInstrumentsScenario, selectInstrumentsScenario)
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<muse::IInteractive> interactive = { this };
+    muse::Inject<ISelectInstrumentsScenario> selectInstrumentsScenario = { this };
+    muse::Inject<engraving::IEngravingConfiguration> engravingConfiguration = { this };
 
 public:
     EditStaff(QWidget* parent = nullptr);
-    EditStaff(const EditStaff&);
-
-    static int metaTypeId();
 
 private:
     void hideEvent(QHideEvent*) override;
     void apply();
-    void setStaff(Ms::Staff*, const Ms::Fraction& tick);
-    void updateInterval(const Ms::Interval&);
-    void updateStaffType(const Ms::StaffType& staffType);
+    void setStaff(mu::engraving::Staff*, const mu::engraving::Fraction& tick);
+    void updateInterval(const mu::engraving::Interval&);
+    void updateStaffType(const mu::engraving::StaffType& staffType);
     void updateInstrument();
     void updateNextPreviousButtons();
 
@@ -76,6 +75,9 @@ private slots:
     void gotoNextStaff();
     void gotoPreviousStaff();
     void invisibleChanged();
+    void colorChanged();
+    void magChanged(double newValue);
+    void isSmallChanged();
     void transpositionChanged();
 
 signals:
@@ -83,7 +85,9 @@ signals:
 
 private:
     INotationPtr notation() const;
+    IMasterNotationPtr masterNotation() const;
     INotationPartsPtr notationParts() const;
+    INotationPartsPtr masterNotationParts() const;
 
     void initStaff();
 
@@ -95,18 +99,16 @@ private:
 
     QString midiCodeToStr(int midiCode);
 
-    Ms::Staff* m_staff = nullptr;
-    Ms::Staff* m_orgStaff = nullptr;
+    mu::engraving::Staff* m_staff = nullptr;
+    mu::engraving::Staff* m_orgStaff = nullptr;
     Instrument m_instrument;
     Instrument m_orgInstrument;
     InstrumentKey m_instrumentKey;
     int m_minPitchA, m_maxPitchA, m_minPitchP, m_maxPitchP;
-    Ms::Fraction m_tickStart, m_tickEnd;
+    mu::engraving::Fraction m_tickStart, m_tickEnd;
 
     EditStaffType* editStaffTypeDialog = nullptr;
 };
 }
-
-Q_DECLARE_METATYPE(mu::notation::EditStaff)
 
 #endif

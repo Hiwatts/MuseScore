@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,21 +22,22 @@
 #ifndef MU_NOTATION_ALIGNSELECT_H
 #define MU_NOTATION_ALIGNSELECT_H
 
+#include "modularity/ioc.h"
 #include "ui_align_select.h"
-#include "libmscore/types.h"
+#include "engraving/types/types.h"
 
 namespace mu::notation {
-class AlignSelect : public QWidget, public Ui::AlignSelect
+class AlignSelect : public QWidget, public Ui::AlignSelect, public muse::Injectable
 {
     Q_OBJECT
 
 public:
     AlignSelect(QWidget* parent);
-    Ms::Align align() const;
-    void setAlign(Ms::Align);
+    mu::engraving::Align align() const;
+    void setAlign(mu::engraving::Align);
 
 signals:
-    void alignChanged(Ms::Align);
+    void alignChanged(mu::engraving::Align);
 
 private:
     QButtonGroup* g1;

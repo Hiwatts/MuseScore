@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,7 +22,7 @@
 #ifndef MU_INSPECTOR_IINSPECTORMODELCREATOR_H
 #define MU_INSPECTOR_IINSPECTORMODELCREATOR_H
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 
 #include "abstractinspectormodel.h"
 
@@ -34,7 +34,7 @@ class IInspectorModelCreator : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IInspectorModelCreator() = default;
 
-    virtual AbstractInspectorModel* newInspectorModel(AbstractInspectorModel::InspectorModelType modelType, QObject* parent,
+    virtual AbstractInspectorModel* newInspectorModel(InspectorModelType modelType, QObject* parent,
                                                       IElementRepositoryService* repository) const = 0;
 };
 }

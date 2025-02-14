@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,10 +21,11 @@
  */
 #include "backendjsonwriter.h"
 
-using namespace mu::converter;
-using namespace mu::io;
+#include <QIODevice>
 
-BackendJsonWriter::BackendJsonWriter(Device* destinationDevice)
+using namespace mu::converter;
+
+BackendJsonWriter::BackendJsonWriter(QIODevice* destinationDevice)
 {
     m_destinationDevice = destinationDevice;
     m_destinationDevice->open(QIODevice::WriteOnly);

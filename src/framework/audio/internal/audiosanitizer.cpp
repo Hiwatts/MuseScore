@@ -23,10 +23,13 @@
 
 #include <thread>
 
-using namespace mu::audio;
+#include "containers.h"
+
+using namespace muse::audio;
 
 static std::thread::id s_as_mainThreadID;
 static std::thread::id s_as_workerThreadID;
+static std::set<std::thread::id> s_mixerThreadIdSet;
 
 void AudioSanitizer::setupMainThread()
 {
@@ -48,6 +51,11 @@ void AudioSanitizer::setupWorkerThread()
     s_as_workerThreadID = std::this_thread::get_id();
 }
 
+void AudioSanitizer::setMixerThreads(const std::set<std::thread::id>& threadIdSet)
+{
+    s_mixerThreadIdSet = threadIdSet;
+}
+
 std::thread::id AudioSanitizer::workerThread()
 {
     return s_as_workerThreadID;
@@ -55,5 +63,7 @@ std::thread::id AudioSanitizer::workerThread()
 
 bool AudioSanitizer::isWorkerThread()
 {
-    return std::this_thread::get_id() == s_as_workerThreadID;
+    std::thread::id id = std::this_thread::get_id();
+
+    return id == s_as_workerThreadID || muse::contains(s_mixerThreadIdSet, id);
 }

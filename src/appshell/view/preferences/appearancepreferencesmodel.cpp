@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,24 +22,30 @@
 
 #include "appearancepreferencesmodel.h"
 
+#include "translation.h"
+
 #include "ui/internal/themeconverter.h"
 
 #include "log.h"
-#include "translation.h"
 
 using namespace mu::appshell;
 using namespace mu::notation;
-using namespace mu::ui;
+using namespace muse;
+using namespace muse::ui;
 
 static constexpr int INVALID_INDEX = -1;
 
 AppearancePreferencesModel::AppearancePreferencesModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
 void AppearancePreferencesModel::init()
 {
+    uiConfiguration()->isFollowSystemTheme().notification.onNotify(this, [this]() {
+        emit isFollowSystemThemeChanged();
+    });
+
     uiConfiguration()->currentThemeChanged().onNotify(this, [this]() {
         emit themesChanged();
         emit foregroundColorChanged();
@@ -68,6 +74,25 @@ void AppearancePreferencesModel::init()
     });
 }
 
+bool AppearancePreferencesModel::isFollowSystemThemeAvailable() const
+{
+    return uiConfiguration()->isFollowSystemThemeAvailable();
+}
+
+bool AppearancePreferencesModel::isFollowSystemTheme() const
+{
+    return uiConfiguration()->isFollowSystemTheme().val;
+}
+
+void AppearancePreferencesModel::setFollowSystemTheme(bool enabled)
+{
+    if (enabled == isFollowSystemTheme()) {
+        return;
+    }
+
+    uiConfiguration()->setFollowSystemTheme(enabled);
+}
+
 bool AppearancePreferencesModel::highContrastEnabled() const
 {
     return uiConfiguration()->isHighContrast();
@@ -91,7 +116,7 @@ QVariantList AppearancePreferencesModel::highContrastThemes() const
     QVariantList result;
 
     for (const ThemeInfo& theme : allThemes()) {
-        if (theme.codeKey == HIGH_CONTRAST_BLACK_THEME_CODE || theme.codeKey == HIGH_CONTRAST_WHITE_THEME_CODE) {
+        if (theme.codeKey == HIGH_CONTRAST_WHITE_THEME_CODE || theme.codeKey == HIGH_CONTRAST_BLACK_THEME_CODE) {
             result << ThemeConverter::toMap(theme);
         }
     }
@@ -104,12 +129,12 @@ QStringList AppearancePreferencesModel::accentColors() const
     return uiConfiguration()->possibleAccentColors();
 }
 
-void AppearancePreferencesModel::resetThemeToDefault()
+void AppearancePreferencesModel::resetAppearancePreferencesToDefault()
 {
-    uiConfiguration()->resetCurrentThemeToDefault(currentTheme().codeKey);
-    notationConfiguration()->resetCurrentBackgroundColorToDefault();
-    emit backgroundColorChanged();
-    emit themesChanged();
+    uiConfiguration()->resetThemes();
+    uiConfiguration()->resetFonts();
+    notationConfiguration()->resetBackground();
+    notationConfiguration()->resetForeground();
 }
 
 void AppearancePreferencesModel::setNewColor(const QColor& newColor, ColorType colorType)
@@ -122,6 +147,7 @@ void AppearancePreferencesModel::setNewColor(const QColor& newColor, ColorType c
         uiConfiguration()->setCurrentThemeStyleValue(ThemeStyleKey::FONT_PRIMARY_COLOR, Val(newColor));
         break;
     case DisabledColor:
+        NOT_IMPLEMENTED;
         return;
     case BorderColor:
         uiConfiguration()->setCurrentThemeStyleValue(ThemeStyleKey::STROKE_COLOR, Val(newColor));
@@ -136,10 +162,10 @@ QStringList AppearancePreferencesModel::allFonts() const
     return uiConfiguration()->possibleFontFamilies();
 }
 
-QString AppearancePreferencesModel::wallpaperPathFilter() const
+QStringList AppearancePreferencesModel::wallpaperPathFilter() const
 {
-    return qtrc("appshell", "Images") + " (*.jpg *.jpeg *.png);;"
-           + qtrc("appshell", "All") + " (*)";
+    return { muse::qtrc("appshell/preferences", "Images") + " (*.jpg *.jpeg *.png *.bmp *.tif *.tiff)",
+             muse::qtrc("appshell/preferences", "All") + " (*)" };
 }
 
 QString AppearancePreferencesModel::wallpapersDir() const
@@ -154,7 +180,6 @@ void AppearancePreferencesModel::setHighContrastEnabled(bool enabled)
     }
 
     uiConfiguration()->setIsHighContrast(enabled);
-    emit highContrastEnabledChanged();
 }
 
 QString AppearancePreferencesModel::currentThemeCode() const
@@ -234,17 +259,11 @@ bool AppearancePreferencesModel::scoreInversionEnabled() const
 
 void AppearancePreferencesModel::setCurrentThemeCode(const QString& themeCode)
 {
-    if (themeCode == currentThemeCode()) {
+    if (themeCode == currentThemeCode() && !isFollowSystemTheme()) {
         return;
     }
 
-    for (const ThemeInfo& theme : allThemes()) {
-        if (themeCode == QString::fromStdString(theme.codeKey)) {
-            uiConfiguration()->setCurrentTheme(theme.codeKey);
-            break;
-        }
-    }
-    emit themesChanged();
+    uiConfiguration()->setCurrentTheme(themeCodeFromString(themeCode));
 }
 
 void AppearancePreferencesModel::setCurrentAccentColorIndex(int index)
@@ -259,7 +278,6 @@ void AppearancePreferencesModel::setCurrentAccentColorIndex(int index)
 
     QColor color = accentColors()[index];
     uiConfiguration()->setCurrentThemeStyleValue(ThemeStyleKey::ACCENT_COLOR, Val(color));
-    emit themesChanged();
 }
 
 void AppearancePreferencesModel::setCurrentFontIndex(int index)

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,10 +25,12 @@
 
 #include "importmidi_operations.h"
 #include "importmidi_chord.h"
-#include "libmscore/durationtype.h"
-#include "engraving/compat/midi/midifile.h"
+#include "../midishared/midifile.h"
 
-namespace Ms {
+#include "engraving/dom/durationtype.h"
+#include "engraving/dom/sig.h"
+
+namespace mu::iex::midi {
 MTrack::MTrack()
     : program(0)
     , staff(nullptr)
@@ -279,7 +281,7 @@ std::string fromUchar(const uchar* text)
 } // namespace MidiCharset
 
 namespace MidiBar {
-ReducedFraction findBarStart(const ReducedFraction& time, const TimeSigMap* sigmap)
+ReducedFraction findBarStart(const ReducedFraction& time, const engraving::TimeSigMap* sigmap)
 {
     int barIndex, beat, tick;
     sigmap->tickValues(time.ticks(), &barIndex, &beat, &tick);
@@ -287,7 +289,7 @@ ReducedFraction findBarStart(const ReducedFraction& time, const TimeSigMap* sigm
 }
 } // namespace MidiBar
 namespace MidiDuration {
-double durationCount(const QList<std::pair<ReducedFraction, TDuration> >& durations)
+double durationCount(const QList<std::pair<ReducedFraction, engraving::TDuration> >& durations)
 {
     double count = durations.size();
     for (const auto& d: durations) {
@@ -298,4 +300,4 @@ double durationCount(const QList<std::pair<ReducedFraction, TDuration> >& durati
     return count;
 }
 } // namespace MidiDuration
-} // namespace Ms
+} // namespace mu::iex::midi

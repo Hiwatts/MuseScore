@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,8 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import MuseScore.UiComponents 1.0
+
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
+
 import "../../../common"
 
 ExpandableBlank {
@@ -35,11 +37,10 @@ ExpandableBlank {
 
     title: model ? model.title : ""
 
-    height: implicitHeight
     width: parent.width
 
     contentItemComponent: Column {
-        property int navigationRowEnd: overrideDynamicsSection.navigation.row
+        property int navigationRowEnd: tuningsSection.navigationRowEnd
 
         spacing: 12
 
@@ -56,9 +57,9 @@ ExpandableBlank {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
+                navigationName: "Velocity"
                 navigationPanel: root.navigation.panel
                 navigationRowStart: root.navigation.row + 1
-                navigationEnabled: root.navigation.enabled && root.enabled
 
                 titleText: qsTrc("inspector", "Velocity")
                 propertyItem: root.model ? root.model.velocity : null
@@ -66,7 +67,7 @@ ExpandableBlank {
                 step: 1
                 decimals: 0
                 maxValue: 127
-                minValue: -127
+                minValue: 0
             }
 
             SpinBoxPropertyView {
@@ -75,29 +76,13 @@ ExpandableBlank {
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
+                navigationName: "Tuning"
                 navigationPanel: root.navigation.panel
                 navigationRowStart: velocitySection.navigationRowEnd + 1
-                navigationEnabled: root.navigation.enabled && root.enabled
 
-                titleText: qsTrc("inspector", "Tunings (cents)")
+                titleText: qsTrc("inspector", "Tuning (cents)")
                 propertyItem: root.model ? root.model.tuning : null
             }
-        }
-
-        CheckBox {
-            id: overrideDynamicsSection
-            navigation.name: "Override dynamics"
-            navigation.panel: root.navigation.panel
-            navigation.column: root.navigation.column
-            navigation.row: tuningsSection.navigationRowEnd + 1
-            navigation.enabled: root.navigation.enabled && root.enabled
-
-            text: qsTrc("inspector", "Override dynamics")
-
-            isIndeterminate: root.model ? root.model.overrideDynamics.isUndefined : false
-            checked: root.model && !isIndeterminate ? root.model.overrideDynamics.value : false
-
-            onClicked: { root.model.overrideDynamics.value = !checked }
         }
     }
 }

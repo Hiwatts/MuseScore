@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,91 +22,204 @@
 
 #include "startupscenario.h"
 
+#include <QCoreApplication>
+
 #include "async/async.h"
+#include "translation.h"
+#include "log.h"
 
 using namespace mu::appshell;
-using namespace mu::actions;
+using namespace muse;
+using namespace muse::actions;
 
-static const std::string HOME_URI("musescore://home");
-static const std::string NOTATION_URI("musescore://notation");
+static const muse::Uri FIRST_LAUNCH_SETUP_URI("musescore://firstLaunchSetup");
+static const muse::Uri HOME_URI("musescore://home");
+static const muse::Uri NOTATION_URI("musescore://notation");
 
-StartupSessionType StartupScenario::sessionTypeTromString(const QString& str) const
+static StartupModeType modeTypeTromString(const std::string& str)
 {
     if ("start-empty" == str) {
-        return StartupSessionType::StartEmpty;
+        return StartupModeType::StartEmpty;
     }
 
     if ("continue-last" == str) {
-        return StartupSessionType::ContinueLastSession;
+        return StartupModeType::ContinueLastSession;
     }
 
     if ("start-with-new" == str) {
-        return StartupSessionType::StartWithNewScore;
+        return StartupModeType::StartWithNewScore;
     }
 
     if ("start-with-file" == str) {
-        return StartupSessionType::StartWithScore;
+        return StartupModeType::StartWithScore;
     }
 
-    return StartupSessionType::StartEmpty;
+    return StartupModeType::StartEmpty;
 }
 
-void StartupScenario::setSessionType(const QString& sessionType)
+void StartupScenario::setStartupType(const std::optional<std::string>& type)
 {
-    m_sessionType = sessionType;
+    m_startupTypeStr = type ? type.value() : "";
 }
 
-void StartupScenario::setStartupScorePath(const io::path& path)
+bool StartupScenario::isStartWithNewFileAsSecondaryInstance() const
 {
-    m_startupScorePath = path;
+    if (m_startupScoreFile.isValid()) {
+        return false;
+    }
+
+    if (!m_startupTypeStr.empty()) {
+        return modeTypeTromString(m_startupTypeStr) == StartupModeType::StartWithNewScore;
+    }
+
+    return false;
 }
 
-void StartupScenario::run()
+const mu::project::ProjectFile& StartupScenario::startupScoreFile() const
 {
-    if (!m_startupScorePath.empty()) {
-        openScore(m_startupScorePath);
+    return m_startupScoreFile;
+}
+
+void StartupScenario::setStartupScoreFile(const std::optional<project::ProjectFile>& file)
+{
+    m_startupScoreFile = file ? file.value() : project::ProjectFile();
+}
+
+void StartupScenario::runOnSplashScreen()
+{
+    //! NOTE Registering plugins shows a window (dialog) before the main window is shown.
+    //! After closing it, the application may in a state where there are no open windows,
+    //! which leads to automatic exit from the application.
+    //! (Thanks to the splashscreen, but this is not an obvious detail)
+    qApp->setQuitLockEnabled(false);
+
+    Ret ret = registerAudioPluginsScenario()->registerNewPlugins();
+    if (!ret) {
+        LOGE() << ret.toString();
+    }
+
+    qApp->setQuitLockEnabled(true);
+}
+
+void StartupScenario::runAfterSplashScreen()
+{
+    TRACEFUNC;
+
+    if (m_startupCompleted) {
         return;
     }
 
-    StartupSessionType sessionType;
-    if (!m_sessionType.isEmpty()) {
-        sessionType = sessionTypeTromString(m_sessionType);
-    } else {
-        sessionType = configuration()->startupSessionType();
+    StartupModeType modeType = resolveStartupModeType();
+    bool isMainInstance = multiInstancesProvider()->isMainInstance();
+    if (isMainInstance && sessionsManager()->hasProjectsForRestore()) {
+        modeType = StartupModeType::Recovery;
     }
 
-    interactive()->open(startupPageUri(sessionType));
+    Uri startupUri = startupPageUri(modeType);
 
-    switch (sessionType) {
-    case StartupSessionType::StartEmpty:
+    muse::async::Channel<Uri> opened = interactive()->opened();
+    opened.onReceive(this, [this, opened, modeType](const Uri&) {
+        static bool once = false;
+        if (once) {
+            return;
+        }
+        once = true;
+
+        onStartupPageOpened(modeType);
+
+        async::Async::call(this, [this, opened]() {
+            muse::async::Channel<Uri> mut = opened;
+            mut.resetOnReceive(this);
+            m_startupCompleted = true;
+        });
+    });
+
+    interactive()->open(startupUri);
+}
+
+bool StartupScenario::startupCompleted() const
+{
+    return m_startupCompleted;
+}
+
+StartupModeType StartupScenario::resolveStartupModeType() const
+{
+    if (m_startupScoreFile.isValid()) {
+        return StartupModeType::StartWithScore;
+    }
+
+    if (!m_startupTypeStr.empty()) {
+        return modeTypeTromString(m_startupTypeStr);
+    }
+
+    return configuration()->startupModeType();
+}
+
+void StartupScenario::onStartupPageOpened(StartupModeType modeType)
+{
+    TRACEFUNC;
+
+    switch (modeType) {
+    case StartupModeType::StartEmpty:
         break;
-    case StartupSessionType::StartWithNewScore:
+    case StartupModeType::StartWithNewScore:
         dispatcher()->dispatch("file-new");
         break;
-    case StartupSessionType::ContinueLastSession:
+    case StartupModeType::ContinueLastSession:
         dispatcher()->dispatch("continue-last-session");
         break;
-    case StartupSessionType::StartWithScore: {
-        openScore(configuration()->startupScorePath());
+    case StartupModeType::Recovery:
+        restoreLastSession();
+        break;
+    case StartupModeType::StartWithScore: {
+        project::ProjectFile file
+            = m_startupScoreFile.isValid() ? m_startupScoreFile : project::ProjectFile(configuration()->startupScorePath());
+        openScore(file);
     } break;
+    }
+
+    if (!configuration()->hasCompletedFirstLaunchSetup()) {
+        interactive()->open(FIRST_LAUNCH_SETUP_URI);
     }
 }
 
-std::string StartupScenario::startupPageUri(StartupSessionType sessionType) const
+muse::Uri StartupScenario::startupPageUri(StartupModeType modeType) const
 {
-    switch (sessionType) {
-    case StartupSessionType::StartEmpty:
-    case StartupSessionType::StartWithNewScore:
+    switch (modeType) {
+    case StartupModeType::StartEmpty:
+    case StartupModeType::StartWithNewScore:
+    case StartupModeType::Recovery:
         return HOME_URI;
-    case StartupSessionType::ContinueLastSession:
-    case StartupSessionType::StartWithScore:
+    case StartupModeType::StartWithScore:
+    case StartupModeType::ContinueLastSession:
         return NOTATION_URI;
     }
 
     return HOME_URI;
 }
 
-void StartupScenario::openScore(const io::path& path)
+void StartupScenario::openScore(const project::ProjectFile& file)
 {
-    dispatcher()->dispatch("file-open", ActionData::make_arg1<io::path>(path));
+    dispatcher()->dispatch("file-open", ActionData::make_arg2<QUrl, QString>(file.url, file.displayNameOverride));
+}
+
+void StartupScenario::restoreLastSession()
+{
+    IInteractive::Result result = interactive()->question(muse::trc("appshell", "The previous session quit unexpectedly."),
+                                                          muse::trc("appshell", "Do you want to restore the session?"),
+                                                          { IInteractive::Button::No, IInteractive::Button::Yes });
+
+    if (result.button() == static_cast<int>(IInteractive::Button::Yes)) {
+        sessionsManager()->restore();
+    } else {
+        removeProjectsUnsavedChanges(configuration()->sessionProjectsPaths());
+        sessionsManager()->reset();
+    }
+}
+
+void StartupScenario::removeProjectsUnsavedChanges(const io::paths_t& projectsPaths)
+{
+    for (const muse::io::path_t& path : projectsPaths) {
+        projectAutoSaver()->removeProjectUnsavedChanges(path);
+    }
 }

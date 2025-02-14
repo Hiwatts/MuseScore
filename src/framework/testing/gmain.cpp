@@ -20,11 +20,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <QGuiApplication>
-#include <gmock/gmock.h>
+#include <string>
+#include <vector>
 
-#include "framework/global/runtime.h"
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <QGuiApplication>
+
+#include "global/stringutils.h"
+#include "global/runtime.h"
+
 #include "environment.h"
+
+#include "log.h"
 
 GTEST_API_ int main(int argc, char** argv)
 {
@@ -32,11 +41,53 @@ GTEST_API_ int main(int argc, char** argv)
 
     qputenv("QML_DISABLE_DISK_CACHE", "true");
 
-    mu::runtime::mainThreadId(); //! NOTE Needs only call
-    mu::runtime::setThreadName("main");
+    //! NOTE Fixed filter value
+    //! When the test is run in QtCreator with debuger,
+    //! the filter is passed as --gtest_filter="SuiteName.TestName"
+    //! but expected --gtest_filter=SuiteName.TestName (without quotes)
+    //! (maybe QtCreator bug)
+    std::vector<std::string> args;
+    args.reserve(argc);
+    for (int i = 0; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (muse::strings::startsWith(arg, "--gtest_filter=")) {
+            std::vector<std::string> filter;
+            muse::strings::split(arg, filter, "=");
+            if (filter.size() > 1) {
+                std::string val = filter.at(1);
+                if (val.at(0) == '"') {
+                    val = val.substr(1, val.size() - 2);
+                }
+                arg = filter.at(0) + "=" + val;
+            }
+        }
+        args.push_back(arg);
+    }
 
-    mu::testing::Environment::setup();
+    std::vector<char*> argsc;
+    argsc.reserve(argc + 1);
+    for (size_t i = 0; i < args.size(); ++i) {
+        argsc.push_back(const_cast<char*>(args.at(i).c_str()));
+    }
+    argsc.push_back(NULL);
+    argv = argsc.data();
+
+    muse::runtime::mainThreadId(); //! NOTE Needs only call
+    muse::runtime::setThreadName("main");
+
+    muse::testing::Environment::setup();
 
     testing::InitGoogleMock(&argc, argv);
-    return RUN_ALL_TESTS();
+
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+
+    PROFILER_CLEAR;
+
+    int code = RUN_ALL_TESTS();
+
+    muse::testing::Environment::deinit();
+
+    PROFILER_PRINT;
+
+    return code;
 }

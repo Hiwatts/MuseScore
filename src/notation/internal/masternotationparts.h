@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -34,20 +34,30 @@ public:
 
     void setExcerpts(ExcerptNotationList excerpts);
 
-    void removeParts(const IDList& partsIds) override;
-    void removeStaves(const IDList& stavesIds) override;
+    void setParts(const PartInstrumentList& parts, const ScoreOrder& order) override;
 
-    void appendStaff(Staff* staff, const ID& destinationPartId) override;
-    void appendLinkedStaff(Staff* staff, const ID& sourceStaffId, const ID& destinationPartId) override;
+    void removeParts(const muse::IDList& partsIds) override;
+    void removeStaves(const muse::IDList& stavesIds) override;
 
-    void replaceInstrument(const InstrumentKey& instrumentKey, const Instrument& newInstrument) override;
-    void replaceDrumset(const InstrumentKey& instrumentKey, const Drumset& newDrumset) override;
+    bool appendStaff(Staff* staff, const muse::ID& destinationPartId) override;
+    bool appendLinkedStaff(Staff* staff, const muse::ID& sourceStaffId, const muse::ID& destinationPartId) override;
+
+    void replaceInstrument(const InstrumentKey& instrumentKey, const Instrument& newInstrument,
+                           const StaffType* newStaffType = nullptr) override;
+    void replaceDrumset(const InstrumentKey& instrumentKey, const Drumset& newDrumset, bool undoable = true) override;
+
+    void addSystemObjects(const muse::IDList& stavesIds) override;
+    void removeSystemObjects(const muse::IDList& stavesIds) override;
+    void moveSystemObjects(const muse::ID& sourceStaffId, const muse::ID& destinationStaffId) override;
 
 private:
-    void startGlobalEdit();
+    void startGlobalEdit(const muse::TranslatableString& actionName);
     void endGlobalEdit();
 
+    void onPartsRemoved(const std::vector<Part*>& parts) override;
+
     std::vector<INotationPartsPtr> excerptsParts() const;
+    mu::engraving::Excerpt* findExcerpt(const muse::ID& initialPartId) const;
 
     ExcerptNotationList m_excerpts;
 };

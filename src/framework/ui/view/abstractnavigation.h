@@ -19,18 +19,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_ABSTRACTNAVIGATION_H
-#define MU_UI_ABSTRACTNAVIGATION_H
+#ifndef MUSE_UI_ABSTRACTNAVIGATION_H
+#define MUSE_UI_ABSTRACTNAVIGATION_H
 
 #include <QObject>
 #include <QQmlParserStatus>
 
+#include "async/asyncable.h"
 #include "../inavigation.h"
 #include "qmlaccessible.h"
 #include "navigationevent.h"
 
-namespace mu::ui {
-class AbstractNavigation : public QObject, public QQmlParserStatus
+#include "modularity/ioc.h"
+#include "../inavigationcontroller.h"
+
+namespace muse::ui {
+class AbstractNavigation : public QObject, public QQmlParserStatus, public Injectable, public async::Asyncable
 {
     Q_OBJECT
 
@@ -43,10 +47,14 @@ class AbstractNavigation : public QObject, public QQmlParserStatus
 
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(bool active READ active NOTIFY activeChanged)
+    Q_PROPERTY(bool highlight READ highlight NOTIFY highlightChanged)
 
     Q_PROPERTY(AccessibleItem * accessible READ accessible WRITE setAccessible NOTIFY accessibleChanged)
 
     Q_INTERFACES(QQmlParserStatus)
+
+public:
+    Inject<INavigationController> navigationController = { this };
 
 public:
     explicit AbstractNavigation(QObject* parent = nullptr);
@@ -58,6 +66,7 @@ public:
     QString name() const;
 
     const INavigation::Index& index() const;
+    void setIndex(const INavigation::Index& index);
     async::Channel<INavigation::Index> indexChanged() const;
 
     bool enabled() const;
@@ -66,10 +75,15 @@ public:
     bool active() const;
     async::Channel<bool> activeChanged() const;
 
+    bool highlight() const;
+
     AccessibleItem* accessible() const;
     void setAccessibleParent(AccessibleItem* p);
 
     void onEvent(INavigation::EventPtr e);
+
+    QWindow* window() const;
+    QQuickItem* visualItem() const;
 
     // QQmlParserStatus
     void classBegin() override;
@@ -91,6 +105,7 @@ signals:
     void rowChanged(int row);
     void enabledChanged(bool enabled);
     void activeChanged(bool active);
+    void highlightChanged();
     void accessibleChanged();
 
     void navigationEvent(QVariant event);
@@ -113,4 +128,4 @@ protected:
 };
 }
 
-#endif // MU_UI_ABSTRACTNAVIGATION_H
+#endif // MUSE_UI_ABSTRACTNAVIGATION_H

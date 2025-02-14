@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Palette 1.0
 
 Item {
@@ -36,6 +36,7 @@ Item {
     readonly property string searchText: searchField.searchText
 
     property alias popupMaxHeight: addPalettesPopup.maxHeight
+    property var popupAnchorItem: null
 
     property alias navigation: navPanel
 
@@ -45,22 +46,63 @@ Item {
 
     function startSearch() {
         isSearchOpened = true
-        searchField.forceActiveFocus()
-        searchField.selectAll()
+        Qt.callLater(searchField.forceActiveFocus)
+        Qt.callLater(searchField.selectAll)
     }
 
     function endSearch() {
         isSearchOpened = false
-        addPalettesButton.forceActiveFocus()
+        Qt.callLater(addPalettesButton.forceActiveFocus)
+        Qt.callLater(addPalettesButton.navigation.requestActive)
     }
 
     NavigationPanel {
         id: navPanel
         name: "PalettesHeader"
-        onActiveChanged: {
+        enabled: root.enabled && root.visible
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
+        }
+    }
+
+    QtObject {
+        id: prv
+
+        property var openedPopup: null
+        property bool isPopupOpened: Boolean(openedPopup) && openedPopup.isOpened
+
+        function openPopup(popup, model) {
+            if (isPopupOpened) {
+                if (openedPopup === popup) {
+                    resetOpenedPopup()
+                    return
+                }
+
+                resetOpenedPopup()
+            }
+
+            if (Boolean(popup)) {
+                openedPopup = popup
+
+                if (Boolean(model)) {
+                    popup.model = model
+                }
+
+                popup.open()
+            }
+        }
+
+        function closeOpenedPopup() {
+            if (isPopupOpened) {
+                resetOpenedPopup()
+            }
+        }
+
+        function resetOpenedPopup() {
+            openedPopup.close()
+            openedPopup = null
         }
     }
 
@@ -75,13 +117,35 @@ Item {
         navigation.panel: navPanel
         navigation.order: 1
 
-        text: qsTrc("palette", "Add Palettes")
+        text: qsTrc("palette", "Add palettes")
         visible: !root.isSearchOpened
         enabled: visible
 
         onClicked: {
-            addPalettesPopup.visible = !addPalettesPopup.visible
-            createCustomPalettePopup.visible = false
+            prv.openPopup(addPalettesPopup, paletteProvider.availableExtraPalettesModel())
+        }
+
+        AddPalettesPopup {
+            id: addPalettesPopup
+            paletteProvider: root.paletteProvider
+
+            popupAvailableWidth: root ? root.width : 0
+            anchorItem: root.popupAnchorItem
+
+            onAddCustomPaletteRequested: {
+                prv.openPopup(createCustomPalettePopup)
+            }
+        }
+
+        CreateCustomPalettePopup {
+            id: createCustomPalettePopup
+
+            popupAvailableWidth: root ? root.width : 0
+            anchorItem: root.popupAnchorItem
+
+            onAddCustomPaletteRequested: function(paletteName) {
+                root.addCustomPaletteRequested(paletteName)
+            }
         }
     }
 
@@ -93,13 +157,14 @@ Item {
         navigation.panel: navPanel
         navigation.order: 2
 
+        toolTipTitle: qsTrc("palette", "Search palettes")
+
         icon: IconCode.SEARCH
         visible: !root.isSearchOpened
         enabled: visible
 
         onClicked: {
-            addPalettesPopup.visible = false
-            createCustomPalettePopup.visible = false
+            prv.closeOpenedPopup()
             root.startSearch()
         }
     }
@@ -116,65 +181,16 @@ Item {
                 searchField.forceActiveFocus()
             }
         }
-
         clearTextButtonVisible: true
-        clearTextButton.objectName: "SearchPalettesFieldClose"
-        clearTextButton.navigation.order: 4
-        clearTextButton.navigation.onTriggered: {
-            root.endSearch()
-            addPalettesButton.navigation.requestActive()
-        }
 
         onTextCleared: {
             root.endSearch()
         }
 
         visible: root.isSearchOpened
-        onVisibleChanged: {
-            if (!searchField.visible) {
-                addPalettesButton.navigation.requestActive()
-            }
-        }
-
-        onSearchTextChanged: resultsTimer.restart()
-        onActiveFocusChanged: {
-            resultsTimer.stop();
-            Accessible.name = qsTrc("palette", "Palette Search")
-        }
-
-        Timer {
-            id: resultsTimer
-            interval: 500
-            onTriggered: {
-                parent.Accessible.name = parent.searchText.length === 0
-                        ? qsTrc("palette", "Palette Search")
-                        : qsTrc("palette", "%n palette(s) match(es)", "", paletteTree.count);
-            }
-        }
 
         Keys.onEscapePressed: root.endSearch()
-    }
 
-    CreateCustomPalettePopup {
-        id: createCustomPalettePopup
-
-        anchorItem: addPalettesButton
-        width: parent.width
-
-        onAddCustomPaletteRequested: function (paletteName) {
-            root.addCustomPaletteRequested(paletteName)
-        }
-    }
-
-    AddPalettesPopup {
-        id: addPalettesPopup
-        paletteProvider: root.paletteProvider
-
-        anchorItem: addPalettesButton
-        width: parent.width
-
-        onAddCustomPaletteRequested: {
-            createCustomPalettePopup.open()
-        }
+        onAccepted: applyCurrentPaletteElement()
     }
 }

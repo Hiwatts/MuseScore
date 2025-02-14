@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,64 +24,101 @@
 
 #include <QObject>
 
+#include "progress.h"
+
 #include "modularity/ioc.h"
+#include "iappshellconfiguration.h"
 #include "async/asyncable.h"
 
 #include "global/iinteractive.h"
 #include "languages/ilanguagesconfiguration.h"
 #include "languages/ilanguagesservice.h"
-#include "telemetry/itelemetryconfiguration.h"
+#include "shortcuts/ishortcutsconfiguration.h"
+#include "project/iprojectconfiguration.h"
 
 namespace mu::appshell {
-class GeneralPreferencesModel : public QObject, public async::Asyncable
+class GeneralPreferencesModel : public QObject, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
-
-    INJECT(appshell, framework::IInteractive, interactive)
-    INJECT(appshell, languages::ILanguagesConfiguration, languagesConfiguration)
-    INJECT(appshell, languages::ILanguagesService, languagesService)
-    INJECT(appshell, telemetry::ITelemetryConfiguration, telemetryConfiguration)
 
     Q_PROPERTY(QVariantList languages READ languages NOTIFY languagesChanged)
     Q_PROPERTY(QString currentLanguageCode READ currentLanguageCode WRITE setCurrentLanguageCode NOTIFY currentLanguageCodeChanged)
 
-    Q_PROPERTY(bool isTelemetryAllowed READ isTelemetryAllowed WRITE setIsTelemetryAllowed NOTIFY isTelemetryAllowedChanged)
-    Q_PROPERTY(bool isAutoSave READ isAutoSave WRITE setIsAutoSave NOTIFY isAutoSaveChanged)
-    Q_PROPERTY(int autoSavePeriod READ autoSavePeriod WRITE setAutoSavePeriod NOTIFY autoSavePeriodChanged)
+    Q_PROPERTY(QStringList keyboardLayouts READ keyboardLayouts CONSTANT)
+    Q_PROPERTY(QString currentKeyboardLayout READ currentKeyboardLayout WRITE setCurrentKeyboardLayout NOTIFY currentKeyboardLayoutChanged)
+
     Q_PROPERTY(bool isOSCRemoteControl READ isOSCRemoteControl WRITE setIsOSCRemoteControl NOTIFY isOSCRemoteControlChanged)
     Q_PROPERTY(int oscPort READ oscPort WRITE setOscPort NOTIFY oscPortChanged)
+
+    Q_PROPERTY(bool isNeedRestart READ isNeedRestart WRITE setIsNeedRestart NOTIFY isNeedRestartChanged)
+
+    Q_PROPERTY(QVariantList startupModes READ startupModes NOTIFY startupModesChanged)
+
+    muse::Inject<IAppShellConfiguration> configuration = { this };
+    muse::Inject<muse::IInteractive> interactive = { this };
+    muse::Inject<muse::languages::ILanguagesConfiguration> languagesConfiguration = { this };
+    muse::Inject<muse::languages::ILanguagesService> languagesService = { this };
+    muse::Inject<muse::shortcuts::IShortcutsConfiguration> shortcutsConfiguration = { this };
 
 public:
     explicit GeneralPreferencesModel(QObject* parent = nullptr);
 
     Q_INVOKABLE void load();
-    Q_INVOKABLE void openUpdateTranslationsPage();
+    Q_INVOKABLE void checkUpdateForCurrentLanguage();
+
+    Q_INVOKABLE void setCurrentStartupMode(int modeIndex);
+    Q_INVOKABLE void setStartupScorePath(const QString& scorePath);
+
+    Q_INVOKABLE QStringList scorePathFilter() const;
 
     QVariantList languages() const;
     QString currentLanguageCode() const;
 
-    bool isTelemetryAllowed() const;
-    bool isAutoSave() const;
-    int autoSavePeriod() const;
+    QStringList keyboardLayouts() const;
+    QString currentKeyboardLayout() const;
+
+    QVariantList startupModes() const;
+
     bool isOSCRemoteControl() const;
     int oscPort() const;
+    bool isNeedRestart() const;
 
 public slots:
-    void setCurrentLanguageCode(QString currentLanguageCode);
-    void setIsTelemetryAllowed(bool isTelemetryAllowed);
-    void setIsAutoSave(bool isAutoSave);
-    void setAutoSavePeriod(int sutoSavePeriod);
+    void setCurrentLanguageCode(const QString& currentLanguageCode);
+    void setCurrentKeyboardLayout(const QString& keyboardLayout);
     void setIsOSCRemoteControl(bool isOSCRemoteControl);
     void setOscPort(int oscPort);
+    void setIsNeedRestart(bool newIsNeedRestart);
 
 signals:
     void languagesChanged(QVariantList languages);
     void currentLanguageCodeChanged(QString currentLanguageCode);
-    void isTelemetryAllowedChanged(bool isTelemetryAllowed);
-    void isAutoSaveChanged(bool isAutoSave);
+    void currentKeyboardLayoutChanged();
     void isOSCRemoteControlChanged(bool isOSCRemoteControl);
     void oscPortChanged(int oscPort);
-    void autoSavePeriodChanged(int autoSavePeriod);
+
+    void receivingUpdateForCurrentLanguage(int current, int total, QString status);
+    void isNeedRestartChanged();
+
+    void startupModesChanged();
+
+private:
+    muse::Progress m_languageUpdateProgress;
+
+    bool m_isNeedRestart = false;
+
+    struct StartMode
+    {
+        StartupModeType type = StartupModeType::StartWithNewScore;
+        QString title;
+        bool checked = false;
+        bool canSelectScorePath = false;
+        QString scorePath;
+    };
+
+    using StartModeList = QList<StartMode>;
+
+    StartModeList allStartupModes() const;
 };
 }
 

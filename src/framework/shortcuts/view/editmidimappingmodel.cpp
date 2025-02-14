@@ -22,15 +22,15 @@
 
 #include "editmidimappingmodel.h"
 
-#include "log.h"
-#include "utils.h"
 #include "translation.h"
+#include "utils.h"
+#include "log.h"
 
-using namespace mu::shortcuts;
-using namespace mu::midi;
+using namespace muse::shortcuts;
+using namespace muse::midi;
 
 EditMidiMappingModel::EditMidiMappingModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
@@ -58,13 +58,13 @@ QString EditMidiMappingModel::mappingTitle() const
 {
     MidiDeviceID currentMidiInDeviceId = midiInPort()->deviceID();
     if (currentMidiInDeviceId.empty() || !m_event.isValid()) {
-        return qtrc("shortcuts", "Waiting…");
+        return muse::qtrc("shortcuts", "Waiting…");
     }
 
-    return deviceName(currentMidiInDeviceId) + " > " + eventName(m_event);
+    return deviceName(currentMidiInDeviceId) + " > " + m_event.name().toQString();
 }
 
-QVariant EditMidiMappingModel::inputedEvent() const
+QVariant EditMidiMappingModel::inputtedEvent() const
 {
     QVariantMap obj;
     obj["type"] = static_cast<int>(m_event.type);
@@ -74,24 +74,11 @@ QVariant EditMidiMappingModel::inputedEvent() const
 
 QString EditMidiMappingModel::deviceName(const MidiDeviceID& deviceId) const
 {
-    for (const MidiDevice& device : midiInPort()->devices()) {
+    for (const MidiDevice& device : midiInPort()->availableDevices()) {
         if (device.id == deviceId) {
             return QString::fromStdString(device.name);
         }
     }
 
     return QString();
-}
-
-QString EditMidiMappingModel::eventName(const RemoteEvent& event) const
-{
-    QString title;
-
-    if (event.type == RemoteEventType::Note) {
-        return qtrc("shortcuts", "Note ") + QString::fromStdString(pitchToString(event.value));
-    } else if (event.type == RemoteEventType::Controller) {
-        return qtrc("shortcuts", "Controller ") + QString::number(event.value);
-    }
-
-    return qtrc("shortcuts", "None");
 }

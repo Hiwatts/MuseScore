@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,16 +21,14 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Preferences 1.0
 
 import "internal"
 
 PreferencesPage {
     id: root
-
-    contentHeight: content.height
 
     AppearancePreferencesModel {
         id: appearanceModel
@@ -41,32 +39,36 @@ PreferencesPage {
     }
 
     Column {
-        id: content
-
         width: parent.width
         spacing: root.sectionsSpacing
 
         ThemesSection {
-            width: content.width
+            width: parent.width
 
             themes: appearanceModel.highContrastEnabled ? appearanceModel.highContrastThemes : appearanceModel.generalThemes
             currentThemeCode: appearanceModel.currentThemeCode
             highContrastEnabled: appearanceModel.highContrastEnabled
+            isFollowSystemThemeAvailable: appearanceModel.isFollowSystemThemeAvailable
+            isFollowSystemTheme: appearanceModel.isFollowSystemTheme
             accentColors: appearanceModel.accentColors
             currentAccentColorIndex: appearanceModel.currentAccentColorIndex
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
 
-            onThemeChangeRequested: {
+            onThemeChangeRequested: function(newThemeCode) {
                 appearanceModel.currentThemeCode = newThemeCode
             }
 
-            onHighContrastChangeRequested: {
+            onHighContrastChangeRequested: function(enabled) {
                 appearanceModel.highContrastEnabled = enabled
             }
 
-            onAccentColorChangeRequested: {
+            onSetFollowSystemThemeRequested: function(enabled) {
+                appearanceModel.isFollowSystemTheme = enabled
+            }
+
+            onAccentColorChangeRequested: function(newColorIndex) {
                 appearanceModel.currentAccentColorIndex = newColorIndex
             }
 
@@ -76,7 +78,7 @@ PreferencesPage {
                 }
             }
 
-            onEnsureContentVisibleRequested: {
+            onEnsureContentVisibleRequested: function(contentRect) {
                 root.ensureContentVisibleRequested(contentRect)
             }
         }
@@ -88,7 +90,7 @@ PreferencesPage {
         UiColorsSection {
             id: uiColorsSection
 
-            width: content.width
+            width: parent.width
 
             visible: appearanceModel.highContrastEnabled
 
@@ -96,7 +98,7 @@ PreferencesPage {
             //! NOTE: 3 because ThemesSection have two panels
             navigation.order: root.navigationOrderStart + 3
 
-            onColorChangeRequested: {
+            onColorChangeRequested: function(newColor, propertyType) {
                 appearanceModel.setNewColor(newColor, propertyType)
             }
 
@@ -117,11 +119,11 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 4
 
-            onFontChangeRequested: {
+            onFontChangeRequested: function(newFontIndex) {
                 appearanceModel.currentFontIndex = newFontIndex
             }
 
-            onBodyTextSizeChangeRequested: {
+            onBodyTextSizeChangeRequested: function(newBodyTextSize) {
                 appearanceModel.bodyTextSize = newBodyTextSize
             }
 
@@ -139,8 +141,8 @@ PreferencesPage {
 
             width: parent.width
 
-            title: qsTrc("appshell", "Background")
-            wallpaperDialogTitle: qsTrc("appshell", "Choose background wallpaper")
+            title: qsTrc("appshell/preferences", "Background")
+            wallpaperDialogTitle: qsTrc("appshell/preferences", "Choose background wallpaper")
             useColor: appearanceModel.backgroundUseColor
             color: appearanceModel.backgroundColor
             wallpaperPath: appearanceModel.backgroundWallpaperPath
@@ -150,15 +152,15 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 5
 
-            onUseColorChangeRequested: {
+            onUseColorChangeRequested: function(newValue) {
                 appearanceModel.backgroundUseColor = newValue
             }
 
-            onColorChangeRequested: {
+            onColorChangeRequested: function(newColor) {
                 appearanceModel.backgroundColor = newColor
             }
 
-            onWallpaperPathChangeRequested: {
+            onWallpaperPathChangeRequested: function(newWallpaperPath) {
                 appearanceModel.backgroundWallpaperPath = newWallpaperPath
             }
 
@@ -179,8 +181,8 @@ PreferencesPage {
             enabled: !appearanceModel.scoreInversionEnabled
             opacityOverride: paperSettings.enabled ? 1.0 : 0.6
 
-            title: qsTrc("appshell", "Paper")
-            wallpaperDialogTitle: qsTrc("appshell", "Choose Notepaper")
+            title: qsTrc("appshell/preferences", "Paper")
+            wallpaperDialogTitle: qsTrc("appshell/preferences", "Choose notepaper")
             useColor: appearanceModel.foregroundUseColor
             color: appearanceModel.foregroundColor
             wallpaperPath: appearanceModel.foregroundWallpaperPath
@@ -190,15 +192,15 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 6
 
-            onUseColorChangeRequested: {
+            onUseColorChangeRequested: function(newValue) {
                 appearanceModel.foregroundUseColor = newValue
             }
 
-            onColorChangeRequested: {
+            onColorChangeRequested: function(newColor) {
                 appearanceModel.foregroundColor = newColor
             }
 
-            onWallpaperPathChangeRequested: {
+            onWallpaperPathChangeRequested: function(newWallpaperPath) {
                 appearanceModel.foregroundWallpaperPath = newWallpaperPath
             }
 
@@ -218,7 +220,7 @@ PreferencesPage {
             navigation.order: root.navigationOrderStart + 7
 
             onResetThemeToDefaultRequested: {
-                appearanceModel.resetThemeToDefault()
+                appearanceModel.resetAppearancePreferencesToDefault()
             }
 
             onFocusChanged: {
@@ -227,7 +229,7 @@ PreferencesPage {
                 }
             }
 
-            onScoreInversionEnableChangeRequested: {
+            onScoreInversionEnableChangeRequested: function(enable) {
                 appearanceModel.scoreInversionEnabled = enable
             }
         }

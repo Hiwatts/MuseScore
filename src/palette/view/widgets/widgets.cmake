@@ -13,12 +13,14 @@ set(WIDGETS_SRC
     ${CMAKE_CURRENT_LIST_DIR}/keycanvas.h
     ${CMAKE_CURRENT_LIST_DIR}/noteGroups.h
     ${CMAKE_CURRENT_LIST_DIR}/noteGroups.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/notegroupsexampleview.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/notegroupsexampleview.h
     ${CMAKE_CURRENT_LIST_DIR}/symboldialog.h
     ${CMAKE_CURRENT_LIST_DIR}/symboldialog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/specialcharactersdialog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/specialcharactersdialog.h
-    ${CMAKE_CURRENT_LIST_DIR}/editdrumsetdialog.h
-    ${CMAKE_CURRENT_LIST_DIR}/editdrumsetdialog.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/customizekitdialog.h
+    ${CMAKE_CURRENT_LIST_DIR}/customizekitdialog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/drumsetpalette.cpp
     ${CMAKE_CURRENT_LIST_DIR}/drumsetpalette.h
     )
@@ -31,6 +33,6 @@ set (WIDGETS_UI
     ${CMAKE_CURRENT_LIST_DIR}/note_groups.ui
     ${CMAKE_CURRENT_LIST_DIR}/symboldialog.ui
     ${CMAKE_CURRENT_LIST_DIR}/specialcharactersdialog.ui
-    ${CMAKE_CURRENT_LIST_DIR}/editdrumsetdialog.ui
+    ${CMAKE_CURRENT_LIST_DIR}/customizekitdialog.ui
     )
 

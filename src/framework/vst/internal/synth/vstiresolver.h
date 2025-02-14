@@ -20,35 +20,39 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_VST_VSTIRESOLVER_H
-#define MU_VST_VSTIRESOLVER_H
+#ifndef MUSE_VST_VSTIRESOLVER_H
+#define MUSE_VST_VSTIRESOLVER_H
 
 #include <map>
 
 #include "modularity/ioc.h"
 #include "audio/isynthresolver.h"
 
-#include "ivstpluginsregister.h"
-#include "ivstmodulesrepository.h"
+#include "../../ivstinstancesregister.h"
+#include "../../ivstmodulesrepository.h"
 #include "vstsynthesiser.h"
 
-namespace mu::vst {
-class VstiResolver : public audio::synth::ISynthResolver::IResolver
+namespace muse::vst {
+class VstiResolver : public audio::synth::ISynthResolver::IResolver, public Injectable
 {
-    INJECT(vst, IVstModulesRepository, pluginModulesRepo)
-    INJECT(vst, IVstPluginsRegister, pluginsRegister)
+    Inject<IVstModulesRepository> pluginModulesRepo = { this };
+    Inject<IVstInstancesRegister> instancesRegister = { this };
 public:
-    audio::synth::ISynthesizerPtr resolveSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const override;
-    audio::AudioResourceMetaList resolveResources() const override;
+
+    VstiResolver(const modularity::ContextPtr& iocCtx)
+        : Injectable(iocCtx) {}
+
+    muse::audio::synth::ISynthesizerPtr resolveSynth(const muse::audio::TrackId trackId,
+                                                     const muse::audio::AudioInputParams& params) const override;
+    bool hasCompatibleResources(const muse::audio::PlaybackSetupData& setup) const override;
+    muse::audio::AudioResourceMetaList resolveResources() const override;
+    muse::audio::SoundPresetList resolveSoundPresets(const muse::audio::AudioResourceMeta& resourceMeta) const override;
     void refresh() override;
+    void clearSources() override;
 
 private:
-    VstSynthPtr createSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const;
-
-    using SynthPair = std::pair<audio::AudioResourceId, VstSynthPtr>;
-
-    mutable std::map<audio::TrackId, SynthPair> m_synthMap;
+    VstSynthPtr createSynth(const muse::audio::TrackId trackId, const muse::audio::AudioInputParams& params) const;
 };
 }
 
-#endif // MU_VST_VSTIRESOLVER_H
+#endif // MUSE_VST_VSTIRESOLVER_H

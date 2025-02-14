@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,13 +19,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_ENGRAVING_CHORDLIST_H
-#define MU_ENGRAVING_CHORDLIST_H
+#ifndef MU_ENGRAVING_READCHORDLISTHOOK_H
+#define MU_ENGRAVING_READCHORDLISTHOOK_H
 
-#include <functional>
-#include <QString>
+#include "types/string.h"
 
-namespace Ms {
+namespace mu::engraving {
 class XmlReader;
 class Score;
 }
@@ -34,16 +33,16 @@ namespace mu::engraving::compat {
 class ReadChordListHook
 {
 public:
-    ReadChordListHook(Ms::Score* score);
+    ReadChordListHook(Score* score);
 
-    void read(Ms::XmlReader& e);
+    void read(XmlReader& e);
     void validate();
 
 private:
-    Ms::Score* m_score = nullptr;
+    Score* m_score = nullptr;
     bool m_chordListTag = false;
-    QString m_oldChordDescriptionFile;
+    muse::String m_oldChordDescriptionFile;
 };
 }
 
-#endif // MU_ENGRAVING_CHORDLIST_H
+#endif // MU_ENGRAVING_READCHORDLISTHOOK_H

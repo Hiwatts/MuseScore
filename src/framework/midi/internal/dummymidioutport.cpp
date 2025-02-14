@@ -24,13 +24,14 @@
 #include "log.h"
 #include "midierrors.h"
 
-using namespace mu::midi;
+using namespace muse;
+using namespace muse::midi;
 
 void DummyMidiOutPort::init()
 {
 }
 
-MidiDeviceList DummyMidiOutPort::devices() const
+MidiDeviceList DummyMidiOutPort::availableDevices() const
 {
     MidiDevice d;
     d.id = "dummy";
@@ -38,12 +39,12 @@ MidiDeviceList DummyMidiOutPort::devices() const
     return { d };
 }
 
-mu::async::Notification DummyMidiOutPort::devicesChanged() const
+async::Notification DummyMidiOutPort::availableDevicesChanged() const
 {
     return {};
 }
 
-mu::Ret DummyMidiOutPort::connect(const MidiDeviceID& deviceID)
+Ret DummyMidiOutPort::connect(const MidiDeviceID& deviceID)
 {
     LOGI() << "deviceID: " << deviceID;
     m_connectedDeviceID = deviceID;
@@ -66,7 +67,12 @@ MidiDeviceID DummyMidiOutPort::deviceID() const
     return m_connectedDeviceID;
 }
 
-mu::Ret DummyMidiOutPort::sendEvent(const Event& e)
+bool DummyMidiOutPort::supportsMIDI20Output() const
+{
+    return false;
+}
+
+Ret DummyMidiOutPort::sendEvent(const Event& e)
 {
     if (!isConnected()) {
         return make_ret(Err::MidiNotConnected);

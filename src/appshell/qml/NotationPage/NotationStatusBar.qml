@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,32 +21,32 @@
  */
 import QtQuick 2.15
 import QtQuick.Window 2.15
+import QtQuick.Layouts 1.15
 
 import MuseScore.AppShell 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 import MuseScore.NotationScene 1.0
+import MuseScore.Playback 1.0
 
-Rectangle {
+Item {
     id: root
-
-    color: ui.theme.backgroundPrimaryColor
 
     NotationStatusBarModel {
         id: model
     }
 
-    NavigationSection {
+    property NavigationSection navigationSection: NavigationSection {
         id: navSec
         name: "NotationStatusBar"
-        enabled: root.visible
-        order: 7
+        enabled: root.enabled && root.visible
+        order: 8
     }
 
     NavigationPanel {
         id: navPanel
         name: "NotationStatusBar"
-        enabled: root.visible
+        enabled: root.enabled && root.visible
         order: 0
         direction: NavigationPanel.Horizontal
         section: navSec
@@ -56,21 +56,7 @@ Rectangle {
         model.load()
     }
 
-    StyledTextLabel {
-        anchors.left: parent.left
-        anchors.leftMargin: 12
-        anchors.right: statusBarRow.left
-        anchors.rightMargin: 12
-        anchors.verticalCenter: parent.verticalCenter
-
-        horizontalAlignment: Text.AlignLeft
-
-        text: model.accessibilityInfo
-
-        visible: !hiddenControlsMenuButton.visible
-    }
-
-    Row {
+    RowLayout {
         id: statusBarRow
 
         //! TODO: hiding of controls is disabled because there is a bug
@@ -79,20 +65,51 @@ Rectangle {
         //property int remainingSpace: Window.window ? Window.window.width - (viewModeControl.width + zoomControl.width + eps) : 0
         property int remainingSpace: 999999
 
+        anchors.left: parent.left
+        anchors.leftMargin: 12
         anchors.right: parent.right
-        anchors.rightMargin: hiddenControlsMenuButton.visible ? 4 : 12
+        anchors.rightMargin: 4
 
         height: parent.height
 
-        spacing: 10
+        spacing: 4
+
+        PlaybackLoadingInfo {
+            id: playbackLoadingInfo
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
+            Layout.preferredWidth: 312
+
+            onStarted: {
+                visible = true
+            }
+
+            onFinished: {
+                visible = false
+            }
+        }
+
+        SeparatorLine { orientation: Qt.Vertical; visible: playbackLoadingInfo.visible }
+
+        StyledTextLabel {
+            id: accessibiityInfo
+            Layout.alignment: Qt.AlignVCenter
+            Layout.fillWidth: true
+
+            text: model.accessibilityInfo
+            horizontalAlignment: Text.AlignLeft
+
+            visible: !hiddenControlsMenuButton.visible
+        }
 
         SeparatorLine { orientation: Qt.Vertical; visible: workspaceControl.visible }
 
         FlatButton {
             id: workspaceControl
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
 
-            text: model.currentWorkspaceAction.title
+            text: model.currentWorkspaceItem.title
             transparent: true
             visible: statusBarRow.remainingSpace > width + concertPitchControl.width
 
@@ -108,12 +125,13 @@ Rectangle {
 
         ConcertPitchControl {
             id: concertPitchControl
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
 
-            text: model.concertPitchAction.title
-            icon: model.concertPitchAction.icon
-            checked: model.concertPitchAction.checked
-            enabled: model.concertPitchAction.enabled
+            text: model.concertPitchItem.title
+            icon: model.concertPitchItem.icon
+            checked: model.concertPitchItem.checked
+            enabled: model.concertPitchItem.enabled
             visible: statusBarRow.remainingSpace > width
 
             navigation.panel: navPanel
@@ -128,7 +146,8 @@ Rectangle {
 
         ViewModeControl {
             id: viewModeControl
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
 
             currentViewMode: model.currentViewMode
             availableViewModeList: model.availableViewModeList
@@ -136,15 +155,15 @@ Rectangle {
             navigation.panel: navPanel
             navigation.order: 3
 
-            onChangeCurrentViewModeRequested: {
+            onChangeCurrentViewModeRequested: function(newViewMode) {
                 model.setCurrentViewMode(newViewMode)
             }
         }
 
         ZoomControl {
             id: zoomControl
-
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: 28
 
             enabled: model.zoomEnabled
             currentZoomPercentage: model.currentZoomPercentage
@@ -155,11 +174,11 @@ Rectangle {
             navigationPanel: navPanel
             navigationOrderMin: 4
 
-            onChangeZoomPercentageRequested: {
+            onChangeZoomPercentageRequested: function(newZoomPercentage) {
                 model.currentZoomPercentage = newZoomPercentage
             }
 
-            onChangeZoomRequested: {
+            onChangeZoomRequested: function(zoomId) {
                 model.setCurrentZoom(zoomId)
             }
 
@@ -177,7 +196,7 @@ Rectangle {
         MenuButton {
             id: hiddenControlsMenuButton
 
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.alignment: Qt.AlignVCenter
 
             visible: !concertPitchControl.visible ||
                      !workspaceControl.visible
@@ -189,23 +208,23 @@ Rectangle {
                 var result = []
 
                 if (!concertPitchControl.visible) {
-                    result.push(model.concertPitchAction)
+                    result.push(model.concertPitchItem)
                 }
 
                 if (!workspaceControl.visible) {
-                    result.push(model.currentWorkspaceAction)
+                    result.push(model.currentWorkspaceItem)
                 }
 
                 return result
             }
 
-            onHandleMenuItem: {
+            onHandleMenuItem: function(itemId) {
                 switch (itemId) {
-                case model.concertPitchAction.id:
-                    model.handleAction(model.concertPitchAction.code)
+                case model.concertPitchItem.id:
+                    model.handleAction(model.concertPitchItem.code)
                     break
-                case model.currentWorkspaceAction.id:
-                    model.handleAction(model.concertPitchAction.code)
+                case model.currentWorkspaceItem.id:
+                    model.handleAction(model.concertPitchItem.code)
                     break
                 }
             }

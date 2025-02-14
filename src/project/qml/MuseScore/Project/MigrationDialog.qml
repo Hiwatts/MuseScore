@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,166 +20,193 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
+import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Project 1.0
 
+import "internal/Migration"
+
 StyledDialogView {
-    id: dialog
+    id: root
+    modal: true
 
-    title: "" // will be set when open
+    //! TODO: After setting title the accessibility for this dialog on VoiceOver stops working
+    //title: qsTrc("project/migration", "Style improvements")
 
-    property string version: "?"
-    property bool isApplyLeland: false
-    property bool isApplyEdwin: false
+    property string appVersion: ""
+    property int migrationType: MigrationType.Unknown
+
+    property bool isApplyLeland: true
+    property bool isApplyEdwin: true
+    property bool isRemapPercussion: true
     property bool isAskAgain: true
 
-    contentWidth: 600
-    contentHeight: 600
+    contentHeight: {
+        switch (root.migrationType) {
+        case MigrationType.Pre_3_6: return 533 // 517 just fits, then add 16
+        case MigrationType.Ver_3_6: return 271 // 255 just fits, then add 16
+        case MigrationType.Unknown: return 0
+        }
+        return 600
+    }
 
-    modal: true
+    contentWidth: {
+        switch (root.migrationType) {
+        case MigrationType.Pre_3_6: return 590
+        case MigrationType.Ver_3_6: return 491
+        case MigrationType.Unknown: return 0
+        }
+        return 600
+    }
+
+    //! NOTE Different dialogs for different migration versions
+    onOpened: {
+        switch(root.migrationType) {
+        case MigrationType.Pre_3_6:
+            loader.sourceComponent = migrCompPre362
+            break;
+        case MigrationType.Ver_3_6:
+            isApplyLeland = false
+            isApplyEdwin = false
+            loader.sourceComponent = migrComp362
+            break;
+        default:
+            console.assert(false, "Wrong migration type!")
+        }
+    }
 
     function makeRet(isApply) {
         var ret = {
             errcode: 0,
             value: {
                 isApplyMigration: isApply,
-                isAskAgain: dialog.isAskAgain,
-                isApplyLeland: dialog.isApplyLeland,
-                isApplyEdwin: dialog.isApplyEdwin
+                isAskAgain: root.isAskAgain,
+                isApplyLeland: root.isApplyLeland,
+                isApplyEdwin: root.isApplyEdwin,
+                isRemapPercussion: root.isRemapPercussion,
             }
         }
 
         return ret
     }
 
-    Item {
-        id: content
+    function watchVideo() {
+        Qt.openUrlExternally("https://youtu.be/U7dagae87eM")
+    }
+
+    ColumnLayout {
+        spacing: 0
         anchors.fill: parent
-        anchors.margins: 16
 
-        StyledTextLabel {
-            id: headerLabel
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 36
+        Loader {
+            id: loader
 
-            font.bold: true
-            font.pixelSize: 20
-            horizontalAlignment: Qt.AlignHCenter
-            verticalAlignment: Qt.AlignVCenter
+            Layout.fillWidth: true
+            Layout.margins: 20
 
-            text: qsTrc("project", "Would you like to try our improved score style?")
+            onLoaded: {
+                item.activateNavigation()
+            }
         }
 
-        Image {
-            id: imageItem
-            anchors.top: headerLabel.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 200
-            fillMode: Image.PreserveAspectFit
-            source: "migration.png"
-        }
+        SeparatorLine { }
 
-        CheckBox {
-            id: lelandOption
-            anchors.top: imageItem.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 24
-            text: qsTrc("project", "Our new professional notation font, Leland")
-            checked: dialog.isApplyLeland
-            onClicked: dialog.isApplyLeland = !dialog.isApplyLeland
-        }
-
-        CheckBox {
-            id: edwinOption
-            anchors.top: lelandOption.bottom
-            anchors.left: parent.left
-            anchors.topMargin: 16
-            text: qsTrc("project", "Our improved text font, Edwin")
-            checked: dialog.isApplyEdwin
-            onClicked: dialog.isApplyEdwin = !dialog.isApplyEdwin
-        }
-
-        StyledTextLabel {
-            id: versionLabel
-            anchors.top: edwinOption.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.topMargin: 32
-            font.pixelSize: 14
-            horizontalAlignment: Qt.AlignLeft
-            verticalAlignment: Qt.AlignVCenter
-
-            text: qsTrc("project", "Since this file was created in MuseScore %1, some layout changes may occur.").arg(dialog.version)
-        }
-
-        StyledTextLabel {
-            id: linkLabel
-            anchors.top: versionLabel.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.topMargin: 16
-            font.pixelSize: 14
-            horizontalAlignment: Qt.AlignLeft
-            verticalAlignment: Qt.AlignVCenter
-
-            text: "<a href=\"%1\">%2</a>"
-            .arg(Qt.locale().name === "zh_CN" ? "https://www.bilibili.com/video/BV1FT4y1K7UM" : "https://youtu.be/qLR40BGNy68")
-            .arg(qsTr("Watch our release video to learn more"))
-        }
-
-        Item {
+        RowLayout {
             id: footer
 
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 112
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 2
-                color: ui.theme.buttonColor
-            }
+            Layout.leftMargin: 20
+            Layout.rightMargin: 20
+            Layout.topMargin: 16
+            Layout.bottomMargin: 16
 
             CheckBox {
                 id: askAgain
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.topMargin: 16
-                text: qsTrc("project", "Remember my choice and don't ask again")
-                checked: !dialog.isAskAgain
-                onClicked: dialog.isAskAgain = !dialog.isAskAgain
-            }
+                text: qsTrc("global", "Don’t ask again")
+                checked: !root.isAskAgain
 
-            FlatButton {
-                anchors.right: applyBtn.left
-                anchors.bottom: parent.bottom
-                anchors.margins: 16
-                text: qsTrc("project", "Keep old style")
+                navigation.panel: buttonBox.navigationPanel
+                navigation.column: 100
+
                 onClicked: {
-                    dialog.ret = dialog.makeRet(false)
-                    dialog.hide()
+                    root.isAskAgain = checked // not `!checked` because the negation is in `checked: !dialog.isAskAgain`
                 }
             }
 
-            FlatButton {
-                id: applyBtn
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.margins: 16
-                text: qsTrc("project", "Apply new style")
-                enabled: dialog.isApplyLeland || dialog.isApplyEdwin
-                onClicked: {
-                    dialog.ret = dialog.makeRet(true)
-                    dialog.hide()
+            ButtonBox {
+                id: buttonBox
+                buttons: [ ButtonBoxModel.Ok ]
+
+                Layout.fillWidth: true
+
+                navigationPanel.section: root.navigationSection
+                navigationPanel.order: 1
+
+                onStandardButtonClicked: function(buttonId) {
+                    if (buttonId === ButtonBoxModel.Ok) {
+                        root.ret = root.makeRet(true)
+                        root.hide()
+                    }
                 }
             }
         }
     }
+
+    //! NOTE for 3.6.2
+    Component {
+        id: migrComp362
+
+        MigrationContentFor362 {
+            appVersion: root.appVersion
+            isRemapPercussion: root.isRemapPercussion
+
+            anchors.fill: parent
+
+            navigationPanel.section: root.navigationSection
+            navigationPanel.order: 2
+
+            onIsRemapPercussionChangeRequested: function(remapPercussion) {
+                root.isRemapPercussion = remapPercussion
+            }
+
+            onWatchVideoRequested: {
+                root.watchVideo()
+            }
+        }
+    }
+
+    //! NOTE for pre-3.6.2 files
+    Component {
+        id: migrCompPre362
+
+        MigrationContentForPre362 {
+            appVersion: root.appVersion
+            isApplyLeland: root.isApplyLeland
+            isApplyEdwin: root.isApplyEdwin
+            isRemapPercussion: root.isRemapPercussion
+
+            anchors.fill: parent
+
+            navigationPanel.section: root.navigationSection
+            navigationPanel.order: 2
+
+            onIsApplyLelandChangeRequested: function(applyLeland) {
+                root.isApplyLeland = applyLeland
+            }
+
+            onIsApplyEdwinChangeRequested: function(applyEdwin) {
+                root.isApplyEdwin = applyEdwin
+            }
+
+            onIsRemapPercussionChangeRequested: function(remapPercussion) {
+                root.isRemapPercussion = remapPercussion
+            }
+
+            onWatchVideoRequested: {
+                root.watchVideo()
+            }
+        }
+    }
 }
+

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,74 +21,38 @@
  */
 import QtQuick 2.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+
 import MuseScore.NotationScene 1.0
 
-Rectangle {
+StyledToolBarView {
     id: root
 
-    property alias navigation: navPanel
+    navigationPanel.name: "UndoRedoToolBar"
+    navigationPanel.accessible.name: qsTrc("notation", "Undo redo toolbar")
 
-    color: ui.theme.backgroundPrimaryColor
+    spacing: 0
+    padding: 6
 
-    Component.onCompleted: {
-        model.load()
-    }
+    model: UndoRedoToolbarModel { }
 
-    NavigationPanel {
-        id: navPanel
-        name: "UndoRedoToolBar"
-        enabled: root.enabled && root.visible
-        accessible.name: qsTrc("notation", "Undo Redo toolbar")
-    }
-
-    UndoRedoModel {
-        id: model
-    }
-
-    Row {
-        anchors.centerIn: parent
-
-        height: childrenRect.height
-        spacing: 2
-
-        FlatButton {
-            icon: model.undoItem.icon
-            iconFont: ui.theme.toolbarIconsFont
-
-            toolTipTitle: model.undoItem.title
-            toolTipDescription: model.undoItem.description
-            toolTipShortcut: model.undoItem.shortcut
-
-            enabled: model.undoItem.enabled
-            transparent: true
-
-            navigation.panel: navPanel
-            navigation.order: 1
-
-            onClicked: {
-                model.undo()
-            }
+    sourceComponentCallback: function(type) {
+        switch(type) {
+        case ToolBarItemType.ACTION: return controlComp
         }
 
-        FlatButton {
-            icon: model.redoItem.icon
-            iconFont: ui.theme.toolbarIconsFont
+        return null
+    }
 
-            toolTipTitle: model.redoItem.title
-            toolTipDescription: model.redoItem.description
-            toolTipShortcut: model.redoItem.shortcut
+    Component {
+        id: controlComp
 
-            enabled: model.redoItem.enabled
-            transparent: true
+        StyledToolBarItem {
+            width: 30
+            height: width
 
-            navigation.panel: navPanel
-            navigation.order: 2
-
-            onClicked: {
-                model.redo()
-            }
+            navigation.panel: root.navigationPanel
+            navigation.order: model.index
         }
     }
 }

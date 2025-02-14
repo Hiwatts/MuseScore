@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,20 +21,25 @@
  */
 #include "readstyle.h"
 
+#include "types/constants.h"
+
 #include "style/defaultstyle.h"
 #include "style/style.h"
-#include "io/xml.h"
 
-#include "libmscore/masterscore.h"
+#include "rw/xmlreader.h"
+
+#include "dom/masterscore.h"
 
 #include "readchordlisthook.h"
 
 #include "log.h"
 
+using namespace mu;
+using namespace muse;
 using namespace mu::engraving::compat;
-using namespace Ms;
+using namespace mu::engraving;
 
-static int readStyleDefaultsVersion(MasterScore* score, const QByteArray& scoreData, const QString& completeBaseName)
+static int readStyleDefaultsVersion(MasterScore* score, const ByteArray& scoreData, const String& completeBaseName)
 {
     XmlReader e(scoreData);
     e.setDocName(completeBaseName);
@@ -49,18 +54,23 @@ static int readStyleDefaultsVersion(MasterScore* score, const QByteArray& scoreD
     return ReadStyleHook::styleDefaultByMscVersion(score->mscVersion());
 }
 
-ReadStyleHook::ReadStyleHook(Ms::Score* score, const QByteArray& scoreData, const QString& completeBaseName)
+ReadStyleHook::ReadStyleHook(Score* score, const ByteArray& scoreData, const String& completeBaseName)
     : m_score(score), m_scoreData(scoreData), m_completeBaseName(completeBaseName)
 {
 }
 
 int ReadStyleHook::styleDefaultByMscVersion(const int mscVer)
 {
+    constexpr int LEGACY_MSC_VERSION_V400 = 400;
+    constexpr int LEGACY_MSC_VERSION_V302 = 302;
     constexpr int LEGACY_MSC_VERSION_V3 = 301;
     constexpr int LEGACY_MSC_VERSION_V2 = 206;
     constexpr int LEGACY_MSC_VERSION_V1 = 114;
 
-    if (mscVer > LEGACY_MSC_VERSION_V2 && mscVer < MSCVERSION) {
+    if (mscVer > LEGACY_MSC_VERSION_V3 && mscVer < LEGACY_MSC_VERSION_V400) {
+        return LEGACY_MSC_VERSION_V302;
+    }
+    if (mscVer > LEGACY_MSC_VERSION_V2 && mscVer <= LEGACY_MSC_VERSION_V3) {
         return LEGACY_MSC_VERSION_V3;
     }
 
@@ -72,7 +82,7 @@ int ReadStyleHook::styleDefaultByMscVersion(const int mscVer)
         return LEGACY_MSC_VERSION_V1;
     }
 
-    return MSCVERSION;
+    return Constants::MSC_VERSION;
 }
 
 void ReadStyleHook::setupDefaultStyle()
@@ -81,22 +91,18 @@ void ReadStyleHook::setupDefaultStyle()
         return;
     }
 
-    if (m_score->created() && DefaultStyle::isHasDefaultStyle()) {
-        m_score->setStyle(DefaultStyle::defaultStyle());
+    int defaultsVersion = -1;
+    if (m_score->isMaster()) {
+        defaultsVersion = readStyleDefaultsVersion(m_score->masterScore(), m_scoreData, m_completeBaseName);
     } else {
-        int defaultsVersion = -1;
-        if (m_score->isMaster()) {
-            defaultsVersion = readStyleDefaultsVersion(m_score->masterScore(), m_scoreData, m_completeBaseName);
-        } else {
-            defaultsVersion = m_score->masterScore()->style().defaultStyleVersion();
-        }
-
-        m_score->setStyle(DefaultStyle::resolveStyleDefaults(defaultsVersion));
-        m_score->style().setDefaultStyleVersion(defaultsVersion);
+        defaultsVersion = m_score->masterScore()->style().defaultStyleVersion();
     }
+
+    m_score->setStyle(DefaultStyle::resolveStyleDefaults(defaultsVersion));
+    m_score->style().setDefaultStyleVersion(defaultsVersion);
 }
 
-void ReadStyleHook::setupDefaultStyle(Ms::Score* score)
+void ReadStyleHook::setupDefaultStyle(Score* score)
 {
     IF_ASSERT_FAILED(!score->isMaster()) {
         return;
@@ -107,18 +113,18 @@ void ReadStyleHook::setupDefaultStyle(Ms::Score* score)
     score->style().setDefaultStyleVersion(defaultsVersion);
 }
 
-void ReadStyleHook::readStyleTag(Ms::XmlReader& e)
+void ReadStyleHook::readStyleTag(XmlReader& e)
 {
     readStyleTag(m_score, e);
 }
 
-void ReadStyleHook::readStyleTag(Ms::Score* score, Ms::XmlReader& e)
+void ReadStyleHook::readStyleTag(Score* score, XmlReader& e)
 {
     ReadChordListHook clhook(score);
     score->style().read(e, &clhook);
 }
 
-bool ReadStyleHook::readStyleProperties(Ms::MStyle* style, Ms::XmlReader& e)
+bool ReadStyleHook::readStyleProperties(MStyle* style, XmlReader& e)
 {
     return style->readProperties(e);
 }

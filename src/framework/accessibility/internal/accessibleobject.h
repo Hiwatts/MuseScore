@@ -19,13 +19,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_ACCESSIBILITY_ACCESSIBLEOBJECT_H
-#define MU_ACCESSIBILITY_ACCESSIBLEOBJECT_H
+#ifndef MUSE_ACCESSIBILITY_ACCESSIBLEOBJECT_H
+#define MUSE_ACCESSIBILITY_ACCESSIBLEOBJECT_H
 
 #include <QObject>
+#include <QAccessibleInterface>
+
 #include "../iaccessible.h"
 
-namespace mu::accessibility {
+namespace muse::accessibility {
 class AccessibilityController;
 class AccessibleObject : public QObject
 {
@@ -33,15 +35,17 @@ class AccessibleObject : public QObject
 public:
     explicit AccessibleObject(IAccessible* item);
 
-    void setController(std::shared_ptr<AccessibilityController> controller);
-    const std::shared_ptr<AccessibilityController>& controller() const;
+    static QAccessibleInterface* accessibleInterface(QObject* object);
+
+    void setController(std::weak_ptr<AccessibilityController> controller);
+    const std::weak_ptr<AccessibilityController>& controller() const;
 
     IAccessible* item() const;
 
 private:
     IAccessible* m_item = nullptr;
-    std::shared_ptr<AccessibilityController> m_controller;
+    std::weak_ptr<AccessibilityController> m_controller;
 };
 }
 
-#endif // MU_ACCESSIBILITY_ACCESSIBLEOBJECT_H
+#endif // MUSE_ACCESSIBILITY_ACCESSIBLEOBJECT_H

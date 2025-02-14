@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,16 +22,60 @@
 
 #include "audioexportconfiguration.h"
 
+#include "settings.h"
+
+using namespace muse;
+using namespace mu;
 using namespace mu::iex::audioexport;
+using namespace muse::audio;
 
-static constexpr int DEFAULT_BITRATE = 128;
+static const Settings::Key EXPORT_SAMPLE_RATE_KEY("iex_audioexport", "export/audio/sampleRate");
+static const Settings::Key EXPORT_MP3_BITRATE("iex_audioexport", "export/audio/mp3Bitrate");
 
-int AudioExportConfiguration::exportMp3Bitrate()
+void AudioExportConfiguration::init()
 {
-    return m_exportMp3Bitrate ? m_exportMp3Bitrate.value() : DEFAULT_BITRATE;
+    settings()->setDefaultValue(EXPORT_SAMPLE_RATE_KEY, Val(44100));
+    settings()->setDefaultValue(EXPORT_MP3_BITRATE, Val(128));
 }
 
-void AudioExportConfiguration::setExportMp3Bitrate(std::optional<int> bitrate)
+int AudioExportConfiguration::exportMp3Bitrate() const
 {
-    m_exportMp3Bitrate = bitrate;
+    return m_exportMp3BitrateOverride ? m_exportMp3BitrateOverride.value() : settings()->value(EXPORT_MP3_BITRATE).toInt();
+}
+
+void AudioExportConfiguration::setExportMp3Bitrate(int bitrate)
+{
+    settings()->setSharedValue(EXPORT_MP3_BITRATE, Val(bitrate));
+}
+
+void AudioExportConfiguration::setExportMp3BitrateOverride(std::optional<int> bitrate)
+{
+    m_exportMp3BitrateOverride = bitrate;
+}
+
+const std::vector<int>& AudioExportConfiguration::availableMp3BitRates() const
+{
+    static const std::vector<int> rates { 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, };
+    return rates;
+}
+
+int AudioExportConfiguration::exportSampleRate() const
+{
+    return settings()->value(EXPORT_SAMPLE_RATE_KEY).toInt();
+}
+
+void AudioExportConfiguration::setExportSampleRate(int rate)
+{
+    settings()->setSharedValue(EXPORT_SAMPLE_RATE_KEY, Val(rate));
+}
+
+const std::vector<int>& AudioExportConfiguration::availableSampleRates() const
+{
+    static const std::vector<int> rates { 32000, 44100, 48000 };
+    return rates;
+}
+
+samples_t AudioExportConfiguration::exportBufferSize() const
+{
+    return 4096;
 }

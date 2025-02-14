@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,25 +23,44 @@
 #define MU_NOTATION_NOTATIONNAVIGATOR_H
 
 #include <QObject>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QQuickPaintedItem>
 
+#include "draw/types/geometry.h"
 #include "modularity/ioc.h"
-#include "async/asyncable.h"
 #include "inotationconfiguration.h"
 #include "context/iglobalcontext.h"
 #include "ui/iuiconfiguration.h"
 #include "engraving/iengravingconfiguration.h"
-#include "notationpaintview.h"
+#include "abstractnotationpaintview.h"
 
 namespace mu::notation {
-class NotationNavigator : public NotationPaintView
+class NotationNavigatorCursorView : public QQuickPaintedItem, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(notation, context::IGlobalContext, globalContext)
-    INJECT(notation, INotationConfiguration, configuration)
-    INJECT(notation, ui::IUiConfiguration, uiConfiguration)
-    INJECT(notation, engraving::IEngravingConfiguration, engravingConfiguration)
+    muse::Inject<INotationConfiguration> configuration = { this };
+
+public:
+    NotationNavigatorCursorView(QQuickItem* parent = nullptr);
+
+    void setRect(const muse::RectF& cursorRect);
+
+private:
+    virtual void paint(QPainter* painter) override;
+
+    muse::RectF m_cursorRect;
+};
+
+class NotationNavigator : public AbstractNotationPaintView
+{
+    Q_OBJECT
+
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<INotationConfiguration> configuration = { this };
+    muse::Inject<muse::ui::IUiConfiguration> uiConfiguration = { this };
+    muse::Inject<engraving::IEngravingConfiguration> engravingConfiguration = { this };
 
     Q_PROPERTY(int orientation READ orientation NOTIFY orientationChanged)
 
@@ -49,12 +68,12 @@ public:
     NotationNavigator(QQuickItem* parent = nullptr);
 
     Q_INVOKABLE void load();
-    Q_INVOKABLE void setCursorRect(const QRect& rect);
+    Q_INVOKABLE void setCursorRect(const QRectF& rect);
 
     int orientation() const;
 
 signals:
-    void moveNotationRequested(int dx, int dy);
+    void moveNotationRequested(qreal dx, qreal dy);
     void orientationChanged();
 
 private:
@@ -68,23 +87,23 @@ private:
     void rescale();
 
     void paint(QPainter* painter) override;
+    void onViewSizeChanged() override;
 
     void wheelEvent(QWheelEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
 
-    void paintCursor(QPainter* painter);
     void paintPageNumbers(QPainter* painter);
 
-    void moveCanvasToRect(const QRect& viewRect);
+    bool moveCanvasToRect(const muse::RectF& viewRect);
 
     bool isVerticalOrientation() const;
 
-    QRectF notationContentRect() const;
     PageList pages() const;
 
-    QRect m_cursorRect;
-    PointF m_startMove;
+    muse::RectF m_cursorRect;
+    NotationNavigatorCursorView* m_cursorRectView = nullptr;
+    muse::PointF m_startMove;
 };
 }
 

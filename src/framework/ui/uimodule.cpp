@@ -21,11 +21,13 @@
  */
 #include "uimodule.h"
 
-#include <QtQml>
+#include <QQmlEngine>
+#include <QFontDatabase>
 
 #include "modularity/ioc.h"
 
 #include "internal/uiengine.h"
+#include "internal/mainwindow.h"
 #include "internal/uiconfiguration.h"
 #include "internal/interactiveuriregister.h"
 #include "internal/uiactionsregister.h"
@@ -34,14 +36,19 @@
 
 #ifdef Q_OS_MAC
 #include "internal/platform/macos/macosplatformtheme.h"
-#include "view/platform/macos/macosmainwindowprovider.h"
+#include "view/platform/macos/macosmainwindowbridge.h"
 #elif defined(Q_OS_WIN)
 #include "internal/platform/windows/windowsplatformtheme.h"
-#include "view/mainwindowprovider.h"
+#include "view/mainwindowbridge.h"
+#elif defined(Q_OS_LINUX)
+#include "internal/platform/linux/linuxplatformtheme.h"
+#include "view/mainwindowbridge.h"
 #else
 #include "internal/platform/stub/stubplatformtheme.h"
-#include "view/mainwindowprovider.h"
+#include "view/mainwindowbridge.h"
 #endif
+
+#include "internal/uiengine.h"
 
 #include "view/qmltooltip.h"
 #include "view/iconcodes.h"
@@ -54,24 +61,20 @@
 #include "view/qmlaccessible.h"
 #include "view/focuslistener.h"
 
+#include "view/internal/errordetailsmodel.h"
+#include "view/internal/progressdialogmodel.h"
+
+#include "global/api/iapiregister.h"
+#include "api/navigationapi.h"
+#include "api/keyboardapi.h"
+
 #include "dev/interactivetestsmodel.h"
 #include "dev/testdialog.h"
 
-using namespace mu::ui;
-using namespace mu::modularity;
+#include "log.h"
 
-static std::shared_ptr<UiConfiguration> s_configuration = std::make_shared<UiConfiguration>();
-static std::shared_ptr<UiActionsRegister> s_uiactionsRegister = std::make_shared<UiActionsRegister>();
-static std::shared_ptr<NavigationController> s_keyNavigationController = std::make_shared<NavigationController>();
-static std::shared_ptr<NavigationUiActions> s_keyNavigationUiActions = std::make_shared<NavigationUiActions>();
-
-#ifdef Q_OS_MAC
-static std::shared_ptr<MacOSPlatformTheme> s_platformTheme = std::make_shared<MacOSPlatformTheme>();
-#elif defined(Q_OS_WIN)
-static std::shared_ptr<WindowsPlatformTheme> s_platformTheme = std::make_shared<WindowsPlatformTheme>();
-#else
-static std::shared_ptr<StubPlatformTheme> s_platformTheme = std::make_shared<StubPlatformTheme>();
-#endif
+using namespace muse::ui;
+using namespace muse::modularity;
 
 static void ui_init_qrc()
 {
@@ -85,26 +88,55 @@ std::string UiModule::moduleName() const
 
 void UiModule::registerExports()
 {
-    ioc()->registerExport<IUiConfiguration>(moduleName(), s_configuration);
-    ioc()->registerExportNoDelete<IUiEngine>(moduleName(), UiEngine::instance());
-    ioc()->registerExport<IInteractiveProvider>(moduleName(), UiEngine::instance()->interactiveProvider());
+    m_uiengine = std::make_shared<UiEngine>(iocContext());
+    m_configuration = std::make_shared<UiConfiguration>(iocContext());
+    m_uiactionsRegister = std::make_shared<UiActionsRegister>(iocContext());
+    m_keyNavigationController = std::make_shared<NavigationController>(iocContext());
+    m_keyNavigationUiActions = std::make_shared<NavigationUiActions>();
+
+    #ifdef Q_OS_MAC
+    m_platformTheme = std::make_shared<MacOSPlatformTheme>();
+    #elif defined(Q_OS_WIN)
+    m_platformTheme = std::make_shared<WindowsPlatformTheme>();
+    #elif defined(Q_OS_LINUX)
+    m_platformTheme = std::make_shared<LinuxPlatformTheme>();
+    #else
+    m_platformTheme = std::make_shared<StubPlatformTheme>();
+    #endif
+
+    ioc()->registerExport<IUiConfiguration>(moduleName(), m_configuration);
+    ioc()->registerExport<IUiEngine>(moduleName(), m_uiengine);
+    ioc()->registerExport<IMainWindow>(moduleName(), new MainWindow());
+    ioc()->registerExport<IInteractiveProvider>(moduleName(), m_uiengine->interactiveProvider());
     ioc()->registerExport<IInteractiveUriRegister>(moduleName(), new InteractiveUriRegister());
-    ioc()->registerExport<IPlatformTheme>(moduleName(), s_platformTheme);
-    ioc()->registerExport<IUiActionsRegister>(moduleName(), s_uiactionsRegister);
-    ioc()->registerExport<INavigationController>(moduleName(), s_keyNavigationController);
+    ioc()->registerExport<IPlatformTheme>(moduleName(), m_platformTheme);
+    ioc()->registerExport<IUiActionsRegister>(moduleName(), m_uiactionsRegister);
+    ioc()->registerExport<INavigationController>(moduleName(), m_keyNavigationController);
 }
 
 void UiModule::resolveImports()
 {
     auto ar = ioc()->resolve<IUiActionsRegister>(moduleName());
     if (ar) {
-        ar->reg(s_keyNavigationUiActions);
+        ar->reg(m_keyNavigationUiActions);
     }
 
-    auto ir = modularity::ioc()->resolve<IInteractiveUriRegister>(moduleName());
+    auto ir = ioc()->resolve<IInteractiveUriRegister>(moduleName());
     if (ir) {
-        ir->registerWidgetUri(Uri("musescore://devtools/interactive/testdialog"), TestDialog::static_metaTypeId());
-        ir->registerQmlUri(Uri("musescore://devtools/interactive/sample"), "DevTools/Interactive/SampleDialog.qml");
+        ir->registerWidgetUri<TestDialog>(Uri("muse://devtools/interactive/testdialog"));
+        ir->registerQmlUri(Uri("muse://devtools/interactive/sample"), "DevTools/Interactive/SampleDialog.qml");
+    }
+}
+
+void UiModule::registerApi()
+{
+    using namespace muse::api;
+
+    auto api = ioc()->resolve<IApiRegister>(moduleName());
+    if (api) {
+        api->regApiCreator(moduleName(), "api.navigation", new ApiCreator<muse::api::NavigationApi>());
+        api->regApiCreator(moduleName(), "api.keyboard", new ApiCreator<muse::api::KeyboardApi>());
+        api->regApiSingltone(moduleName(), "api.theme", m_uiengine->theme());
     }
 }
 
@@ -115,62 +147,82 @@ void UiModule::registerResources()
 
 void UiModule::registerUiTypes()
 {
-    qmlRegisterUncreatableType<UiEngine>("MuseScore.Ui", 1, 0, "UiEngine", "Cannot create an UiEngine");
-    qmlRegisterUncreatableType<UiTheme>("MuseScore.Ui", 1, 0, "QmlTheme", "Cannot create a QmlTheme");
-    qmlRegisterUncreatableType<QmlToolTip>("MuseScore.Ui", 1, 0, "QmlToolTip", "Cannot create a QmlToolTip");
-    qmlRegisterUncreatableType<IconCode>("MuseScore.Ui", 1, 0, "IconCode", "Cannot create an IconCode");
-    qmlRegisterUncreatableType<MusicalSymbolCodes>("MuseScore.Ui", 1, 0, "MusicalSymbolCodes",
+    qmlRegisterUncreatableType<UiEngine>("Muse.Ui", 1, 0, "UiEngine", "Cannot create an UiEngine");
+    qmlRegisterUncreatableType<api::ThemeApi>("Muse.Ui", 1, 0, "QmlTheme", "Cannot create a QmlTheme");
+    qmlRegisterUncreatableType<QmlToolTip>("Muse.Ui", 1, 0, "QmlToolTip", "Cannot create a QmlToolTip");
+    qmlRegisterUncreatableType<IconCode>("Muse.Ui", 1, 0, "IconCode", "Cannot create an IconCode");
+    qmlRegisterUncreatableType<MusicalSymbolCodes>("Muse.Ui", 1, 0, "MusicalSymbolCodes",
                                                    "Cannot create an MusicalSymbolCodes");
-    qmlRegisterUncreatableType<InteractiveProvider>("MuseScore.Ui", 1, 0, "QmlInteractiveProvider", "Cannot create");
-    qmlRegisterUncreatableType<ContainerType>("MuseScore.Ui", 1, 0, "ContainerType", "Cannot create a ContainerType");
+    qmlRegisterUncreatableType<InteractiveProvider>("Muse.Ui", 1, 0, "QmlInteractiveProvider", "Cannot create");
+    qmlRegisterUncreatableType<ContainerType>("Muse.Ui", 1, 0, "ContainerType", "Cannot create a ContainerType");
 
-    qmlRegisterUncreatableType<AbstractNavigation>("MuseScore.Ui", 1, 0, "AbstractNavigation", "Cannot create a AbstractType");
-    qmlRegisterUncreatableType<NavigationEvent>("MuseScore.Ui", 1, 0, "NavigationEvent", "Cannot create a KeyNavigationEvent");
-    qmlRegisterType<NavigationSection>("MuseScore.Ui", 1, 0, "NavigationSection");
-    qmlRegisterType<NavigationPanel>("MuseScore.Ui", 1, 0, "NavigationPanel");
-    qmlRegisterType<NavigationPopupPanel>("MuseScore.Ui", 1, 0, "NavigationPopupPanel");
-    qmlRegisterType<NavigationControl>("MuseScore.Ui", 1, 0, "NavigationControl");
-    qmlRegisterType<AccessibleItem>("MuseScore.Ui", 1, 0, "AccessibleItem");
-    qmlRegisterUncreatableType<MUAccessible>("MuseScore.Ui", 1, 0, "MUAccessible", "Cannot create a enum type");
+    qmlRegisterUncreatableType<NavigationEvent>("Muse.Ui", 1, 0, "NavigationEvent", "Cannot create a KeyNavigationEvent");
+    qmlRegisterType<QmlDataFormatter>("Muse.Ui", 1, 0, "DataFormatter");
+    qmlRegisterType<NavigationSection>("Muse.Ui", 1, 0, "NavigationSection");
+    qmlRegisterType<NavigationPanel>("Muse.Ui", 1, 0, "NavigationPanel");
+    qmlRegisterType<NavigationPopupPanel>("Muse.Ui", 1, 0, "NavigationPopupPanel");
+    qmlRegisterType<NavigationControl>("Muse.Ui", 1, 0, "NavigationControl");
+    qmlRegisterType<AccessibleItem>("Muse.Ui", 1, 0, "AccessibleItem");
+    qmlRegisterUncreatableType<MUAccessible>("Muse.Ui", 1, 0, "MUAccessible", "Cannot create a enum type");
 
-    qmlRegisterType<FocusListener>("MuseScore.Ui", 1, 0, "FocusListener");
+    qmlRegisterType<FocusListener>("Muse.Ui", 1, 0, "FocusListener");
 
 #ifdef Q_OS_MAC
-    qmlRegisterType<MacOSMainWindowProvider>("MuseScore.Ui", 1, 0, "MainWindowProvider");
+    qmlRegisterType<MacOSMainWindowBridge>("Muse.Ui", 1, 0, "MainWindowBridge");
 #else
-    qmlRegisterType<MainWindowProvider>("MuseScore.Ui", 1, 0, "MainWindowProvider");
+    qmlRegisterType<MainWindowBridge>("Muse.Ui", 1, 0, "MainWindowBridge");
 #endif
 
-    qmlRegisterType<InteractiveTestsModel>("MuseScore.Ui", 1, 0, "InteractiveTestsModel");
-    qRegisterMetaType<TestDialog>("TestDialog");
+    qmlRegisterType<ErrorDetailsModel>("Muse.Ui", 1, 0, "ErrorDetailsModel");
+    qmlRegisterType<ProgressDialogModel>("Muse.Ui", 1, 0, "ProgressDialogModel");
 
-    modularity::ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(ui_QML_IMPORT);
+    qmlRegisterType<InteractiveTestsModel>("Muse.Ui", 1, 0, "InteractiveTestsModel");
+
+    ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(muse_ui_QML_IMPORT);
 }
 
-void UiModule::onInit(const framework::IApplication::RunMode&)
+void UiModule::onPreInit(const IApplication::RunMode& mode)
 {
-    s_configuration->init();
-    s_keyNavigationController->init();
+    if (mode == IApplication::RunMode::AudioPluginRegistration) {
+        return;
+    }
+
+    m_configuration->init();
 }
 
-void UiModule::onAllInited(const framework::IApplication::RunMode& mode)
+void UiModule::onInit(const IApplication::RunMode& mode)
 {
-    if (framework::IApplication::RunMode::Editor != mode) {
+    if (mode != IApplication::RunMode::GuiApp) {
+        return;
+    }
+
+    if (QFontDatabase::addApplicationFont(":/ui/data/MusescoreIcon.ttf") == -1) {
+        LOGE() << "Unable load icon font: `:/ui/data/MusescoreIcon.ttf`";
+    }
+
+    m_keyNavigationController->init();
+}
+
+void UiModule::onAllInited(const IApplication::RunMode& mode)
+{
+    if (IApplication::RunMode::GuiApp != mode) {
         return;
     }
 
     //! NOTE Some of the settings are taken from the workspace,
     //! we need to be sure that the workspaces are initialized.
     //! So, we loads these settings on onStartApp
-    s_configuration->load();
+    m_configuration->load();
 
     //! NOTE UIActions are collected from many modules, and these modules determine the state of their UIActions.
     //! All modules need to be initialized in order to get the correct state of UIActions.
     //! So, we do init on onStartApp
-    s_uiactionsRegister->init();
+    m_uiactionsRegister->init();
+
+    m_uiengine->init();
 }
 
 void UiModule::onDeinit()
 {
-    s_configuration->deinit();
+    m_configuration->deinit();
 }

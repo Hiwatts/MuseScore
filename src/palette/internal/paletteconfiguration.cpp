@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,23 +23,47 @@
 
 #include "log.h"
 #include "settings.h"
+#include "translation.h"
 
 #include "ui/internal/uiengine.h"
 
+using namespace mu;
 using namespace mu::palette;
-using namespace mu::framework;
-using namespace mu::ui;
+using namespace muse;
+using namespace muse::ui;
 
 static const std::string MODULE_NAME("palette");
 static const Settings::Key PALETTE_SCALE(MODULE_NAME, "application/paletteScale");
 static const Settings::Key PALETTE_USE_SINGLE(MODULE_NAME, "application/useSinglePalette");
+static const Settings::Key IS_SINGLE_CLICK_TO_OPEN_PALETTE(MODULE_NAME, "application/singleClickToOpenPalette");
+static const Settings::Key IS_PALETTE_DRAG_ENABLED(MODULE_NAME, "application/paletteDragEnabled");
 
 void PaletteConfiguration::init()
 {
     settings()->setDefaultValue(PALETTE_SCALE, Val(1.0));
-    settings()->setCanBeMannualyEdited(PALETTE_SCALE, true);
+    settings()->setDescription(PALETTE_SCALE, muse::qtrc("palette", "Palette scale").toStdString());
+    settings()->setCanBeManuallyEdited(PALETTE_SCALE, true, Val(0.5), Val(5.0));
+
     settings()->setDefaultValue(PALETTE_USE_SINGLE, Val(false));
-    settings()->setCanBeMannualyEdited(PALETTE_USE_SINGLE, true);
+
+    m_isSinglePalette.val = settings()->value(PALETTE_USE_SINGLE).toBool();
+    settings()->valueChanged(PALETTE_USE_SINGLE).onReceive(this, [this](const Val& newValue) {
+        m_isSinglePalette.set(newValue.toBool());
+    });
+
+    settings()->setDefaultValue(IS_SINGLE_CLICK_TO_OPEN_PALETTE, Val(true));
+
+    m_isSingleClickToOpenPalette.val = settings()->value(IS_SINGLE_CLICK_TO_OPEN_PALETTE).toBool();
+    settings()->valueChanged(IS_SINGLE_CLICK_TO_OPEN_PALETTE).onReceive(this, [this](const Val& newValue) {
+        m_isSingleClickToOpenPalette.set(newValue.toBool());
+    });
+
+    settings()->setDefaultValue(IS_PALETTE_DRAG_ENABLED, Val(true));
+
+    m_isPaletteDragEnabled.val = settings()->value(IS_PALETTE_DRAG_ENABLED).toBool();
+    settings()->valueChanged(IS_PALETTE_DRAG_ENABLED).onReceive(this, [this](const Val& newValue) {
+        m_isPaletteDragEnabled.set(newValue.toBool());
+    });
 }
 
 double PaletteConfiguration::paletteScaling() const
@@ -61,14 +85,34 @@ double PaletteConfiguration::paletteSpatium() const
     return PALETTE_SPATIUM;
 }
 
-bool PaletteConfiguration::isSinglePalette() const
+ValCh<bool> PaletteConfiguration::isSinglePalette() const
 {
-    return settings()->value(PALETTE_USE_SINGLE).toBool();
+    return m_isSinglePalette;
 }
 
 void PaletteConfiguration::setIsSinglePalette(bool isSingle)
 {
     settings()->setSharedValue(PALETTE_USE_SINGLE, Val(isSingle));
+}
+
+ValCh<bool> PaletteConfiguration::isSingleClickToOpenPalette() const
+{
+    return m_isSingleClickToOpenPalette;
+}
+
+void PaletteConfiguration::setIsSingleClickToOpenPalette(bool isSingleClick)
+{
+    settings()->setSharedValue(IS_SINGLE_CLICK_TO_OPEN_PALETTE, Val(isSingleClick));
+}
+
+ValCh<bool> PaletteConfiguration::isPaletteDragEnabled() const
+{
+    return m_isPaletteDragEnabled;
+}
+
+void PaletteConfiguration::setIsPaletteDragEnabled(bool enabled)
+{
+    settings()->setSharedValue(IS_PALETTE_DRAG_ENABLED, Val(enabled));
 }
 
 QColor PaletteConfiguration::elementsBackgroundColor() const
@@ -96,17 +140,17 @@ QColor PaletteConfiguration::themeColor(ThemeStyleKey key) const
     return uiConfiguration()->currentTheme().values[key].toString();
 }
 
-mu::async::Notification PaletteConfiguration::colorsChanged() const
+muse::async::Notification PaletteConfiguration::colorsChanged() const
 {
     return uiConfiguration()->currentThemeChanged();
 }
 
-mu::io::path PaletteConfiguration::keySignaturesDirPath() const
+muse::io::path_t PaletteConfiguration::keySignaturesDirPath() const
 {
     return globalConfiguration()->userAppDataPath() + "/keysigs";
 }
 
-mu::io::path PaletteConfiguration::timeSignaturesDirPath() const
+muse::io::path_t PaletteConfiguration::timeSignaturesDirPath() const
 {
     return globalConfiguration()->userAppDataPath() + "/timesigs";
 }
@@ -121,7 +165,7 @@ bool PaletteConfiguration::enableExperimental() const
     return globalConfiguration()->enableExperimental();
 }
 
-mu::ValCh<PaletteConfiguration::PaletteConfig> PaletteConfiguration::paletteConfig(const QString& paletteId) const
+ValCh<PaletteConfiguration::PaletteConfig> PaletteConfiguration::paletteConfig(const QString& paletteId) const
 {
     if (!m_paletteConfigs.contains(paletteId)) {
         m_paletteConfigs[paletteId] = ValCh<PaletteConfig>();
@@ -135,7 +179,7 @@ void PaletteConfiguration::setPaletteConfig(const QString& paletteId, const Pale
     m_paletteConfigs[paletteId].set(config);
 }
 
-mu::ValCh<PaletteConfiguration::PaletteCellConfig> PaletteConfiguration::paletteCellConfig(const QString& cellId) const
+ValCh<PaletteConfiguration::PaletteCellConfig> PaletteConfiguration::paletteCellConfig(const QString& cellId) const
 {
     if (!m_paletteCellsConfigs.contains(cellId)) {
         m_paletteCellsConfigs[cellId] = ValCh<PaletteCellConfig>();

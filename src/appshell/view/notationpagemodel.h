@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,22 +30,30 @@
 #include "actions/iactionsdispatcher.h"
 #include "context/iglobalcontext.h"
 #include "iappshellconfiguration.h"
+#include "notation/inotationconfiguration.h"
+#include "braille/ibrailleconfiguration.h"
+#include "dockwindow/idockwindowprovider.h"
 
 namespace mu::appshell {
-class NotationPageModel : public QObject, public async::Asyncable, public actions::Actionable
+class NotationPageModel : public QObject, public muse::Injectable, public muse::async::Asyncable, public muse::actions::Actionable
 {
     Q_OBJECT
 
-    INJECT(appshell, actions::IActionsDispatcher, dispatcher)
-    INJECT(appshell, context::IGlobalContext, globalContext)
-    INJECT(appshell, IAppShellConfiguration, configuration)
-
     Q_PROPERTY(bool isNavigatorVisible READ isNavigatorVisible NOTIFY isNavigatorVisibleChanged)
+    Q_PROPERTY(bool isBraillePanelVisible READ isBraillePanelVisible NOTIFY isBraillePanelVisibleChanged)
+
+    muse::Inject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<IAppShellConfiguration> configuration = { this };
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
+    muse::Inject<braille::IBrailleConfiguration> brailleConfiguration = { this };
+    muse::Inject<muse::dock::IDockWindowProvider> dockWindowProvider = { this };
 
 public:
     explicit NotationPageModel(QObject* parent = nullptr);
 
     bool isNavigatorVisible() const;
+    bool isBraillePanelVisible() const;
 
     Q_INVOKABLE void init();
 
@@ -55,24 +63,30 @@ public:
     Q_INVOKABLE QString noteInputBarName() const;
 
     Q_INVOKABLE QString palettesPanelName() const;
-    Q_INVOKABLE QString instrumentsPanelName() const;
+    Q_INVOKABLE QString layoutPanelName() const;
     Q_INVOKABLE QString inspectorPanelName() const;
     Q_INVOKABLE QString selectionFiltersPanelName() const;
+    Q_INVOKABLE QString undoHistoryPanelName() const;
 
-    Q_INVOKABLE QString pianoPanelName() const;
     Q_INVOKABLE QString mixerPanelName() const;
+    Q_INVOKABLE QString pianoKeyboardPanelName() const;
     Q_INVOKABLE QString timelinePanelName() const;
     Q_INVOKABLE QString drumsetPanelName() const;
+    Q_INVOKABLE QString percussionPanelName() const;
 
     Q_INVOKABLE QString statusBarName() const;
 
 signals:
     void isNavigatorVisibleChanged();
+    void isBraillePanelVisibleChanged();
 
 private:
+    void onNotationChanged();
+
     void toggleDock(const QString& name);
 
     void updateDrumsetPanelVisibility();
+    void updatePercussionPanelVisibility();
 };
 }
 

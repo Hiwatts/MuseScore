@@ -22,16 +22,10 @@
 #include "testdialog.h"
 #include "ui_testdialog.h"
 
-using namespace mu::ui;
-
-TestDialog::TestDialog(const TestDialog& dialog)
-    : WidgetDialog(dialog.parentWidget()),
-    ui(dialog.ui)
-{
-}
+using namespace muse::ui;
 
 TestDialog::TestDialog(QWidget* parent)
-    : WidgetDialog(parent),
+    : QDialog(parent),
     ui(new Ui::TestDialog)
 {
     ui->setupUi(this);
@@ -45,16 +39,6 @@ TestDialog::~TestDialog()
 QString TestDialog::title() const
 {
     return m_title;
-}
-
-int TestDialog::static_metaTypeId()
-{
-    return qRegisterMetaType<TestDialog>("TestDialog");
-}
-
-int TestDialog::metaTypeId() const
-{
-    return static_metaTypeId();
 }
 
 void TestDialog::setTitle(QString title)

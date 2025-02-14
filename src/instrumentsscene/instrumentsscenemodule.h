@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,10 +22,13 @@
 #ifndef MU_INSTRUMENTSSCENE_INSTRUMENTSSCENEMODULE_H
 #define MU_INSTRUMENTSSCENE_INSTRUMENTSSCENEMODULE_H
 
+#include <memory>
+
 #include "modularity/imodulesetup.h"
 
 namespace mu::instrumentsscene {
-class InstrumentsSceneModule : public modularity::IModuleSetup
+class InstrumentsActionsController;
+class InstrumentsSceneModule : public muse::modularity::IModuleSetup
 {
 public:
     std::string moduleName() const override;
@@ -33,6 +36,10 @@ public:
     void resolveImports() override;
     void registerResources() override;
     void registerUiTypes() override;
+    void onInit(const muse::IApplication::RunMode& mode) override;
+
+private:
+    std::shared_ptr<InstrumentsActionsController> m_actionsController;
 };
 }
 

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,7 +30,7 @@
 #include <QtCore/qobjectdefs.h>
 #include <QtCore/qscopedpointer.h>
 
-namespace Ms {
+namespace mu::engraving {
 class EngravingItem;
 }
 
@@ -85,7 +85,9 @@ public:
     void setResolution(int dpi);
     int resolution() const;
 
-    void setElement(const Ms::EngravingItem* e);
+    void setElement(const mu::engraving::EngravingItem* e);
+
+    void setReplaceClipPathWithMask(bool v);
 
 protected:
     QPaintEngine* paintEngine() const;

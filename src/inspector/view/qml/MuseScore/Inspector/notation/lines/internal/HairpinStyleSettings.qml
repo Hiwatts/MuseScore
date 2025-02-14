@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../../common"
@@ -50,38 +50,30 @@ FocusableItem {
             height: childrenRect.height
             width: parent.width
 
-            CheckBox {
+            PropertyCheckBox {
                 anchors.left: parent.left
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
-                isIndeterminate: root.model ? root.model.isNienteCircleVisible.isUndefined : false
-                checked: root.model && !isIndeterminate ? root.model.isNienteCircleVisible.value : false
                 text: qsTrc("inspector", "Niente circle")
+                propertyItem: root.model ? root.model.isNienteCircleVisible : null
 
                 navigation.name: "NienteCircleCheckBox"
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 1
-                navigation.enabled: root.enabled
-
-                onClicked: { root.model.isNienteCircleVisible.value = !checked }
             }
 
-            CheckBox {
+            PropertyCheckBox {
                 anchors.left: parent.horizontalCenter
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
-                isIndeterminate: root.model ? root.model.allowDiagonal.isUndefined : false
-                checked: root.model && !isIndeterminate ? root.model.allowDiagonal.value : false
                 text: qsTrc("inspector", "Allow diagonal")
+                propertyItem: root.model ? root.model.allowDiagonal : null
 
                 navigation.name: "AllowDiagonalCheckBox"
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 2
-                navigation.enabled: root.enabled
-
-                onClicked: { root.model.allowDiagonal.value = !checked }
             }
         }
 
@@ -95,7 +87,7 @@ FocusableItem {
             navigationRowStart: root.navigationRowStart + 3
         }
 
-        SeparatorLine { anchors.margins: -10 }
+        SeparatorLine { anchors.margins: -12 }
 
         Item {
             height: childrenRect.height
@@ -143,13 +135,12 @@ FocusableItem {
             width: parent.width
 
             SpinBoxPropertyView {
-                id: continiousHeightSection
+                id: continuousHeightSection
                 anchors.left: parent.left
-                anchors.right: parent.horizontalCenter
-                anchors.rightMargin: 2
+                anchors.right: parent.right
 
-                titleText: qsTrc("inspector", "Height (continuing to a new system)")
-                propertyItem: root.model ? root.model.continiousHeight : null
+                titleText: qsTrc("inspector", "Height (new system)")
+                propertyItem: root.model ? root.model.continuousHeight : null
 
                 step: 0.1
                 maxValue: 10
@@ -159,13 +150,6 @@ FocusableItem {
                 navigationPanel: root.navigationPanel
                 navigationRowStart: heightSection.navigationRowEnd + 1
             }
-        }
-
-        PlacementSection {
-            propertyItem: root.model ? root.model.placement : null
-
-            navigationPanel: root.navigationPanel
-            navigationRowStart: continiousHeightSection.navigationRowEnd + 1
         }
     }
 }

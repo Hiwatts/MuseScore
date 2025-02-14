@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,60 +22,95 @@
 #ifndef MU_ENGRAVING_ACCESSIBLEITEM_H
 #define MU_ENGRAVING_ACCESSIBLEITEM_H
 
+#include "global/allocator.h"
+
 #include "accessibility/iaccessible.h"
 #include "modularity/ioc.h"
 #include "accessibility/iaccessibilitycontroller.h"
 
-#include "libmscore/engravingitem.h"
-
-//! NOTE At the moment this is just a concept, not a production-ready system, a lot of work yet.
+#include "../dom/engravingitem.h"
+#include "../dom/textbase.h"
 
 namespace mu::engraving {
-class AccessibleScore;
-class AccessibleItem : public accessibility::IAccessible
+class AccessibleRoot;
+class AccessibleItem : public muse::accessibility::IAccessible, public muse::Injectable, public std::enable_shared_from_this<AccessibleItem>
 {
-    INJECT_STATIC(engraving, accessibility::IAccessibilityController, accessibilityController)
+    OBJECT_ALLOCATOR(engraving, AccessibleItem)
 
 public:
-    AccessibleItem(Ms::EngravingItem* e);
+    muse::Inject<muse::accessibility::IAccessibilityController> accessibilityController = { this };
+
+public:
+    AccessibleItem(EngravingItem* e, Role role = Role::ElementOnScore);
     virtual ~AccessibleItem();
-    virtual AccessibleItem* clone(Ms::EngravingItem* e) const;
+    virtual AccessibleItem* clone(EngravingItem* e) const;
 
     virtual void setup();
 
-    const Ms::EngravingItem* element() const;
+    AccessibleRoot* accessibleRoot() const;
+
+    const EngravingItem* element() const;
 
     bool registered() const;
 
-    void setFocus();
     void notifyAboutFocus(bool focused);
 
     // IAccessible
     const IAccessible* accessibleParent() const override;
     size_t accessibleChildCount() const override;
     const IAccessible* accessibleChild(size_t i) const override;
+    QWindow* accessibleWindow() const override;
+    muse::modularity::ContextPtr iocContext() const override;
 
     Role accessibleRole() const override;
     QString accessibleName() const override;
     QString accessibleDescription() const override;
     bool accessibleState(State st) const override;
     QRect accessibleRect() const override;
+    bool accessibleIgnored() const override;
 
-    async::Channel<Property> accessiblePropertyChanged() const override;
-    async::Channel<State, bool> accessibleStateChanged() const override;
+    QVariant accessibleValue() const override;
+    QVariant accessibleMaximumValue() const override;
+    QVariant accessibleMinimumValue() const override;
+    QVariant accessibleValueStepSize() const override;
+
+    void accessibleSelection(int selectionIndex, int* startOffset, int* endOffset) const override;
+    int accessibleSelectionCount() const override;
+
+    int accessibleCursorPosition() const override;
+
+    QString accessibleText(int startOffset, int endOffset) const override;
+    QString accessibleTextBeforeOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    QString accessibleTextAfterOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    QString accessibleTextAtOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    int accessibleCharacterCount() const override;
+
+    // ListView item Interface
+    int accessibleRowIndex() const override;
+
+    muse::async::Channel<Property, muse::Val> accessiblePropertyChanged() const override;
+    muse::async::Channel<State, bool> accessibleStateChanged() const override;
+
+    void setState(State state, bool arg) override;
     // ---
 
     static bool enabled;
 
 private:
+    TextCursor* textCursor() const;
 
-    AccessibleScore* accessibleScore() const;
+protected:
 
-    Ms::EngravingItem* m_element = nullptr;
+    EngravingItem* m_element = nullptr;
     bool m_registred = false;
 
-    mu::async::Channel<IAccessible::State, bool> m_accessibleStateChanged;
+    Role m_role = Role::ElementOnScore;
+
+    muse::async::Channel<IAccessible::Property, muse::Val> m_accessiblePropertyChanged;
+    muse::async::Channel<IAccessible::State, bool> m_accessibleStateChanged;
 };
+using AccessibleItemPtr = std::shared_ptr<AccessibleItem>;
+using AccessibleItemWeakPtr = std::weak_ptr<AccessibleItem>;
 }
 
 #endif // MU_ENGRAVING_ACCESSIBLEITEM_H

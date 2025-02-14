@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,28 +24,34 @@
 #define MU_NOTATION_LOOPMARKER_H
 
 #include "notation/inotationconfiguration.h"
-#include "notation/inotationstyle.h"
 #include "modularity/ioc.h"
 
+#include "notation/inotation.h"
+
+#include "draw/types/geometry.h"
+
 namespace mu::notation {
-class LoopMarker
+class LoopMarker : public muse::Injectable
 {
-    INJECT(notation, INotationConfiguration, configuration)
+    muse::Inject<INotationConfiguration> configuration = { this };
 
 public:
-    LoopMarker(LoopBoundaryType type);
+    LoopMarker(LoopBoundaryType type, const muse::modularity::ContextPtr& iocCtx);
 
-    void setRect(const QRect& rect);
+    void setNotation(INotationPtr notation);
     void setVisible(bool visible);
-    void setStyle(INotationStylePtr style);
 
-    void paint(draw::Painter* painter);
+    void move(muse::midi::tick_t tick);
+
+    void paint(muse::draw::Painter* painter);
 
 private:
+    muse::RectF resolveMarkerRectByTick(muse::midi::tick_t tick) const;
+
     LoopBoundaryType m_type = LoopBoundaryType::Unknown;
-    QRect m_rect;
+    muse::RectF m_rect;
     bool m_visible = false;
-    INotationStylePtr m_style;
+    INotationPtr m_notation;
 };
 }
 

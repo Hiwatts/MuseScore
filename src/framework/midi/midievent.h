@@ -19,19 +19,32 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_MIDI_MIDIEVENT_H
-#define MU_MIDI_MIDIEVENT_H
+#ifndef MUSE_MIDI_MIDIEVENT_H
+#define MUSE_MIDI_MIDIEVENT_H
 
 #include <cstdint>
 #include <array>
 #include <set>
+#include <cassert>
+#include <string>
+
+#include "containers.h"
 
 #ifndef UNUSED
 #define UNUSED(x) (void)x;
 #endif
 
-namespace mu::midi {
+#ifndef MU_FALLTHROUGH
+#if __has_cpp_attribute(fallthrough)
+#define MU_FALLTHROUGH() [[fallthrough]]
+#else
+#define MU_FALLTHROUGH() (void)0
+#endif
+#endif
+
+namespace muse::midi {
 using channel_t = uint8_t;
+using tuning_t = float;
 
 /*!
  * MIDI Event stored in Universal MIDI Packet Format Message
@@ -103,14 +116,8 @@ struct Event {
             uint32_t full;
         } u;
         u.full = data;
-        if (
-            (u.byte[0] & 0x80)
-            || (u.byte[0] & 0x90)
-            || (u.byte[0] & 0xA0)
-            || (u.byte[0] & 0xB0)
-            || (u.byte[0] & 0xC0)
-            || (u.byte[0] & 0xD0)
-            || (u.byte[0] & 0xE0)
+        if ((u.byte[0] >= 0x80)
+            && (u.byte[0] < 0xF0)
             ) {
             e.m_data[0] = (u.byte[0] << 16) | (u.byte[1] << 8) | u.byte[2];
             e.setMessageType(MessageType::ChannelVoice10);
@@ -133,10 +140,52 @@ struct Event {
         return 0;
     }
 
+    static Event fromMIDI10BytePackage(const unsigned char* pointer, int length)
+    {
+        Event e;
+        uint32_t val = 0;
+        assert(length <= 3);
+        for (int i=0; i < length; i++) {
+            uint32_t byteVal = static_cast<uint32_t>(pointer[i]);
+            val |= byteVal << ((2 - i) * 8);
+        }
+        e.m_data[0]=val;
+        e.setMessageType(MessageType::ChannelVoice10);
+        return e;
+    }
+
+    int to_MIDI10BytesPackage(unsigned char* pointer) const
+    {
+        if (messageType() == MessageType::ChannelVoice10) {
+            auto val = m_data[0];
+            int c = Event::midi10ByteCountForOpcode(opcode());
+            assert(c <= 3);
+            for (int i=0; i < c; i++) {
+                auto byteVal = (val >> ((2 - i) * 8)) & 0xff;
+                pointer[i]=static_cast<unsigned char>(byteVal);
+            }
+            return c;
+        }
+        return 0;
+    }
+
+    static Event fromRawData(const uint32_t* data, size_t count)
+    {
+        Event e;
+        size_t numBytes = std::min(count, e.m_data.size()) * sizeof(uint32_t);
+        memcpy(e.m_data.data(), data, numBytes);
+        return e;
+    }
+
     bool operator ==(const Event& other) const { return m_data == other.m_data; }
     bool operator !=(const Event& other) const { return !operator==(other); }
     operator bool() const {
         return operator!=(NOOP()) && isValid();
+    }
+
+    bool operator <(const Event& other) const
+    {
+        return m_data < other.m_data;
     }
 
     bool isChannelVoice() const { return messageType() == MessageType::ChannelVoice10 || messageType() == MessageType::ChannelVoice20; }
@@ -271,29 +320,29 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return attribute() >> 9;
+            return static_cast<uint8_t>(attribute() >> 9);
         }
         return note();
     }
 
     //! return tuning in semitones from Pitch attribute (for NoteOn & NoteOff) events) if exists else return 0.f
-    float pitchTuning() const
+    tuning_t pitchTuning() const
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return (attribute() & 0x1FF) / static_cast<float>(0x200);
+            return static_cast<tuning_t>((attribute() & 0x1FF) / static_cast<tuning_t>(0x200));
         }
         return 0.f;
     }
 
     //! return tuning in cents
-    float pitchTuningCents() const
+    tuning_t pitchTuningCents() const
     {
         return pitchTuning() * 100;
     }
 
     //! 4.2.14.3 @see pitchNote(), pitchTuning()
-    void setPitchNote(uint8_t note, float tuning)
+    void setPitchNote(uint8_t note, tuning_t tuning)
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         assertMessageType({ MessageType::ChannelVoice20 });
@@ -309,7 +358,7 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (messageType() == MessageType::ChannelVoice20) {
-            return m_data[1] >> 16;
+            return static_cast<uint16_t>(m_data[1] >> 16);
         }
         return m_data[0] & 0x7F;
     }
@@ -367,7 +416,7 @@ struct Event {
                 return ((m_data[0] & 0x7F) << 7) | ((m_data[0] & 0x7F00) >> 8);
             default: assert(false);
             }
-            Q_FALLTHROUGH();
+            MU_FALLTHROUGH();
         case MessageType::ChannelVoice20:
             switch (opcode()) {
             case Opcode::PolyPressure:
@@ -384,7 +433,7 @@ struct Event {
                 return m_data[1];
             default: assert(false);
             }
-            Q_FALLTHROUGH();
+            MU_FALLTHROUGH();
         default:;     //TODO
         }
 
@@ -442,6 +491,11 @@ struct Event {
             break;
         default: assert(false);
         }
+    }
+
+    const uint32_t* rawData() const
+    {
+        return m_data.data();
     }
 
     /*! return signed value:
@@ -629,9 +683,9 @@ struct Event {
     }
 
     //!convert ChannelVoice from MIDI2.0 to MIDI1.0
-    std::list<Event> toMIDI10() const
+    std::vector<Event> toMIDI10() const
     {
-        std::list<Event> events;
+        std::vector<Event> events;
         switch (messageType()) {
         case MessageType::ChannelVoice10: events.push_back(*this);
             break;
@@ -641,17 +695,18 @@ struct Event {
             basic10Event.setGroup(group());
             switch (opcode()) {
             //D2.1
+            case Opcode::PolyPressure:
+            case Opcode::ControlChange:
             case Opcode::NoteOn:
             case Opcode::NoteOff: {
                 auto e = basic10Event;
-                auto v = scaleDown(velocity(), 16, 7);
-                e.setNote(note());
-                if (v != 0) {
-                    e.setVelocity(v);
-                } else {
+                auto v1 = (m_data[0] & 0x7F00);
+                auto v2 = m_data[1] >> 25;
+                if (opcode() == Opcode::NoteOn && v2 == 0) {
                     //4.2.2 velocity comment
-                    e.setVelocity(1);
+                    v2 = 1;
                 }
+                e.m_data[0] |= v1 | v2;
                 events.push_back(e);
                 break;
             }
@@ -667,11 +722,11 @@ struct Event {
             //D2.3
             case Opcode::AssignableController:
             case Opcode::RegisteredController: {
-                std::list<std::pair<uint8_t, uint8_t> > controlChanges = {
+                std::vector<std::pair<uint8_t, uint8_t> > controlChanges = {
                     { (opcode() == Opcode::RegisteredController ? 101 : 99), bank() },
                     { (opcode() == Opcode::RegisteredController ? 100 : 98), index() },
-                    { 6,  (data() & 0x7FFFFFFF) >> 24 },
-                    { 38, (data() & 0x1FC0000) >> 18 }
+                    { 6,  data() >> 25 }, // first 7 bits
+                    { 38, (data() & 0x1FC0000) >> 18 } // second 7 bits
                 };
                 for (auto& c : controlChanges) {
                     auto e = basic10Event;
@@ -683,16 +738,16 @@ struct Event {
                 break;
             }
 
-            //D.4
+            //D2.4
             case Opcode::ProgramChange: {
                 if (isBankValid()) {
                     auto e = basic10Event;
                     e.setOpcode(Opcode::ControlChange);
                     e.setIndex(0);
-                    e.setData((bank() & 0x7F00) >> 8);
+                    e.setData((m_data[1] & 0x7F00) >> 8);
                     events.push_back(e);
                     e.setIndex(0);
-                    e.setData(bank() & 0x7F);
+                    e.setData(m_data[1] & 0x7F);
                     events.push_back(e);
                 }
                 auto e = basic10Event;
@@ -703,7 +758,7 @@ struct Event {
             //D2.5
             case Opcode::PitchBend: {
                 auto e = basic10Event;
-                e.setData(data());
+                e.setData(pitchBend14());
                 events.push_back(e);
                 break;
             }
@@ -736,7 +791,7 @@ struct Event {
             case Opcode::NoteOn:
             case Opcode::NoteOff:
                 event.setNote(note());
-                event.setVelocity(scaleUp(velocity(), 7, 16));
+                event.setVelocity(static_cast<uint16_t>(scaleUp(velocity(), 7, 16)));
                 if (velocity() == 0) {
                     event.setOpcode(Opcode::NoteOff);
                 }
@@ -748,22 +803,24 @@ struct Event {
                 break;
             //D3.3
             case Opcode::ControlChange: {
-                std::set<uint8_t> skip = { 6, 38, 98, 99, 100, 101 };
-                if (skip.find(index()) == skip.end()) {
-                    break;
-                }
                 switch (index()) {
+                default:
+                    event.setIndex(index());
+                    event.setData(scaleUp(data(), 7, 32));
+                    break;
+                // RPN and NPRN controller messages are no ordenary conrollers
+                // and need special handling in MIDI 2.0
                 case 99:
                     event.setOpcode(Opcode::AssignableController);
-                    event.setBank(data());
+                    event.setBank(static_cast<uint16_t>(data()));
                     break;
                 case 101:
                     event.setOpcode(Opcode::RegisteredController);
-                    event.setBank(data());
+                    event.setBank(static_cast<uint16_t>(data()));
                     break;
                 case 98:
                 case 100:
-                    event.setIndex(data());
+                    event.setIndex(static_cast<uint8_t>(data()));
                     break;
                 case 6:
                     event.m_data[0] &= 0x1FFFFFF;
@@ -773,9 +830,6 @@ struct Event {
                     event.m_data[0] &= 0xFE03FFFF;
                     event.m_data[0] |= (data() & 0x7F) << 18;
                     break;
-                default:
-                    event.setIndex(index());
-                    event.setData(scaleUp(data(), 7, 32));
                 }
                 break;
             }
@@ -809,7 +863,7 @@ struct Event {
     #define opcodeValueMap(o) { o, std::string(#o) \
 }
 
-        static std::map<Opcode, std::string> m = {
+        static const std::map<Opcode, std::string> m = {
             opcodeValueMap(Opcode::RegisteredPerNoteController),
             opcodeValueMap(Opcode::AssignablePerNoteController),
             opcodeValueMap(Opcode::RegisteredController),
@@ -827,7 +881,7 @@ struct Event {
             opcodeValueMap(Opcode::PerNoteManagement)
         };
     #undef opcodeValueMap
-        return m[opcode()];
+        return muse::value(m, opcode());
     }
 
     std::string to_string() const
@@ -943,7 +997,7 @@ struct Event {
             dataToStr();
             break;
         case MessageType::SystemExclusiveData:
-            str += "MIDI System Exlusive";
+            str += "MIDI System Exclusive";
             dataToStr();
             break;
         case MessageType::Data:
@@ -952,6 +1006,96 @@ struct Event {
             break;
         }
         return str;
+    }
+
+    uint8_t velocity7() const
+    {
+        uint16_t val = velocity();
+        if (isChannelVoice20()) {
+            return static_cast<uint8_t>(scaleDown(val, 16, 7));
+        }
+        return static_cast<uint8_t>(val);
+    }
+
+    void setVelocity7(uint8_t value)
+    {
+        if (isChannelVoice20()) {
+            uint16_t scaled = scaleUp(value, 7, 16);
+            setVelocity(scaled);
+            return;
+        }
+        setVelocity(value);
+    }
+
+    uint8_t data7() const
+    {
+        uint32_t val = data();
+        if (messageType() == MessageType::ChannelVoice20) {
+            return scaleDown(val, 32, 7);
+        }
+        return val;
+    }
+
+    uint32_t data14() const
+    {
+        uint32_t val = data();
+        if (messageType() == MessageType::ChannelVoice20) {
+            return scaleDown(val, 32, 14);
+        }
+        return val;
+    }
+
+    uint32_t pitchBend14() const
+    {
+        assert(isChannelVoice() && opcode() == Opcode::PitchBend);
+        return data14();
+    }
+
+    int midi20WordCount() const
+    {
+        return Event::wordCountForMessageType(messageType());
+    }
+
+    static int wordCountForMessageType(MessageType messageType)
+    {
+        switch (messageType) {
+        case MessageType::Utility: return 1;
+        case MessageType::SystemRealTime: return 1;
+        case MessageType::ChannelVoice10: return 1;
+        case MessageType::SystemExclusiveData: return 2;
+        case MessageType::ChannelVoice20: return 2;
+        case MessageType::Data: return 4;
+        }
+        return 0; // reserved
+    }
+
+    static int midi10ByteCountForOpcode(Opcode opcode)
+    {
+        switch (opcode) {
+        case Opcode::RegisteredPerNoteController:
+        case Opcode::AssignablePerNoteController:
+        case Opcode::RelativeRegisteredController:
+        case Opcode::RelativeAssignableController:
+        case Opcode::PerNotePitchBend:
+        case Opcode::PerNoteManagement:
+            //D2.8 cannot be translated to Midi 1.0
+            assert(false);
+        case Opcode::RegisteredController:
+        case Opcode::AssignableController:
+            // Already translated to a sequence of CCs.
+            assert(false);
+        case Opcode::NoteOff:
+        case Opcode::NoteOn:
+        case Opcode::PolyPressure:
+        case Opcode::ControlChange:
+        case Opcode::PitchBend:
+            return 3;
+        case Opcode::ProgramChange:
+        case Opcode::ChannelPressure:
+            return 2;
+        }
+        assert(false);
+        return 0;
     }
 
 private:
@@ -1009,4 +1153,4 @@ private:
 };
 }
 
-#endif // MU_MIDI_MIDIEVENT_H
+#endif // MUSE_MIDI_MIDIEVENT_H

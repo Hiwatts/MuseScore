@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,6 +23,7 @@
 #define MU_INSPECTOR_ABSTRACTINSPECTORPROXYMODEL_H
 
 #include "models/abstractinspectormodel.h"
+#include "models/iinspectormodelcreator.h"
 
 #include <QHash>
 
@@ -31,17 +32,27 @@ class AbstractInspectorProxyModel : public AbstractInspectorModel
 {
     Q_OBJECT
 
-    Q_PROPERTY(InspectorModelType preferedSubModelType READ preferedSubModelType CONSTANT)
+    Q_PROPERTY(bool isMultiModel READ isMultiModel NOTIFY modelsChanged)
+    Q_PROPERTY(QVariantList models READ models NOTIFY modelsChanged)
+    Q_PROPERTY(QObject * firstModel READ firstModel NOTIFY modelsChanged)
+
+    Q_PROPERTY(InspectorModelType defaultSubModelType READ defaultSubModelType NOTIFY defaultSubModelTypeChanged)
 
 public:
-    explicit AbstractInspectorProxyModel(QObject* parent, IElementRepositoryService* repository,
-                                         InspectorModelType preferedSubModelType = InspectorModelType::TYPE_UNDEFINED);
+    INJECT(IInspectorModelCreator, inspectorModelCreator)
 
-    Q_INVOKABLE QObject* modelByType(const InspectorModelType type);
-    Q_INVOKABLE QVariantList models();
+public:
+    explicit AbstractInspectorProxyModel(QObject* parent, IElementRepositoryService* repository);
 
-    Q_INVOKABLE bool isMultiModel() const;
-    Q_INVOKABLE QObject* firstModel();
+    bool isMultiModel() const;
+    QVariantList models() const;
+    QObject* firstModel() const;
+
+    InspectorModelType defaultSubModelType() const;
+
+    Q_INVOKABLE QObject* modelByType(InspectorModelType type) const;
+
+    QList<AbstractInspectorModel*> modelList() const;
 
     void createProperties() override {}
     void loadProperties() override {}
@@ -51,17 +62,23 @@ public:
     void requestResetToDefaults() override;
     bool isEmpty() const override;
 
-    virtual bool isElementSupported(const ElementKey&) const { return false; }
+    void updateModels(const ElementKeySet& newElementKeySet);
 
-    InspectorModelType preferedSubModelType() const;
+    void onCurrentNotationChanged() override;
+
+public slots:
+    void setDefaultSubModelType(mu::inspector::InspectorModelType modelType);
+
+signals:
+    void modelsChanged();
+    void defaultSubModelTypeChanged();
 
 protected:
-    void addModel(AbstractInspectorModel* model);
-    QList<AbstractInspectorModel*> modelList() const;
+    void setModels(const QList<AbstractInspectorModel*>& models);
 
 private:
-    QHash<int, AbstractInspectorModel*> m_modelsHash;
-    InspectorModelType m_preferedSubModelType = InspectorModelType::TYPE_UNDEFINED;
+    QHash<InspectorModelType, AbstractInspectorModel*> m_models;
+    InspectorModelType m_defaultSubModelType = InspectorModelType::TYPE_UNDEFINED;
 };
 }
 

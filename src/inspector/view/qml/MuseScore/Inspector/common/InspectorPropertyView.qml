@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 Column {
@@ -31,17 +31,31 @@ Column {
 
     property PropertyItem propertyItem: null
 
+    property string navigationName: "InspectorPropertyView"
     property NavigationPanel navigationPanel: null
     property int navigationRowStart: 0
-    property int navigationRowEnd: menuButton.navigation.row
-    property bool navigationEnabled: true
+    property int buttonNavigationRow: navigationRowStart
 
-    property alias titleText: titleLabel.text
-    property alias showTitle: titleLabel.visible
-    property alias showMenuButton: menuButton.visible
+    // Normally, this is just the reset or menu button (navigationRowStart + 0),
+    // and one control (navigationRowStart + 1)
+    property int navigationRowEnd: navigationRowStart + 1
+
+    property string titleText: ""
+    property Component titleLabelComponent: null
+    property alias showTitle: titleLabelLoader.visible
+    property alias showButton: buttonLoader.visible
 
     readonly property bool isStyled: propertyItem ? propertyItem.isStyled : false
-    readonly property bool isModified: propertyItem ? propertyItem.isModified : false
+    property bool isModified: propertyItem ? propertyItem.isModified : false
+
+    signal requestResetToDefault()
+    signal requestApplyToStyle()
+
+    function requestActiveFocus() {
+        if (buttonLoader.item && buttonLoader.item.navigation) {
+            buttonLoader.item.navigation.requestActive()
+        }
+    }
 
     enabled: propertyItem && propertyItem.isEnabled
     visible: propertyItem && propertyItem.isVisible
@@ -49,6 +63,21 @@ Column {
     width: parent.width
 
     spacing: 8
+
+    //! NOTE Overridden in instances and specializations of InspectorPropertyView
+    function focusOnFirst() {
+        if (buttonLoader.item && buttonLoader.item.navigation) {
+            buttonLoader.item.navigation.requestActive()
+        }
+    }
+
+    onRequestResetToDefault: {
+        root.propertyItem.resetToDefault()
+    }
+
+    onRequestApplyToStyle: {
+        root.propertyItem.applyToStyle()
+    }
 
     RowLayout {
         id: contentRow
@@ -58,53 +87,92 @@ Column {
 
         spacing: 4
 
-        StyledTextLabel {
-            id: titleLabel
+        Loader {
+            id: titleLabelLoader
 
-            visible: !isEmpty
             Layout.alignment: Qt.AlignLeft
             Layout.fillWidth: true
 
-            horizontalAlignment: Text.AlignLeft
+            visible: Boolean(root.titleText)
+
+            sourceComponent: root.titleLabelComponent ? root.titleLabelComponent : defaultTitleLabel
+
+            Component {
+                id: defaultTitleLabel
+
+                StyledTextLabel {
+                    width: parent.width
+                    visible: !isEmpty
+
+                    text: root.titleText
+                    horizontalAlignment: Text.AlignLeft
+                }
+            }
         }
 
-        MenuButton {
-            id: menuButton
+        Loader {
+            id: buttonLoader
 
-            height: 20
-            width: height
+            active: visible
+            sourceComponent: root.isStyled ? menuButtonComponent : resetButtonComponent
+            Layout.alignment: Qt.AlignRight
 
-            navigation.panel: root.navigationPanel
-            navigation.row: root.navigationRowStart
-            navigation.enabled: root.enabled && root.navigationEnabled && visible
-            navigation.accessible.name: root.titleText + " " + qsTrc("inspector", "Menu")
+            Component {
+                id: resetButtonComponent
 
-            menuModel: {
-                var result = []
+                PropertyResetButton {
+                    navigation.name: root.navigationName + "Reset"
+                    navigation.panel: root.navigationPanel
+                    navigation.row: root.buttonNavigationRow
+                    navigation.accessible.name: root.titleText ? qsTrc("inspector", "Reset “%1” to default value").arg(root.titleText)
+                                                               : qsTrc("inspector", "Reset property to default value")
 
-                result.push({ title: qsTrc("inspector", "Reset"), enabled: root.isModified, icon: IconCode.NONE, id: "reset" })
+                    enabled: root.isModified
 
-                if (root.isStyled) {
-                    if (root.isModified) {
-                        result.push({ title: qsTrc("inspector", "Save as default style for this score"), enabled: true, icon: IconCode.SAVE, id: "save" })
-                    } else {
-                        result.push({ title: qsTrc("inspector", "This is set as the default style for this score"), enabled: false, icon: IconCode.TICK_RIGHT_ANGLE })
+                    onClicked: {
+                        root.requestResetToDefault()
                     }
                 }
-
-                return result
             }
 
-            menuAlign: Qt.AlignHCenter
+            Component {
+                id: menuButtonComponent
 
-            onHandleMenuItem: function(itemId) {
-                switch (itemId) {
-                case "reset":
-                    root.propertyItem.resetToDefault()
-                    break
-                case "save":
-                    root.propertyItem.applyToStyle()
-                    break
+                MenuButton {
+                    width: 20
+                    height: width
+
+                    navigation.name: root.navigationName + " Menu Button"
+                    navigation.panel: root.navigationPanel
+                    navigation.row: root.buttonNavigationRow
+                    navigation.accessible.name: root.titleText + " " + qsTrc("inspector", "Menu")
+
+                    menuModel: {
+                        var result = []
+
+                        result.push({ title: qsTrc("inspector", "Reset"), enabled: root.isModified, icon: IconCode.UNDO, id: "reset" })
+
+                        if (root.isModified) {
+                            result.push({ title: qsTrc("inspector", "Save as default style for this score"), enabled: !root.propertyItem.isUndefined, icon: IconCode.SAVE, id: "save" })
+                        } else {
+                            result.push({ title: qsTrc("inspector", "This is set as the default style for this score"), enabled: false, icon: IconCode.TICK_RIGHT_ANGLE })
+                        }
+
+                        return result
+                    }
+
+                    menuAlign: Qt.AlignHCenter
+
+                    onHandleMenuItem: function(itemId) {
+                        switch (itemId) {
+                        case "reset":
+                            root.requestResetToDefault()
+                            break
+                        case "save":
+                            root.requestApplyToStyle()
+                            break
+                        }
+                    }
                 }
             }
         }

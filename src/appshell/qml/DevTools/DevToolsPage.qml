@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,22 +21,18 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Dock 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Dock 1.0
 
-import MuseScore.Plugins 1.0
-import MuseScore.Audio 1.0
+import Muse.Audio 1.0
 
 import "./Gallery"
 import "./Interactive"
-import "./NotationDialogs"
-import "./Telemetry"
-import "./VST"
+import "./CrashHandler"
+import "./CorruptScore"
 import "./KeyNav"
 import "./Preferences"
-
-import "../dockwindow"
 
 DockPage {
     id: root
@@ -49,14 +45,10 @@ DockPage {
         case "settings": root.central = settingsComp; break
         case "gallery": root.central = galleryComp; break
         case "interactive": root.central = interactiveComp; break
-        case "mu3dialogs": root.central = notationDialogs; break
-        case "telemetry": root.central = telemetryComp; break
-        case "audio": root.central = audioComp; break
-        case "synth": root.central = synthSettingsComp; break
-        case "midiports": root.central = midiPortsComp; break
-        case "vst": root.central = vstComponent; break
-        case "plugins": root.central = pluginsComp; break
-        case "autobot": root.central = autobotComp; break
+        case "crashhandler": root.central = crashhandlerComp; break
+        case "corruptscore": root.central = corruptScoreComp; break
+        case "mpe": root.central = mpeComponent; break
+        case "extensions": root.central = extensionsComp; break
         case "navigation": root.central = keynavComp; break
         }
     }
@@ -67,10 +59,12 @@ DockPage {
 
             objectName: "devtoolsPanel"
 
+            width: maximumWidth
             minimumWidth: 200
-            maximumWidth: 292
+            maximumWidth: 280
 
-            allowedAreas: Qt.NoDockWidgetArea
+            floatable: false
+            closable: false
 
             Rectangle {
                 anchors.fill: parent
@@ -83,18 +77,14 @@ DockPage {
                         { "name": "settings", "title": "Settings" },
                         { "name": "gallery", "title": "UI Gallery" },
                         { "name": "interactive", "title": "Interactive" },
-                        { "name": "mu3dialogs", "title": "MU3Dialogs" },
-                        { "name": "telemetry", "title": "Telemetry" },
-                        { "name": "audio", "title": "Audio" },
-                        { "name": "synth", "title": "Synth" },
-                        { "name": "midiports", "title": "MIDI ports" },
-                        { "name": "vst", "title": "VST" },
-                        { "name": "plugins", "title": "Plugins" },
-                        { "name": "autobot", "title": "Autobot" },
+                        { "name": "crashhandler", "title": "Crash handler" },
+                        { "name": "corruptscore", "title": "Corrupt score" },
+                        { "name": "mpe", "title": "MPE" },
+                        { "name": "extensions", "title": "Extensions" },
                         { "name": "navigation", "title": "KeyNav" }
                     ]
 
-                    onSelected: {
+                    onSelected: function(name) {
                         root.setCurrentCentral(name)
                     }
                 }
@@ -123,57 +113,32 @@ DockPage {
     }
 
     Component {
-        id: notationDialogs
+        id: crashhandlerComp
 
-        MU3Dialogs {}
+        CrashHandlerDevTools {}
     }
 
     Component {
-        id: telemetryComp
+        id: corruptScoreComp
 
         Loader {
-            source: "qrc:/qml/DevTools/Telemetry/TelemetryInfo.qml"
+            source: "qrc:/qml/DevTools/CorruptScore/CorruptScoreDevTools.qml"
         }
     }
 
     Component {
-        id: audioComp
+        id: mpeComponent
 
-        Playback {}
-    }
-
-    Component {
-        id: synthSettingsComp
-
-        SynthSettings {}
-    }
-
-    Component {
-        id: midiPortsComp
-
-        MidiPorts {}
-    }
-
-    Component {
-        id: vstComponent
-
-        //safe if VST is not available
         Loader {
-            source: "qrc:/qml/DevTools/VST/VSTTests.qml"
+            source: "qrc:/qml/DevTools/MPE/ArticulationsProfileEditorView.qml"
         }
     }
 
     Component {
-        id: pluginsComp
-
-        PluginsTests {}
-    }
-
-    Component {
-        id: autobotComp
+        id: extensionsComp
 
         Loader {
-            source: "qrc:/qml/DevTools/Autobot/AutobotControl.qml"
+            source: "qrc:/qml/DevTools/Extensions/ExtensionsListView.qml"
         }
     }
 

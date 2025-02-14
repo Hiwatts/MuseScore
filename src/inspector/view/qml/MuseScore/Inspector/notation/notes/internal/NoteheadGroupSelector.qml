@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 import MuseScore.Inspector 1.0
 
 import "../../../common"
@@ -31,7 +31,7 @@ import "../../../common"
 InspectorPropertyView {
     id: root
 
-    titleText: qsTrc("inspector", "Notehead group")
+    titleText: qsTrc("inspector", "Notehead type")
 
     navigationRowEnd: navigationRowStart + gridView.count + 1 /*menu button*/
 
@@ -46,12 +46,14 @@ InspectorPropertyView {
             radius: 3
         }
 
-        GridView {
+        StyledGridView {
             id: gridView
             anchors.fill: parent
             anchors.margins: 8
 
             implicitHeight: Math.min(contentHeight, 3 * cellHeight)
+
+            readonly property int cellRadius: 2
 
             cellHeight: 40
             cellWidth: 40
@@ -60,24 +62,18 @@ InspectorPropertyView {
                 id: noteheadGroupsModel
             }
 
-            interactive: true
-            boundsBehavior: Flickable.StopAtBounds
-            clip: true
-
-            ScrollBar.vertical: StyledScrollBar {}
-
             delegate: ListItemBlank {
                 id: delegateItem
                 implicitHeight: gridView.cellHeight
                 implicitWidth: gridView.cellWidth
 
                 hint: model.headHint
+                background.radius: gridView.cellRadius
 
                 navigation.name: hint
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 1 + index
                 navigation.accessible.name: hint
-                navigation.enabled: root.enabled
                 navigation.onActiveChanged: {
                     if (navigation.active) {
                         gridView.positionViewAtIndex(index, ListView.Contain)
@@ -104,12 +100,16 @@ InspectorPropertyView {
             highlight: Rectangle {
                 color: ui.theme.accentColor
                 opacity: ui.theme.accentOpacityNormal
-                radius: 2
+                radius: gridView.cellRadius
             }
 
             currentIndex: root.propertyItem && !root.propertyItem.isUndefined
                           ? root.propertyItem.value
                           : -1
+
+            ScrollBar.vertical: StyledScrollBar {
+                policy: ScrollBar.AlwaysOn
+            }
         }
     }
 }

@@ -20,27 +20,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_SYNTHRESOLVER_H
-#define MU_AUDIO_SYNTHRESOLVER_H
+#ifndef MUSE_AUDIO_SYNTHRESOLVER_H
+#define MUSE_AUDIO_SYNTHRESOLVER_H
 
 #include <map>
 #include <mutex>
 
-#include "synthtypes.h"
 #include "isynthresolver.h"
 
-namespace mu::audio::synth {
+namespace muse::audio::synth {
 class SynthResolver : public ISynthResolver
 {
 public:
     void init(const AudioInputParams& defaultInputParams) override;
 
-    ISynthesizerPtr resolveSynth(const TrackId trackId, const AudioInputParams& params) const override;
+    ISynthesizerPtr resolveSynth(const TrackId trackId, const AudioInputParams& params, const PlaybackSetupData& setupData) const override;
     ISynthesizerPtr resolveDefaultSynth(const TrackId trackId) const override;
     AudioInputParams resolveDefaultInputParams() const override;
     AudioResourceMetaList resolveAvailableResources() const override;
+    SoundPresetList resolveAvailableSoundPresets(const AudioResourceMeta& resourceMeta) const override;
 
     void registerResolver(const AudioSourceType type, IResolverPtr resolver) override;
+
+    void clearSources() override;
 
 private:
     using SynthPair = std::pair<audio::AudioResourceId, ISynthesizerPtr>;
@@ -52,4 +54,4 @@ private:
 };
 }
 
-#endif // MU_AUDIO_SYNTHRESOLVER_H
+#endif // MUSE_AUDIO_SYNTHRESOLVER_H

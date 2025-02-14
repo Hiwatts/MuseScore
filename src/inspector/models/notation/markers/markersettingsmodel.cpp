@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,20 +29,20 @@ MarkerSettingsModel::MarkerSettingsModel(QObject* parent, IElementRepositoryServ
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_MARKER);
-    setTitle(qtrc("inspector", "Marker"));
-    setIcon(ui::IconCode::Code::MARKER);
+    setTitle(muse::qtrc("inspector", "Marker"));
+    setIcon(muse::ui::IconCode::Code::MARKER);
     createProperties();
 }
 
 void MarkerSettingsModel::createProperties()
 {
-    m_type = buildPropertyItem(Ms::Pid::MARKER_TYPE);
-    m_label = buildPropertyItem(Ms::Pid::LABEL);
+    m_type = buildPropertyItem(mu::engraving::Pid::MARKER_TYPE);
+    m_label = buildPropertyItem(mu::engraving::Pid::LABEL);
 }
 
 void MarkerSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::MARKER);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::MARKER);
 }
 
 void MarkerSettingsModel::loadProperties()

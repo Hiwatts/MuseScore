@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,14 +24,18 @@
 
 #include <set>
 
-namespace Ms {
+#include "types/types.h"
+
+namespace mu::engraving {
 class Segment;
 class ChordRest;
 class Staff;
+}
 
+namespace mu::iex::midi {
 namespace MidiTie {
-bool isTiedFor(const Segment* seg, int strack, int voice);
-bool isTiedBack(const Segment* seg, int strack, int voice);
+bool isTiedFor(const engraving::Segment* seg, mu::engraving::track_idx_t strack, mu::engraving::voice_idx_t voice);
+bool isTiedBack(const engraving::Segment* seg, mu::engraving::track_idx_t strack, mu::engraving::voice_idx_t voice);
 
 class TieStateMachine
 {
@@ -41,18 +45,18 @@ public:
         UNTIED, TIED_FOR, TIED_BOTH, TIED_BACK
     };
 
-    void addSeg(const Segment* seg, int strack);
+    void addSeg(const engraving::Segment* seg, mu::engraving::track_idx_t strack);
     State state() const { return state_; }
 
 private:
-    std::set<int> tiedVoices;
+    std::set<mu::engraving::voice_idx_t> tiedVoices;
     State state_ = State::UNTIED;
 };
 
 #ifdef QT_DEBUG
-bool areTiesConsistent(const Staff* staff);
+bool areTiesConsistent(const engraving::Staff* staff);
 #endif
 } // namespace MidiTie
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_TIE_H

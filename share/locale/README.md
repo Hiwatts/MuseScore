@@ -1,28 +1,14 @@
-Note to translators
-===================
+# Adding a new language
 
-Read more about how MuseScore works together with Transifex for handling translations: http://musescore.org/node/22982
+Steps to follow after we receive a [request for a new language](https://github.com/musescore/MuseScore/wiki/Help-translate-MuseScore-Studio#adding-a-new-language):
 
+1. Add the new language [on Transifex](https://app.transifex.com/musescore/musescore/languages/).
 
-How to add a new language
-=========================
+2. Run `tools/translations/tx_pull.sh` to fetch the `musescore_LANG.ts` and `instruments_LANG.ts` files.
 
-You need the name of the language and the two letter code
+3. Add the language name and/or code to these files:
 
-On [Transifex](https://www.transifex.com/musescore/musescore/dashboard/)
-------
-* Add the language
-https://www.transifex.com/organization/musescore/team/1397/
-or request it https://www.transifex.com/projects/p/musescore/
+    - `share/locale/languages.json`
+    - `buildscripts/packaging/macOS/Info.plist.in`
 
-In [MuseScore source](https://github.com/musescore/MuseScore)
-------
-* Add the language in share/locale/languages.xml
-
-* Add the share/locale/mscore_XX.ts file, tx pull can help (`tx pull -t language_code`)
-* Add the share/locale/instruments_XX.ts file, see above
-* Add the share/locale/tours_XX.ts file, see above
-
-* Add the language in build/ci/tx2s3/languages.json
-
-* Finally create a PR
+4. Commit the changes and submit a PR.

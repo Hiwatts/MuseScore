@@ -19,8 +19,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_MIDI_ALSAMIDIOUTPORT_H
-#define MU_MIDI_ALSAMIDIOUTPORT_H
+#ifndef MUSE_MIDI_ALSAMIDIOUTPORT_H
+#define MUSE_MIDI_ALSAMIDIOUTPORT_H
 
 #include <memory>
 
@@ -28,22 +28,26 @@
 #include "midi/imidioutport.h"
 #include "internal/midideviceslistener.h"
 
-namespace mu::midi {
+namespace muse::midi {
 class AlsaMidiOutPort : public IMidiOutPort, public async::Asyncable
 {
 public:
     AlsaMidiOutPort() = default;
-    ~AlsaMidiOutPort() override;
+    ~AlsaMidiOutPort() = default;
 
     void init();
+    void deinit();
 
-    MidiDeviceList devices() const override;
-    async::Notification devicesChanged() const override;
+    MidiDeviceList availableDevices() const override;
+    async::Notification availableDevicesChanged() const override;
 
     Ret connect(const MidiDeviceID& deviceID) override;
     void disconnect() override;
     bool isConnected() const override;
     MidiDeviceID deviceID() const override;
+    async::Notification deviceChanged() const override;
+
+    bool supportsMIDI20Output() const override;
 
     Ret sendEvent(const Event& e) override;
 
@@ -53,12 +57,13 @@ private:
     struct Alsa;
     std::shared_ptr<Alsa> m_alsa;
     MidiDeviceID m_deviceID;
+    async::Notification m_deviceChanged;
 
-    async::Notification m_devicesChanged;
+    async::Notification m_availableDevicesChanged;
     MidiDevicesListener m_devicesListener;
 
     mutable std::mutex m_devicesMutex;
 };
 }
 
-#endif // MU_MIDI_ALSAMIDIOUTPORT_H
+#endif // MUSE_MIDI_ALSAMIDIOUTPORT_H

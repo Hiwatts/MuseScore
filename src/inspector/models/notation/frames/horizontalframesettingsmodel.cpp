@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,38 +25,42 @@
 #include "dataformatter.h"
 
 using namespace mu::inspector;
+using namespace mu::engraving;
 
 HorizontalFrameSettingsModel::HorizontalFrameSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_HORIZONTAL_FRAME);
-    setTitle(qtrc("inspector", "Horizontal frame"));
-    setIcon(ui::IconCode::Code::HORIZONTAL_FRAME);
+    setTitle(muse::qtrc("inspector", "Horizontal frame"));
+    setIcon(muse::ui::IconCode::Code::HORIZONTAL_FRAME);
     createProperties();
 }
 
 void HorizontalFrameSettingsModel::createProperties()
 {
-    m_frameWidth = buildPropertyItem(Ms::Pid::BOX_WIDTH);
-    m_leftGap= buildPropertyItem(Ms::Pid::TOP_GAP);
-    m_rightGap = buildPropertyItem(Ms::Pid::BOTTOM_GAP);
-    m_shouldDisplayKeysAndBrackets = buildPropertyItem(Ms::Pid::CREATE_SYSTEM_HEADER);
+    m_frameWidth = buildPropertyItem(Pid::BOX_WIDTH);
+    m_leftGap = buildPropertyItem(Pid::TOP_GAP);
+    m_rightGap = buildPropertyItem(Pid::BOTTOM_GAP);
+    m_shouldDisplayKeysAndBrackets = buildPropertyItem(Pid::CREATE_SYSTEM_HEADER);
+    m_isSizeSpatiumDependent = buildPropertyItem(Pid::SIZE_SPATIUM_DEPENDENT);
 }
 
 void HorizontalFrameSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::HBOX);
+    m_elementList = m_repository->findElementsByType(ElementType::HBOX);
 }
 
 void HorizontalFrameSettingsModel::loadProperties()
 {
-    loadPropertyItem(m_frameWidth, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
+    static const PropertyIdSet propertyIdSet {
+        Pid::BOX_WIDTH,
+        Pid::TOP_GAP,
+        Pid::BOTTOM_GAP,
+        Pid::CREATE_SYSTEM_HEADER,
+        Pid::SIZE_SPATIUM_DEPENDENT
+    };
 
-    loadPropertyItem(m_leftGap);
-    loadPropertyItem(m_rightGap);
-    loadPropertyItem(m_shouldDisplayKeysAndBrackets);
+    loadProperties(propertyIdSet);
 }
 
 void HorizontalFrameSettingsModel::resetProperties()
@@ -65,6 +69,35 @@ void HorizontalFrameSettingsModel::resetProperties()
     m_leftGap->resetToDefault();
     m_rightGap->resetToDefault();
     m_shouldDisplayKeysAndBrackets->resetToDefault();
+    m_isSizeSpatiumDependent->resetToDefault();
+}
+
+void HorizontalFrameSettingsModel::onNotationChanged(const PropertyIdSet& changedPropertyIdSet, const StyleIdSet&)
+{
+    loadProperties(changedPropertyIdSet);
+}
+
+void HorizontalFrameSettingsModel::loadProperties(const PropertyIdSet& propertyIdSet)
+{
+    if (muse::contains(propertyIdSet, Pid::BOX_WIDTH)) {
+        loadPropertyItem(m_frameWidth, formatDoubleFunc);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::TOP_GAP)) {
+        loadPropertyItem(m_leftGap);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::BOTTOM_GAP)) {
+        loadPropertyItem(m_rightGap);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::CREATE_SYSTEM_HEADER)) {
+        loadPropertyItem(m_shouldDisplayKeysAndBrackets);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::SIZE_SPATIUM_DEPENDENT)) {
+        loadPropertyItem(m_isSizeSpatiumDependent);
+    }
 }
 
 PropertyItem* HorizontalFrameSettingsModel::frameWidth() const
@@ -85,4 +118,9 @@ PropertyItem* HorizontalFrameSettingsModel::rightGap() const
 PropertyItem* HorizontalFrameSettingsModel::shouldDisplayKeysAndBrackets() const
 {
     return m_shouldDisplayKeysAndBrackets;
+}
+
+PropertyItem* HorizontalFrameSettingsModel::isSizeSpatiumDependent() const
+{
+    return m_isSizeSpatiumDependent;
 }

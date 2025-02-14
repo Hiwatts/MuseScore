@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,32 +21,34 @@
  */
 #include "imagesettingsmodel.h"
 
-#include "dataformatter.h"
+#include "types/commontypes.h"
 
 #include "translation.h"
 
 using namespace mu::inspector;
+using namespace mu::engraving;
 
 ImageSettingsModel::ImageSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_IMAGE);
-    setTitle(qtrc("inspector", "Image"));
-    setIcon(ui::IconCode::Code::IMAGE_MOUNTAINS);
+    setTitle(muse::qtrc("inspector", "Image"));
+    setIcon(muse::ui::IconCode::Code::IMAGE_MOUNTAINS);
     createProperties();
 }
 
 void ImageSettingsModel::createProperties()
 {
-    m_isAspectRatioLocked = buildPropertyItem(Ms::Pid::LOCK_ASPECT_RATIO);
+    m_isAspectRatioLocked = buildPropertyItem(Pid::LOCK_ASPECT_RATIO);
 
-    m_shouldScaleToFrameSize = buildPropertyItem(Ms::Pid::AUTOSCALE, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_shouldScaleToFrameSize
+        = buildPropertyItem(Pid::AUTOSCALE, [this](const Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         emit requestReloadPropertyItems();
     });
 
-    m_height = buildPropertyItem(Ms::Pid::IMAGE_HEIGHT, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_height = buildPropertyItem(Pid::IMAGE_HEIGHT, [this](const Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         if (m_isAspectRatioLocked->value().toBool()) {
@@ -54,7 +56,7 @@ void ImageSettingsModel::createProperties()
         }
     });
 
-    m_width = buildPropertyItem(Ms::Pid::IMAGE_WIDTH, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_width = buildPropertyItem(Pid::IMAGE_WIDTH, [this](const Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         if (m_isAspectRatioLocked->value().toBool()) {
@@ -62,35 +64,33 @@ void ImageSettingsModel::createProperties()
         }
     });
 
-    m_isSizeInSpatiums = buildPropertyItem(Ms::Pid::SIZE_IS_SPATIUM, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_isSizeInSpatiums
+        = buildPropertyItem(Pid::SIZE_IS_SPATIUM, [this](const Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         emit requestReloadPropertyItems();
     });
 
-    m_isImageFramed = buildPropertyItem(Ms::Pid::IMAGE_FRAMED);
+    m_isImageFramed = buildPropertyItem(Pid::IMAGE_FRAMED);
 }
 
 void ImageSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::IMAGE);
+    m_elementList = m_repository->findElementsByType(ElementType::IMAGE);
 }
 
 void ImageSettingsModel::loadProperties()
 {
-    auto formatDoubleFunc = [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
+    static const PropertyIdSet propertyIdSet {
+        Pid::LOCK_ASPECT_RATIO,
+        Pid::AUTOSCALE,
+        Pid::IMAGE_HEIGHT,
+        Pid::IMAGE_WIDTH,
+        Pid::SIZE_IS_SPATIUM,
+        Pid::IMAGE_FRAMED,
     };
 
-    loadPropertyItem(m_shouldScaleToFrameSize);
-    loadPropertyItem(m_height, formatDoubleFunc);
-    loadPropertyItem(m_width, formatDoubleFunc);
-
-    loadPropertyItem(m_isAspectRatioLocked);
-    loadPropertyItem(m_isSizeInSpatiums);
-    loadPropertyItem(m_isImageFramed);
-
-    updateFrameScalingAvailability();
+    loadProperties(propertyIdSet);
 }
 
 void ImageSettingsModel::resetProperties()
@@ -101,6 +101,45 @@ void ImageSettingsModel::resetProperties()
     m_isAspectRatioLocked->resetToDefault();
     m_isSizeInSpatiums->resetToDefault();
     m_isImageFramed->resetToDefault();
+}
+
+void ImageSettingsModel::onNotationChanged(const PropertyIdSet& changedPropertyIdSet, const StyleIdSet&)
+{
+    loadProperties(changedPropertyIdSet);
+}
+
+void ImageSettingsModel::loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet)
+{
+    if (muse::contains(propertyIdSet, Pid::AUTOSCALE)) {
+        loadPropertyItem(m_shouldScaleToFrameSize);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::IMAGE_HEIGHT)) {
+        loadPropertyItem(m_height, formatDoubleFunc);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::IMAGE_WIDTH)) {
+        loadPropertyItem(m_width, formatDoubleFunc);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::SIZE)) {
+        loadPropertyItem(m_height, formatDoubleFunc);
+        loadPropertyItem(m_width, formatDoubleFunc);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::LOCK_ASPECT_RATIO)) {
+        loadPropertyItem(m_isAspectRatioLocked);
+    }
+
+    if (muse::contains(propertyIdSet, mu::engraving::Pid::SIZE_IS_SPATIUM)) {
+        loadPropertyItem(m_isSizeInSpatiums);
+    }
+
+    if (muse::contains(propertyIdSet, Pid::IMAGE_FRAMED)) {
+        loadPropertyItem(m_isImageFramed);
+    }
+
+    updateFrameScalingAvailability();
 }
 
 PropertyItem* ImageSettingsModel::shouldScaleToFrameSize() const

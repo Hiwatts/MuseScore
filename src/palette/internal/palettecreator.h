@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,33 +31,37 @@
 namespace mu::palette {
 class PaletteCreator
 {
-    INJECT_STATIC(palette, IPaletteConfiguration, configuration)
+    INJECT_STATIC(IPaletteConfiguration, configuration)
 
 public:
     static PalettePtr newTempoPalette(bool defaultPalette = false);
     static PalettePtr newTextPalette(bool defaultPalette = false);
-    static PalettePtr newTimePalette();
-    static PalettePtr newRepeatsPalette();
+    static PalettePtr newTimePalette(bool defaultPalette = false);
+    static PalettePtr newRepeatsPalette(bool defaultPalette = false);
     static PalettePtr newBeamPalette();
     static PalettePtr newDynamicsPalette(bool defaultPalette = false);
-    static PalettePtr newLayoutPalette();
-    static PalettePtr newFingeringPalette();
+    static PalettePtr newLayoutPalette(bool defaultPalette = false);
+    static PalettePtr newFingeringPalette(bool defaultPalette = false);
     static PalettePtr newTremoloPalette();
     static PalettePtr newNoteHeadsPalette();
-    static PalettePtr newArticulationsPalette();
-    static PalettePtr newOrnamentsPalette();
+    static PalettePtr newArticulationsPalette(bool defaultPalette = false);
+    static PalettePtr newOrnamentsPalette(bool defaultPalette = false);
     static PalettePtr newAccordionPalette();
     static PalettePtr newBracketsPalette();
-    static PalettePtr newBreathPalette();
+    static PalettePtr newBreathPalette(bool defaultPalette = false);
     static PalettePtr newArpeggioPalette();
     static PalettePtr newClefsPalette(bool defaultPalette = false);
     static PalettePtr newGraceNotePalette();
     static PalettePtr newBagpipeEmbellishmentPalette();
     static PalettePtr newKeySigPalette();
     static PalettePtr newAccidentalsPalette(bool defaultPalette = false);
-    static PalettePtr newBarLinePalette();
-    static PalettePtr newLinesPalette();
+    static PalettePtr newBarLinePalette(bool defaultPalette = false);
+    static PalettePtr newLinesPalette(bool defaultPalette = false);
     static PalettePtr newFretboardDiagramPalette();
+    static PalettePtr newGuitarPalette(bool defaultPalette = false);
+    static PalettePtr newKeyboardPalette();
+    static PalettePtr newPitchPalette(bool defaultPalette = false);
+    static PalettePtr newHarpPalette();
 
     static PaletteTreePtr newMasterPaletteTree();
     static PaletteTreePtr newDefaultPaletteTree();

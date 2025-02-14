@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,13 +23,20 @@
 #define MU_IMPORTEXPORT_GUITARPROREADER_H
 
 #include "project/inotationreader.h"
+#include "modularity/ioc.h"
+#include "../iguitarproconfiguration.h"
 
 namespace mu::iex::guitarpro {
-class GuitarProReader : public project::INotationReader
+class GuitarProReader : public project::INotationReader, public muse::Injectable
 {
+    muse::Inject<mu::iex::guitarpro::IGuitarProConfiguration> guitarProConfiguration = { this };
+
 public:
-    Ret read(Ms::MasterScore* score, const io::path& path, const Options& options = Options()) override;
+    GuitarProReader(const muse::modularity::ContextPtr& iocCtx)
+        : muse::Injectable(iocCtx) {}
+
+    muse::Ret read(mu::engraving::MasterScore* score, const muse::io::path_t& path, const Options& options = Options()) override;
 };
-}
+} // namespace mu::iex::guitarpro
 
 #endif // MU_IMPORTEXPORT_GUITARPROREADER_H

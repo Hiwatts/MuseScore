@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,58 +19,74 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick 2.15
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Audio 1.0
+
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Audio 1.0
 import MuseScore.Playback 1.0
 
 Loader {
     id: root
 
-    property string headerTitle: undefined
+    property string headerTitle: ""
     property bool headerVisible: true
-    property int headerHeight: 22
-    property int headerWidth: headerVisible ? 98 : 0
-    property int delegateDefaultWidth: 108
+    property int headerWidth: 98
+    property int headerHeight: implicitHeight - spacingAbove - spacingBelow
+
+    property int channelItemWidth: 108
+
+    property real spacingAbove: 4
+    property real spacingBelow: 4
+
     property var model: undefined
-    property var rootPanel: undefined
+
+    property int navigationRowStart: 0
+
+    property bool needReadChannelName: false
 
     default property Component delegateComponent
 
+    signal navigateControlIndexChanged(var index)
+
     active: visible
 
-    sourceComponent: ListView {
-        id: sectionContentList
+    sourceComponent: Row {
+        width: implicitWidth
+        height: root.spacingAbove + sectionContentList.contentHeight + root.spacingBelow
+        spacing: 1 // for separator (will be rendered in MixerPanel.qml)
 
-        width: contentItem.childrenRect.width
-        height: contentHeight
-        contentHeight: contentItem.childrenRect.height
+        StyledTextLabel {
+            visible: root.headerVisible
 
-        interactive: false
-        orientation: Qt.Horizontal
-        spacing: 4
+            anchors.top: parent.top
+            anchors.topMargin: root.spacingAbove
 
-        model: root.model
-
-        header: Item {
-            height: root.headerHeight
             width: root.headerWidth
+            height: root.headerHeight
 
-            StyledTextLabel {
-                anchors {
-                    fill: parent
-                    rightMargin: 12
-                    leftMargin: 12
-                }
+            leftPadding: 12
+            rightPadding: 12
 
-                horizontalAlignment: Qt.AlignRight
-                text: root.headerTitle
-                visible: root.headerVisible
-            }
+            horizontalAlignment: Qt.AlignRight
+            text: root.headerTitle
         }
 
-        delegate: root.delegateComponent
+        ListView {
+            id: sectionContentList
+
+            anchors.top: parent.top
+            anchors.topMargin: root.spacingAbove
+            width: contentItem.childrenRect.width
+            height: contentHeight
+            contentHeight: contentItem.childrenRect.height
+
+            interactive: false
+            orientation: Qt.Horizontal
+            spacing: 1 // for separators (will be rendered in MixerPanel.qml)
+
+            model: root.model
+            delegate: delegateComponent
+        }
     }
 }

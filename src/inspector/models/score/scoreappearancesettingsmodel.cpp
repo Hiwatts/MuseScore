@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,23 +21,81 @@
  */
 #include "scoreappearancesettingsmodel.h"
 
-#include "log.h"
 #include "translation.h"
-#include "dataformatter.h"
-#include "types/scoreappearancetypes.h"
 
 using namespace mu::inspector;
+using namespace mu::notation;
 
 ScoreAppearanceSettingsModel::ScoreAppearanceSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
     setSectionType(InspectorSectionType::SECTION_SCORE_APPEARANCE);
-    setTitle(qtrc("inspector", "Score appearance"));
+    setTitle(muse::qtrc("inspector", "Score appearance"));
+}
+
+bool ScoreAppearanceSettingsModel::hideEmptyStaves() const
+{
+    return styleValue(StyleId::hideEmptyStaves).toBool();
+}
+
+void ScoreAppearanceSettingsModel::setHideEmptyStaves(bool hide)
+{
+    if (updateStyleValue(StyleId::hideEmptyStaves, hide)) {
+        emit hideEmptyStavesChanged();
+    }
+}
+
+bool ScoreAppearanceSettingsModel::dontHideEmptyStavesInFirstSystem() const
+{
+    return styleValue(StyleId::dontHideStavesInFirstSystem).toBool();
+}
+
+void ScoreAppearanceSettingsModel::setDontHideEmptyStavesInFirstSystem(bool dont)
+{
+    if (updateStyleValue(StyleId::dontHideStavesInFirstSystem, dont)) {
+        emit dontHideEmptyStavesInFirstSystemChanged();
+    }
+}
+
+bool ScoreAppearanceSettingsModel::showBracketsWhenSpanningSingleStaff() const
+{
+    return styleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden).toBool();
+}
+
+void ScoreAppearanceSettingsModel::setShowBracketsWhenSpanningSingleStaff(bool show)
+{
+    if (updateStyleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden, show)) {
+        emit showBracketsWhenSpanningSingleStaffChanged();
+    }
 }
 
 bool ScoreAppearanceSettingsModel::isEmpty() const
 {
     return !isNotationExisting();
+}
+
+void ScoreAppearanceSettingsModel::onCurrentNotationChanged()
+{
+    AbstractInspectorModel::onCurrentNotationChanged();
+
+    emit hideEmptyStavesChanged();
+    emit dontHideEmptyStavesInFirstSystemChanged();
+    emit showBracketsWhenSpanningSingleStaffChanged();
+}
+
+void ScoreAppearanceSettingsModel::onNotationChanged(const engraving::PropertyIdSet&, const engraving::StyleIdSet& changedStyleIdSet)
+{
+    if (muse::contains(changedStyleIdSet, StyleId::hideEmptyStaves)) {
+        emit hideEmptyStavesChanged();
+    }
+
+    if (muse::contains(changedStyleIdSet, StyleId::dontHideStavesInFirstSystem)) {
+        emit dontHideEmptyStavesInFirstSystemChanged();
+    }
+
+    if (muse::contains(changedStyleIdSet, StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden)) {
+        emit showBracketsWhenSpanningSingleStaffChanged();
+    }
 }
 
 void ScoreAppearanceSettingsModel::showPageSettings()

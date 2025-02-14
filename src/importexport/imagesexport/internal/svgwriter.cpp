@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,65 +22,77 @@
 
 #include "svgwriter.h"
 
-#include "svggenerator.h"
+#include <QBuffer>
 
-#include "libmscore/masterscore.h"
-#include "libmscore/page.h"
-#include "libmscore/system.h"
-#include "libmscore/staff.h"
-#include "libmscore/measure.h"
-#include "libmscore/stafflines.h"
-#include "engraving/paint/paint.h"
+#include "draw/painter.h"
+
+#include "engraving/dom/measure.h"
+#include "engraving/dom/page.h"
+#include "engraving/dom/score.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/stafflines.h"
+#include "engraving/dom/system.h"
+#include "engraving/dom/repeatlist.h"
+
+#include "svggenerator.h"
 
 #include "log.h"
 
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
-using namespace mu::io;
+using namespace muse;
+using namespace muse::io;
 
 std::vector<INotationWriter::UnitType> SvgWriter::supportedUnitTypes() const
 {
     return { UnitType::PER_PAGE };
 }
 
-mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const Options& options)
+Ret SvgWriter::write(INotationPtr notation, io::IODevice& destinationDevice, const Options& options)
 {
+    TRACEFUNC;
+
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
     }
 
-    Ms::Score* score = notation->elements()->msScore();
+    mu::engraving::Score* score = notation->elements()->msScore();
     IF_ASSERT_FAILED(score) {
         return make_ret(Ret::Code::UnknownError);
     }
 
     score->setPrinting(true); // don’t print page break symbols etc.
 
-    Ms::MScore::pdfPrinting = true;
-    Ms::MScore::svgPrinting = true;
+    mu::engraving::MScore::pdfPrinting = true;
+    mu::engraving::MScore::svgPrinting = true;
 
-    const QList<Ms::Page*>& pages = score->pages();
-    double pixelRationBackup = Ms::MScore::pixelRatio;
+    const std::vector<mu::engraving::Page*>& pages = score->pages();
+    double pixelRationBackup = mu::engraving::MScore::pixelRatio;
 
-    const int PAGE_NUMBER = options.value(OptionKey::PAGE_NUMBER, Val(0)).toInt();
-    if (PAGE_NUMBER < 0 || PAGE_NUMBER >= pages.size()) {
+    const size_t PAGE_NUMBER = muse::value(options, OptionKey::PAGE_NUMBER, Val(0)).toInt();
+    if (PAGE_NUMBER >= pages.size()) {
         return false;
     }
 
-    Ms::Page* page = pages.at(PAGE_NUMBER);
+    mu::engraving::Page* page = pages.at(PAGE_NUMBER);
+
+    QByteArray qdata;
+    QBuffer buf(&qdata);
+    buf.open(QIODevice::WriteOnly);
 
     SvgGenerator printer;
-    QString title(score->title());
+    QString title(score->name());
     printer.setTitle(pages.size() > 1 ? QString("%1 (%2)").arg(title).arg(PAGE_NUMBER + 1) : title);
-    printer.setOutputDevice(&destinationDevice);
+    printer.setOutputDevice(&buf);
 
-    const int TRIM_MARGINS_SIZE = configuration()->trimMarginPixelSize();
+    printer.setReplaceClipPathWithMask(configuration()->exportSvgWithIllustratorCompat());
 
-    RectF pageRect = page->abbox();
-    if (TRIM_MARGINS_SIZE >= 0) {
-        QMarginsF margins(TRIM_MARGINS_SIZE, TRIM_MARGINS_SIZE, TRIM_MARGINS_SIZE, TRIM_MARGINS_SIZE);
-        pageRect = RectF::fromQRectF(page->tbbox().toQRectF() + margins);
+    const int TRIM_MARGIN_SIZE = configuration()->trimMarginPixelSize();
+
+    RectF pageRect = page->pageBoundingRect();
+    if (TRIM_MARGIN_SIZE >= 0) {
+        pageRect = page->tbbox().adjusted(-TRIM_MARGIN_SIZE, -TRIM_MARGIN_SIZE, TRIM_MARGIN_SIZE, TRIM_MARGIN_SIZE);
     }
 
     qreal width = pageRect.width();
@@ -88,32 +100,34 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     printer.setSize(QSize(width, height));
     printer.setViewBox(QRectF(0, 0, width, height));
 
-    mu::draw::Painter painter(&printer, "svgwriter");
+    muse::draw::Painter painter(&printer, "svgwriter");
     painter.setAntialiasing(true);
-    if (TRIM_MARGINS_SIZE >= 0) {
+    if (TRIM_MARGIN_SIZE >= 0) {
         painter.translate(-pageRect.topLeft());
     }
 
-    Ms::MScore::pixelRatio = Ms::DPI / printer.logicalDpiX();
+    mu::engraving::MScore::pixelRatio = mu::engraving::DPI / printer.logicalDpiX();
 
-    if (!options[OptionKey::TRANSPARENT_BACKGROUND].toBool()) {
-        painter.fillRect(pageRect, mu::draw::Color::white);
+    const bool TRANSPARENT_BACKGROUND = muse::value(options, OptionKey::TRANSPARENT_BACKGROUND,
+                                                    Val(configuration()->exportSvgWithTransparentBackground())).toBool();
+    if (!TRANSPARENT_BACKGROUND) {
+        painter.fillRect(pageRect, muse::draw::Color::WHITE);
     }
 
     // 1st pass: StaffLines
-    for (const Ms::System* system : page->systems()) {
-        int stavesCount = system->staves()->size();
+    for (const mu::engraving::System* system : page->systems()) {
+        size_t stavesCount = system->staves().size();
 
-        for (int staffIndex = 0; staffIndex < stavesCount; ++staffIndex) {
-            if (score->staff(staffIndex)->isLinesInvisible(Ms::Fraction(0, 1)) || !score->staff(staffIndex)->show()) {
+        for (size_t staffIndex = 0; staffIndex < stavesCount; ++staffIndex) {
+            if (!score->staff(staffIndex)->show()) {
                 continue; // ignore invisible staves
             }
 
-            if (system->staves()->isEmpty() || !system->staff(staffIndex)->show()) {
+            if (system->staves().empty() || !system->staff(staffIndex)->show()) {
                 continue;
             }
 
-            Ms::Measure* firstMeasure = system->firstMeasure();
+            mu::engraving::Measure* firstMeasure = system->firstMeasure();
             if (!firstMeasure) { // only boxes, hence no staff lines
                 continue;
             }
@@ -122,72 +136,113 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             // MuseScore draws staff lines by measure, but for SVG they can
             // generally be drawn once for each system. This makes a big
             // difference for scores that scroll horizontally on a single
-            // page. But there are exceptions to this rule:
-            //
-            //   ~ One (or more) invisible measure(s) in a system/staff ~
-            //   ~ One (or more) elements of type HBOX or VBOX          ~
-            //
-            // In these cases the SVG staff lines for the system/staff
-            // are drawn by measure.
-            //
-            bool byMeasure = false;
-            for (Ms::MeasureBase* measure = firstMeasure; measure; measure = system->nextMeasure(measure)) {
-                if (!measure->isMeasure() || !Ms::toMeasure(measure)->visible(staffIndex)) {
-                    byMeasure = true;
-                    break;
-                }
-            }
+            // page.
 
-            if (byMeasure) {     // Draw visible staff lines by measure
-                for (Ms::MeasureBase* measure = firstMeasure; measure; measure = system->nextMeasure(measure)) {
-                    if (measure->isMeasure() && Ms::toMeasure(measure)->visible(staffIndex)) {
-                        Ms::StaffLines* sl = Ms::toMeasure(measure)->staffLines(staffIndex);
-                        printer.setElement(sl);
-                        engraving::Paint::paintElement(painter, sl);
+            mu::engraving::StaffLines* concatenatedSL = nullptr;
+            mu::engraving::Shape concatenatedShape;
+            mu::engraving::Shape concatenatedMask;
+            StaffType* prevStaffType = nullptr;
+            for (mu::engraving::MeasureBase* measure = firstMeasure; measure; measure = system->nextMeasure(measure)) {
+                if (!measure->isMeasure()) {
+                    if (concatenatedSL != nullptr) {
+                        printer.setElement(concatenatedSL);
+                        scoreRenderer()->paintItem(painter, concatenatedSL);
+                        concatenatedSL = nullptr;
+                        prevStaffType = nullptr;
+                    }
+                    continue;
+                }
+
+                Measure* m = mu::engraving::toMeasure(measure);
+                mu::engraving::StaffLines* sl = m->staffLines(static_cast<int>(staffIndex));
+
+                if ((!m->visible(staffIndex) && !m->isCutawayClef(staffIndex)) || !sl->visible()
+                    || (score->staff(staffIndex)->staffType(m->tick()) != prevStaffType)) {
+                    if (concatenatedSL != nullptr) {
+                        printer.setElement(concatenatedSL);
+                        scoreRenderer()->paintItem(painter, concatenatedSL);
+                        concatenatedSL = nullptr;
+                        prevStaffType = nullptr;
                     }
                 }
-            } else {   // Draw staff lines once per system
-                Ms::StaffLines* firstSL = system->firstMeasure()->staffLines(staffIndex)->clone();
-                Ms::StaffLines* lastSL =  system->lastMeasure()->staffLines(staffIndex);
 
-                qreal lastX =  lastSL->bbox().right()
-                              + lastSL->pagePos().x()
-                              - firstSL->pagePos().x();
-                std::vector<mu::LineF>& lines = firstSL->getLines();
-                for (size_t l = 0, c = lines.size(); l < c; l++) {
-                    lines[l].setP2(mu::PointF(lastX, lines[l].p2().y()));
+                if (concatenatedSL == nullptr) {
+                    if ((m->visible(staffIndex) || m->isCutawayClef(staffIndex)) && sl->visible()) {
+                        concatenatedSL = sl->clone();
+                        concatenatedShape.add(sl->ldata()->shape());
+                        concatenatedMask.add(sl->ldata()->mask());
+                        prevStaffType = score->staff(staffIndex)->staffType(m->tick());
+                    }
+                } else {
+                    qreal lastX = sl->ldata()->bbox().right()
+                                  + sl->pagePos().x()
+                                  - concatenatedSL->pagePos().x();
+                    std::vector<muse::LineF> lines = concatenatedSL->lines();
+                    for (size_t l = 0, c = lines.size(); l < c; l++) {
+                        lines[l].setP2(muse::PointF(lastX, lines[l].p2().y()));
+                    }
+                    concatenatedSL->setLines(lines);
+                    concatenatedShape.add(sl->ldata()->shape().translated(sl->pagePos() - concatenatedSL->pagePos()));
+                    concatenatedMask.add(sl->ldata()->mask().translated(sl->pagePos() - concatenatedSL->pagePos()));
+                }
+            }
+
+            if (concatenatedSL != nullptr) {
+                concatenatedSL->mutldata()->setShape(concatenatedShape);
+                concatenatedSL->mutldata()->setMask(concatenatedMask);
+                printer.setElement(concatenatedSL);
+                scoreRenderer()->paintItem(painter, concatenatedSL);
+                concatenatedSL = nullptr;
+                prevStaffType = nullptr;
+            }
+        }
+    }
+
+    BeatsColors beatsColors = parseBeatsColors(muse::value(options, OptionKey::BEATS_COLORS, Val()).toQVariant());
+
+    // 2nd pass: Set color for elements on beats
+    int beatIndex = 0;
+    for (const mu::engraving::RepeatSegment* repeatSegment : score->repeatList()) {
+        for (const mu::engraving::Measure* measure : repeatSegment->measureList()) {
+            for (mu::engraving::Segment* segment = measure->first(); segment; segment = segment->next()) {
+                if (!segment->isChordRestType()) {
+                    continue;
                 }
 
-                printer.setElement(firstSL);
-                engraving::Paint::paintElement(painter, firstSL);
+                if (beatsColors.contains(beatIndex)) {
+                    for (EngravingItem* element : segment->elist()) {
+                        if (!element) {
+                            continue;
+                        }
+
+                        if (element->isChord()) {
+                            for (Note* note : toChord(element)->notes()) {
+                                note->setColor(beatsColors[beatIndex]);
+                            }
+                        } else if (element->isChordRest()) {
+                            element->setColor(beatsColors[beatIndex]);
+                        }
+                    }
+                }
+
+                beatIndex++;
             }
         }
     }
 
-    // 2nd pass: the rest of the elements
-    QList<Ms::EngravingItem*> elements = page->elements();
-    std::stable_sort(elements.begin(), elements.end(), Ms::elementLessThan);
+    // 3rd pass: the rest of the elements
+    std::vector<mu::engraving::EngravingItem*> elements = page->elements();
+    std::sort(elements.begin(), elements.end(), mu::engraving::elementLessThan);
 
-    int lastNoteIndex = -1;
-    for (int i = 0; i < PAGE_NUMBER; ++i) {
-        for (const Ms::EngravingItem* element: pages[i]->elements()) {
-            if (element->type() == Ms::ElementType::NOTE) {
-                lastNoteIndex++;
-            }
-        }
-    }
-
-    NotesColors notesColors = parseNotesColors(options.value(OptionKey::NOTES_COLORS, Val()).toQVariant());
-
-    for (const Ms::EngravingItem* element : elements) {
+    for (const mu::engraving::EngravingItem* element : elements) {
         // Always exclude invisible elements
         if (!element->visible()) {
             continue;
         }
 
-        Ms::ElementType type = element->type();
+        mu::engraving::ElementType type = element->type();
         switch (type) { // In future sub-type code, this switch() grows, and eType gets used
-        case Ms::ElementType::STAFF_LINES: // Handled in the 1st pass above
+        case mu::engraving::ElementType::STAFF_LINES: // Handled in the 1st pass above
             continue; // Exclude from 2nd pass
             break;
         default:
@@ -198,41 +253,30 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         printer.setElement(element);
 
         // Paint it
-        if (element->type() == Ms::ElementType::NOTE && !notesColors.isEmpty()) {
-            QColor color = element->color().toQColor();
-            int currentNoteIndex = (++lastNoteIndex);
-
-            if (notesColors.contains(currentNoteIndex)) {
-                color = notesColors[currentNoteIndex];
-            }
-
-            Ms::EngravingItem* note = dynamic_cast<const Ms::Note*>(element)->clone();
-            note->setColor(color);
-            engraving::Paint::paintElement(painter, note);
-            delete note;
-        } else {
-            engraving::Paint::paintElement(painter, element);
-        }
+        scoreRenderer()->paintItem(painter, element);
     }
 
-    painter.endDraw(); // Writes MuseScore SVG file to disk, finally
+    painter.endDraw();
+
+    ByteArray data = ByteArray::fromQByteArrayNoCopy(qdata);
+    destinationDevice.write(data);
 
     // Clean up and return
-    Ms::MScore::pixelRatio = pixelRationBackup;
+    mu::engraving::MScore::pixelRatio = pixelRationBackup;
     score->setPrinting(false);
-    Ms::MScore::pdfPrinting = false;
-    Ms::MScore::svgPrinting = false;
+    mu::engraving::MScore::pdfPrinting = false;
+    mu::engraving::MScore::svgPrinting = false;
 
     return true;
 }
 
-SvgWriter::NotesColors SvgWriter::parseNotesColors(const QVariant& obj) const
+SvgWriter::BeatsColors SvgWriter::parseBeatsColors(const QVariant& obj) const
 {
     QVariantMap map = obj.toMap();
-    NotesColors result;
+    BeatsColors result;
 
-    for (const QString& noteNumber : map.keys()) {
-        result[noteNumber.toInt()] = map[noteNumber].value<QColor>();
+    for (const QString& beatNumber : map.keys()) {
+        result[beatNumber.toInt()] = map[beatNumber].value<QColor>();
     }
 
     return result;

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,21 +25,22 @@
 #include "ui_pagesettings.h"
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
+#include "framework/global/iglobalconfiguration.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
 }
 
 namespace mu::notation {
-class PageSettings : public QDialog, private Ui::PageSettingsBase
+class PageSettings : public QDialog, private Ui::PageSettingsBase, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(notation, mu::context::IGlobalContext, globalContext)
+    muse::Inject<mu::context::IGlobalContext> globalContext = { this };
+    muse::Inject<muse::IGlobalConfiguration> configuration = { this };
 
 public:
     explicit PageSettings(QWidget* parent = 0);
-    PageSettings(const PageSettings&);
 
 public slots:
     void accept();
@@ -48,16 +49,17 @@ public slots:
 private:
     void showEvent(QShowEvent*);
     void hideEvent(QHideEvent*);
+    void keyPressEvent(QKeyEvent* event);
 
     void updateValues();
     void blockSignals(bool);
     void setMarginsMax(double);
-    void applyToScore(Ms::Score*);
+    void applyToScore(mu::engraving::Score*);
 
-    Ms::Score* score() const;
+    mu::engraving::Score* score() const;
     double styleValueDouble(StyleId styleId) const;
     bool styleValueBool(StyleId styleId) const;
-    void setStyleValue(StyleId styleId, const QVariant& newValue) const;
+    void setStyleValue(StyleId styleId, const PropertyValue& newValue) const;
 
     bool mmUnit = false;
     bool _changeFlag = false;

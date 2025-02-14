@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,17 +23,14 @@
 
 using namespace mu::instrumentsscene;
 using namespace mu::notation;
+using namespace muse;
 
-mu::RetVal<PartInstrumentListScoreOrder> SelectInstrumentsScenarioStub::selectInstruments(SelectInstrumentsMode) const
+RetVal<PartInstrumentListScoreOrder> SelectInstrumentsScenarioStub::selectInstruments() const
 {
-    mu::RetVal<PartInstrumentListScoreOrder> result;
-    result.ret = make_ret(Ret::Code::NotSupported);
-    return result;
+    return make_ret(Ret::Code::NotSupported);
 }
 
-mu::RetVal<Instrument> SelectInstrumentsScenarioStub::selectInstrument(const std::string&) const
+RetVal<InstrumentTemplate> SelectInstrumentsScenarioStub::selectInstrument(const notation::InstrumentKey&) const
 {
-    mu::RetVal<Instrument> result;
-    result.ret = make_ret(Ret::Code::NotSupported);
-    return result;
+    return make_ret(Ret::Code::NotSupported);
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,21 +22,44 @@
 #include "noteinputcursor.h"
 
 using namespace mu::notation;
+using namespace mu::engraving;
 
-void NoteInputCursor::paint(mu::draw::Painter* painter)
+NoteInputCursor::NoteInputCursor(bool isThinLine)
+    : m_isThinLine(isThinLine)
 {
-    if (!isNoteInputMode()) {
+}
+
+void NoteInputCursor::paint(muse::draw::Painter* painter)
+{
+    INotationNoteInputPtr noteInput = currentNoteInput();
+    if (!noteInput) {
         return;
     }
 
-    QRectF cursorRect = rect();
-    QColor cursorRectColor = cursorColor();
-    painter->fillRect(RectF::fromQRectF(cursorRect), cursorRectColor);
+    const NoteInputState& state = noteInput->state();
+    Color fillColor = configuration()->selectionColor(state.voice());
+    RectF cursorRect = noteInput->cursorRect();
+
+    if (!m_isThinLine) {
+        Color cursorRectColor = fillColor;
+        cursorRectColor.setAlpha(configuration()->cursorOpacity());
+        painter->fillRect(cursorRect, cursorRectColor);
+    }
 
     constexpr int leftLineWidth = 3;
-    QRectF leftLine = QRectF(cursorRect.topLeft().x(), cursorRect.topLeft().y(), leftLineWidth, cursorRect.height());
-    QColor lineColor = fillColor();
-    painter->fillRect(RectF::fromQRectF(leftLine), lineColor);
+    RectF leftLine(cursorRect.topLeft().x(), cursorRect.topLeft().y(), leftLineWidth, cursorRect.height());
+    Color lineColor = fillColor;
+    painter->fillRect(leftLine, lineColor);
+
+    if (state.staffGroup() == StaffGroup::TAB) {
+        const Staff* staff = state.staff();
+        const StaffType* staffType = staff ? staff->staffType() : nullptr;
+
+        if (staffType) {
+            staffType->drawInputStringMarks(painter, state.string(),
+                                            configuration()->selectionColor(state.voice()), cursorRect);
+        }
+    }
 }
 
 INotationNoteInputPtr NoteInputCursor::currentNoteInput() const
@@ -52,42 +75,4 @@ INotationNoteInputPtr NoteInputCursor::currentNoteInput() const
     }
 
     return interaction->noteInput();
-}
-
-bool NoteInputCursor::isNoteInputMode() const
-{
-    auto noteInput = currentNoteInput();
-    if (!noteInput) {
-        return false;
-    }
-
-    return noteInput->isNoteInputMode();
-}
-
-QRectF NoteInputCursor::rect() const
-{
-    auto noteInput = currentNoteInput();
-    if (!noteInput) {
-        return QRectF();
-    }
-
-    return noteInput->cursorRect();
-}
-
-QColor NoteInputCursor::cursorColor() const
-{
-    QColor color = fillColor();
-    color.setAlpha(configuration()->cursorOpacity());
-    return color;
-}
-
-QColor NoteInputCursor::fillColor() const
-{
-    auto noteInput = currentNoteInput();
-    if (!noteInput) {
-        return QColor();
-    }
-
-    int voiceIndex = noteInput->state().currentVoiceIndex;
-    return configuration()->selectionColor(voiceIndex);
 }

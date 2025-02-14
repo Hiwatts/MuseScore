@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,31 +21,31 @@
  */
 #include "readchordlisthook.h"
 
-#include <QDebug>
-
 #include "style/style.h"
-#include "io/xml.h"
-#include "libmscore/masterscore.h"
+
+#include "dom/score.h"
+
+#include "log.h"
 
 using namespace mu::engraving::compat;
-using namespace Ms;
+using namespace mu::engraving;
 
-ReadChordListHook::ReadChordListHook(Ms::Score* score)
+ReadChordListHook::ReadChordListHook(Score* score)
     : m_score(score)
 {
     if (m_score) {
-        m_oldChordDescriptionFile = m_score->style().value(Sid::chordDescriptionFile).toString();
+        m_oldChordDescriptionFile = m_score->style().styleSt(Sid::chordDescriptionFile);
     }
 }
 
-void ReadChordListHook::read(Ms::XmlReader& e)
+void ReadChordListHook::read(XmlReader& e)
 {
     if (!m_score) {
         return;
     }
 
     m_score->chordList()->clear();
-    m_score->chordList()->read(e);
+    m_score->chordList()->read(e, m_score->mscVersion());
     m_score->chordList()->setCustomChordList(true);
 
     m_chordListTag = true;
@@ -57,6 +57,11 @@ void ReadChordListHook::validate()
         return;
     }
 
+    if (m_chordListTag) {
+        // if we encountered a ChordList tag, everything is fine already
+        return;
+    }
+
     // if we just specified a new chord description file
     // and didn't encounter a ChordList tag
     // then load the chord description file
@@ -64,25 +69,22 @@ void ReadChordListHook::validate()
     MStyle& style = m_score->style();
     ChordList* chordList = m_score->chordList();
 
-    QString newChordDescriptionFile = style.value(Sid::chordDescriptionFile).toString();
-    if (newChordDescriptionFile != m_oldChordDescriptionFile && !m_chordListTag) {
-        if (!newChordDescriptionFile.startsWith("chords_") && style.value(Sid::chordStyle).toString() == "std") {
+    String newChordDescriptionFile = style.styleSt(Sid::chordDescriptionFile);
+    if (newChordDescriptionFile != m_oldChordDescriptionFile) {
+        if (!newChordDescriptionFile.startsWith(u"chords_") && style.styleSt(Sid::chordStyle) == "std") {
             // should not normally happen,
             // but treat as "old" (114) score just in case
-            style.set(Sid::chordStyle, QVariant(QString("custom")));
-            style.set(Sid::chordsXmlFile, QVariant(true));
-            qDebug("StyleData::load: custom chord description file %s with chordStyle == std", qPrintable(newChordDescriptionFile));
+            style.set(Sid::chordStyle, String(u"custom"));
+            style.set(Sid::chordsXmlFile, true);
+            LOGD("StyleData::load: custom chord description file %s with chordStyle == std", muPrintable(newChordDescriptionFile));
         }
-        if (style.value(Sid::chordStyle).toString() == "custom") {
-            chordList->setCustomChordList(true);
-        } else {
-            chordList->setCustomChordList(false);
-        }
+
+        bool custom = style.styleSt(Sid::chordStyle) == "custom";
+        chordList->setCustomChordList(custom);
+
         chordList->unload();
     }
 
     // make sure we have a chordlist
-    if (!m_chordListTag) {
-        chordList->checkChordList(style);
-    }
+    chordList->checkChordList(m_score->configuration()->appDataPath(), style);
 }

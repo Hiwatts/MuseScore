@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,31 +19,138 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick 2.15
 import QtQuick.Controls 2.15
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Audio 1.0
+import QtQuick.Layouts 1.15
+
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Audio 1.0
 import MuseScore.Playback 1.0
 
 import "internal"
 
-Rectangle {
+ColumnLayout {
     id: root
 
-    property alias navigation: flickable.navigation
-    property alias contextMenuModel: flickable.contextMenuModel
+    property NavigationSection navigationSection: null
+    property int contentNavigationPanelOrderStart: 1
 
-    color: ui.theme.backgroundPrimaryColor
+    property alias contextMenuModel: contextMenuModel
+    property Component toolbarComponent: MixerPanelToolbar {
+        navigation.section: root.navigationSection
+        navigation.order: root.contentNavigationPanelOrderStart
+    }
 
-    Flickable {
+    signal resizeRequested(var newWidth, var newHeight)
+
+    spacing: 0
+
+    function resizePanelToContentHeight() {
+        if (contentColumn.completed) {
+            root.resizeRequested(width, implicitHeight)
+        }
+    }
+
+    onImplicitHeightChanged: {
+        root.resizePanelToContentHeight()
+    }
+
+    QtObject {
+        id: prv
+
+        property var currentNavigateControlIndex: undefined
+        property bool isPanelActivated: false
+
+        readonly property real headerWidth: 98
+        readonly property real channelItemWidth: 108
+
+        function setNavigateControlIndex(index) {
+            if (!Boolean(prv.currentNavigateControlIndex) ||
+                    index.row !== prv.currentNavigateControlIndex.row ||
+                    index.column !== prv.currentNavigateControlIndex.column) {
+                prv.isPanelActivated = false
+            }
+
+            prv.currentNavigateControlIndex = index
+        }
+    }
+
+    function scrollToFocusedItem(focusedIndex) {
+        let targetScrollPosition = (focusedIndex) * (prv.channelItemWidth + 1) // + 1 for separators
+        let maxContentX = flickable.contentWidth - flickable.width
+
+        if (targetScrollPosition + prv.channelItemWidth > flickable.contentX + flickable.width) {
+            flickable.contentX = Math.min(targetScrollPosition + prv.channelItemWidth - flickable.width, maxContentX)
+        } else if (targetScrollPosition < flickable.contentX) {
+            flickable.contentX = Math.max(targetScrollPosition - prv.channelItemWidth, 0)
+        }
+    }
+
+    MixerPanelModel {
+        id: mixerPanelModel
+
+        navigationSection: root.navigationSection
+        navigationOrderStart: root.contentNavigationPanelOrderStart + 1 // +1 for toolbar
+
+        Component.onCompleted: {
+            mixerPanelModel.load()
+        }
+
+        onModelReset: {
+            Qt.callLater(setupConnections)
+        }
+
+        function setupConnections() {
+            for (let i = 0; i < mixerPanelModel.rowCount(); i++) {
+                let item = mixerPanelModel.get(i)
+                item.channelItem.panel.navigationEvent.connect(function(event) {
+                    if (event.type === NavigationEvent.AboutActive) {
+                        if (Boolean(prv.currentNavigateControlIndex)) {
+                            event.setData("controlIndex", [prv.currentNavigateControlIndex.row, prv.currentNavigateControlIndex.column])
+                            event.setData("controlOptional", true)
+                        }
+
+                        prv.isPanelActivated = true
+                        scrollToFocusedItem(i)
+                    }
+                })
+            }
+        }
+    }
+
+    MixerPanelContextMenuModel {
+        id: contextMenuModel
+
+        Component.onCompleted: {
+            contextMenuModel.load()
+        }
+    }
+
+    StyledFlickable {
         id: flickable
 
-        property alias navigation: navPanel
-        property alias contextMenuModel: contextMenuModel
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+
+        contentWidth: contentColumn.width + 1 // for trailing separator
+        contentHeight: Math.max(contentColumn.height, height)
+
+        implicitHeight: contentColumn.height
+
+        interactive: height < contentHeight || width < contentWidth
+
+        ScrollBar.horizontal: horizontalScrollBar
+
+        ScrollBar.vertical: StyledScrollBar { policy: ScrollBar.AlwaysOn }
+
+        property bool completed: false
 
         function positionViewAtEnd() {
+            if (!flickable.completed) {
+                return
+            }
+
             if (flickable.contentY == flickable.contentHeight) {
                 return
             }
@@ -55,80 +162,55 @@ Rectangle {
             flickable.positionViewAtEnd()
         }
 
-        anchors.fill: parent
-
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-
-        contentWidth: contentColumn.width
-        contentHeight: contentColumn.height
-        interactive: height < contentHeight || width < contentWidth
-
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
-            anchors.rightMargin: 8
-            policy: ScrollBar.AlwaysOn
-            active: true
-
-            //!Note Scrollbars attached to Flickable have their properties (like active) being set by Flickable automatically
-            //      So it completely ignores the policy and such other stuff
-            //      In order to set our own behaviour we have to common approaches:
-            //      - 1 - Explicitly override changes from Flickable in according handlers (current approach)
-            //      - 2 - Use non-attached ScrollBars as a child objects to Flickable, but in this case we'll have to re-implement
-            //            communication among them from scratch
-            onActiveChanged: {
-                if (!active) {
-                    active = true
-                }
-            }
+        Component.onCompleted: {
+            flickable.completed = true
         }
 
-        ScrollBar.horizontal: StyledScrollBar {
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottomMargin: 8
-        }
+        Row {
+            id: separators
 
-        NavigationPanel {
-            id: navPanel
-            name: "MixerPanel"
-            enabled: root.enabled && root.visible
-        }
+            anchors.fill: parent
+            anchors.leftMargin: contextMenuModel.labelsSectionVisible ? prv.headerWidth : prv.channelItemWidth
 
-        MixerPanelModel {
-            id: mixerPanelModel
+            spacing: prv.channelItemWidth
 
-            Component.onCompleted: {
-                mixerPanelModel.load()
-            }
-        }
+            Repeater {
+                model: contextMenuModel.labelsSectionVisible ? mixerPanelModel.count + 1 : mixerPanelModel.count
 
-        MixerPanelContextMenuModel {
-            id: contextMenuModel
-
-            Component.onCompleted: {
-                contextMenuModel.load()
+                SeparatorLine { orientation: Qt.Vertical }
             }
         }
 
         Column {
             id: contentColumn
 
+            anchors.bottom: parent.bottom
             width: childrenRect.width
+            spacing: 0
 
-            spacing: 8
+            property bool completed: false
+
+            Component.onCompleted: {
+                contentColumn.completed = true
+            }
 
             MixerSoundSection {
                 id: soundSection
 
                 visible: contextMenuModel.soundSectionVisible
                 headerVisible: contextMenuModel.labelsSectionVisible
-                rootPanel: root
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
+                spacingAbove: 8
 
                 model: mixerPanelModel
+
+                navigationRowStart: 1
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
             }
 
             MixerFxSection {
@@ -136,9 +218,36 @@ Rectangle {
 
                 visible: contextMenuModel.audioFxSectionVisible
                 headerVisible: contextMenuModel.labelsSectionVisible
-                rootPanel: root
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
 
                 model: mixerPanelModel
+
+                navigationRowStart: 100
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
+            }
+
+            MixerAuxSendsSection {
+                id: auxSendsSection
+
+                visible: contextMenuModel.auxSendsSectionVisible
+                headerVisible: contextMenuModel.labelsSectionVisible
+                headerWidth: prv.headerWidth
+
+                channelItemWidth: prv.channelItemWidth
+
+                model: mixerPanelModel
+
+                navigationRowStart: 200
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
             }
 
             MixerBalanceSection {
@@ -146,9 +255,17 @@ Rectangle {
 
                 visible: contextMenuModel.balanceSectionVisible
                 headerVisible: contextMenuModel.labelsSectionVisible
-                rootPanel: root
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
 
                 model: mixerPanelModel
+
+                navigationRowStart: 300
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
             }
 
             MixerVolumeSection {
@@ -156,9 +273,55 @@ Rectangle {
 
                 visible: contextMenuModel.volumeSectionVisible
                 headerVisible: contextMenuModel.labelsSectionVisible
-                rootPanel: root
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
 
                 model: mixerPanelModel
+
+                navigationRowStart: 400
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
+            }
+
+            MixerFaderSection {
+                id: faderSection
+
+                visible: contextMenuModel.faderSectionVisible
+                headerVisible: contextMenuModel.labelsSectionVisible
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
+                spacingAbove: -3
+                spacingBelow: -2
+
+                model: mixerPanelModel
+
+                navigationRowStart: 500
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
+            }
+
+            MixerMuteAndSoloSection {
+                id: muteAndSoloSection
+
+                visible: contextMenuModel.muteAndSoloSectionVisible
+                headerVisible: contextMenuModel.labelsSectionVisible
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
+
+                model: mixerPanelModel
+
+                navigationRowStart: 600
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
             }
 
             MixerTitleSection {
@@ -166,10 +329,34 @@ Rectangle {
 
                 visible: contextMenuModel.titleSectionVisible
                 headerVisible: contextMenuModel.labelsSectionVisible
-                rootPanel: root
+                headerWidth: prv.headerWidth
+                channelItemWidth: prv.channelItemWidth
+                spacingAbove: 2
+                spacingBelow: 0
 
                 model: mixerPanelModel
+
+                navigationRowStart: 700
+                needReadChannelName: prv.isPanelActivated
+
+                onNavigateControlIndexChanged: function(index) {
+                    prv.setNavigateControlIndex(index)
+                }
             }
+        }
+    }
+
+    Column {
+        spacing: 0
+        Layout.fillWidth: true
+        visible: horizontalScrollBar.isScrollbarNeeded
+
+        SeparatorLine {}
+
+        StyledScrollBar {
+            id: horizontalScrollBar
+            width: parent.width
+            policy: ScrollBar.AlwaysOn
         }
     }
 

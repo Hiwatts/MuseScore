@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,10 +20,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Preferences 1.0
 
 import "internal"
@@ -31,76 +30,78 @@ import "internal"
 PreferencesPage {
     id: root
 
-    contentHeight: content.height
-
     Component.onCompleted: {
         preferencesModel.load()
     }
 
     GeneralPreferencesModel {
         id: preferencesModel
+
+        onReceivingUpdateForCurrentLanguage: function(current, total, status) {
+            languagesSection.setUpdateProgress(current, total, status)
+        }
     }
 
     Column {
-        id: content
-
         width: parent.width
         spacing: root.sectionsSpacing
 
         LanguagesSection {
+            id: languagesSection
+
             languages: preferencesModel.languages
             currentLanguageCode: preferencesModel.currentLanguageCode
+            isNeedRestart: preferencesModel.isNeedRestart
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
 
-            onLanguageSelected: {
+            onLanguageSelected: function(languageCode) {
                 preferencesModel.currentLanguageCode = languageCode
             }
 
-            onUpdateTranslationsRequested: {
-                root.hideRequested()
-                preferencesModel.openUpdateTranslationsPage()
-            }
-        }
-
-        SeparatorLine {
-            visible: telemetrySection.visible
-        }
-
-        TelemetrySection {
-            id: telemetrySection
-
-            isTelemetryAllowed: preferencesModel.isTelemetryAllowed
-
-            visible: false
-
-            navigation.section: root.navigationSection
-            navigation.order: root.navigationOrderStart + 2
-
-            onTelemetryAllowedChanged: {
-                preferencesModel.isTelemetryAllowed = allowed
+            onCheckForUpdateRequested: {
+                preferencesModel.checkUpdateForCurrentLanguage()
             }
         }
 
         SeparatorLine { }
 
-        AutoSaveSection {
-            isAutoSave: preferencesModel.isAutoSave
-            autoSavePeriod: preferencesModel.autoSavePeriod
+        ProgramStartSection {
+            startupModes: preferencesModel.startupModes
+            scorePathFilter: preferencesModel.scorePathFilter()
 
             navigation.section: root.navigationSection
-            navigation.order: root.navigationOrderStart + 3
+            navigation.order: root.navigationOrderStart + 2
 
-            onAutoSaveChanged: {
-                preferencesModel.isAutoSave = autoSave
+            onCurrentStartupModesChanged: function(index) {
+                preferencesModel.setCurrentStartupMode(index)
             }
 
-            onPeriodChanged: {
-                preferencesModel.autoSavePeriod = period
+            onStartupScorePathChanged: function(path) {
+                preferencesModel.setStartupScorePath(path)
             }
         }
 
+        /*
+         * TODO: https://github.com/musescore/MuseScore/issues/9807
+        KeyboardLayoutsSection {
+            keyboardLayouts: preferencesModel.keyboardLayouts
+            currentKeyboardLayout: preferencesModel.currentKeyboardLayout
+
+            navigation.section: root.navigationSection
+            navigation.order: root.navigationOrderStart + 2
+
+            onKeyboardLayoutSelected: function(keyboardLayout) {
+                preferencesModel.currentKeyboardLayout = keyboardLayout
+            }
+        }
+
+        SeparatorLine { }
+        */
+
+        /*
+         * TODO: https://github.com/musescore/MuseScore/issues/9807
         SeparatorLine { }
 
         RemoteControlSection {
@@ -110,13 +111,13 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 4
 
-            onRemoteControlChanged: {
+            onRemoteControlChanged: function(control) {
                 preferencesModel.isOSCRemoteControl = control
             }
 
-            onPortChanged: {
+            onPortChanged: function(port) {
                 preferencesModel.oscPort = port
             }
-        }
+        }*/
     }
 }

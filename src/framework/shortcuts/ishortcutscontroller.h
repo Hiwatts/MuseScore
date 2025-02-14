@@ -19,15 +19,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_SHORTCUTS_ISHORTCUTSCONTROLLER_H
-#define MU_SHORTCUTS_ISHORTCUTSCONTROLLER_H
+#ifndef MUSE_SHORTCUTS_ISHORTCUTSCONTROLLER_H
+#define MUSE_SHORTCUTS_ISHORTCUTSCONTROLLER_H
 
 #include <string>
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 #include "shortcutstypes.h"
 
-namespace mu::shortcuts {
+namespace muse::shortcuts {
 class IShortcutsController : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IShortcutsController)
@@ -36,7 +36,8 @@ public:
     virtual ~IShortcutsController() = default;
 
     virtual void activate(const std::string& sequence) = 0;
+    virtual bool isRegistered(const std::string& sequence) const = 0;
 };
 }
 
-#endif // MU_SHORTCUTS_ISHORTCUTSCONTROLLER_H
+#endif // MUSE_SHORTCUTS_ISHORTCUTSCONTROLLER_H

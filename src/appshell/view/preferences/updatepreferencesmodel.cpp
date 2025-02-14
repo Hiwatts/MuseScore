@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,23 +27,25 @@
 using namespace mu::appshell;
 
 UpdatePreferencesModel::UpdatePreferencesModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
+}
+
+void UpdatePreferencesModel::load()
+{
+    updateConfiguration()->needCheckForUpdateChanged().onNotify(this, [this]() {
+        emit needCheckForNewAppVersionChanged(needCheckForNewAppVersion());
+    });
 }
 
 bool UpdatePreferencesModel::isAppUpdatable() const
 {
-    return configuration()->isAppUpdatable();
+    return updateConfiguration()->isAppUpdatable();
 }
 
 bool UpdatePreferencesModel::needCheckForNewAppVersion() const
 {
-    return configuration()->needCheckForUpdate();
-}
-
-bool UpdatePreferencesModel::needCheckForNewExtensionsVersion() const
-{
-    return extensionsConfiguration()->needCheckForUpdate();
+    return updateConfiguration()->needCheckForUpdate();
 }
 
 void UpdatePreferencesModel::setNeedCheckForNewAppVersion(bool value)
@@ -52,16 +54,11 @@ void UpdatePreferencesModel::setNeedCheckForNewAppVersion(bool value)
         return;
     }
 
-    configuration()->setNeedCheckForUpdate(value);
+    updateConfiguration()->setNeedCheckForUpdate(value);
     emit needCheckForNewAppVersionChanged(value);
 }
 
-void UpdatePreferencesModel::setNeedCheckForNewExtensionsVersion(bool value)
+QString UpdatePreferencesModel::museScorePrivacyPolicyUrl() const
 {
-    if (value == needCheckForNewExtensionsVersion()) {
-        return;
-    }
-
-    extensionsConfiguration()->setNeedCheckForUpdate(value);
-    emit needCheckForNewExtensionsVersionChanged(value);
+    return QString::fromStdString(updateConfiguration()->museScorePrivacyPolicyUrl());
 }

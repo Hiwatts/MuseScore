@@ -19,8 +19,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_UIACTIONSREGISTER_H
-#define MU_UI_UIACTIONSREGISTER_H
+#ifndef MUSE_UI_UIACTIONSREGISTER_H
+#define MUSE_UI_UIACTIONSREGISTER_H
 
 #include <vector>
 #include <unordered_map>
@@ -31,18 +31,25 @@
 #include "iuicontextresolver.h"
 #include "async/asyncable.h"
 
-namespace mu::ui {
-class UiActionsRegister : public IUiActionsRegister, public async::Asyncable
+namespace muse::ui {
+class UiActionsRegister : public IUiActionsRegister, public Injectable, public async::Asyncable
 {
-    INJECT(ui, IUiContextResolver, uicontextResolver)
-    INJECT(ui, shortcuts::IShortcutsRegister, shortcutsRegister)
+    Inject<IUiContextResolver> uicontextResolver = { this };
+    Inject<shortcuts::IShortcutsRegister> shortcutsRegister = { this };
+
 public:
-    UiActionsRegister() = default;
+    UiActionsRegister(const modularity::ContextPtr& iocCtx)
+        : Injectable(iocCtx) {}
 
     void init();
 
     void reg(const IUiActionsModulePtr& actions) override;
+
+    std::vector<UiAction> actionList() const override;
+
     const UiAction& action(const actions::ActionCode& code) const override;
+    async::Channel<UiActionList> actionsChanged() const override;
+
     UiActionState actionState(const actions::ActionCode& code) const override;
     async::Channel<actions::ActionCodeList> actionStateChanged() const override;
 
@@ -63,7 +70,10 @@ private:
     Info& info(const actions::ActionCode& code);
     const Info& info(const actions::ActionCode& code) const;
 
-    void updateShortcuts();
+    void updateShortcuts(const actions::ActionCodeList& codes);
+    void updateShortcutsAll();
+
+    void updateActions(const UiActionList& actions);
 
     void updateEnabled(const actions::ActionCodeList& codes);
     void updateEnabledAll();
@@ -74,8 +84,9 @@ private:
     void updateChecked(const actions::ActionCodeList& codes);
 
     std::unordered_map<actions::ActionCode, Info> m_actions;
+    async::Channel<UiActionList> m_actionsChanged;
     async::Channel<actions::ActionCodeList> m_actionStateChanged;
 };
 }
 
-#endif // MU_UI_UIACTIONSREGISTER_H
+#endif // MUSE_UI_UIACTIONSREGISTER_H

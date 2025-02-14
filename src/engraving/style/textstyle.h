@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,22 +23,42 @@
 #define MU_ENGRAVING_TEXTSTYLE_H
 
 #include "styledef.h"
-#include "libmscore/types.h"
+#include "../types/types.h"
 
-namespace Ms {
-#define TEXT_STYLE_SIZE 14
+namespace mu::engraving {
+enum class TextStylePropertyType : char {
+    Undefined = 0,
+    FontFace,
+    FontSize,
+    LineSpacing,
+    SizeSpatiumDependent,
+    FontStyle,
+    Color,
+    TextAlign,
+    Offset,
+    FrameType,
+    FramePadding,
+    FrameWidth,
+    FrameRound,
+    FrameBorderColor,
+    FrameFillColor,
+    MusicalSymbolsScale,
+};
 
-typedef std::array<StyledProperty, TEXT_STYLE_SIZE> TextStyle;
+struct TextStyleProperty {
+    TextStylePropertyType type;
+    Sid sid;
+    Pid pid;
+};
 
-const TextStyle* textStyle(Tid);
-const TextStyle* textStyle(const char*);
+constexpr size_t TEXT_STYLE_SIZE = 15;
 
-const char* textStyleName(Tid);
-QString textStyleUserName(Tid);
-Tid textStyleFromName(const QString&);
+typedef std::array<TextStyleProperty, TEXT_STYLE_SIZE> TextStyle;
 
-const std::vector<Tid>& allTextStyles();
-const std::vector<Tid>& primaryTextStyles();
+const TextStyle* textStyle(TextStyleType);
+const std::vector<TextStyleType>& allTextStyles();
+const std::vector<TextStyleType>& editableTextStyles();
+const std::vector<TextStyleType>& primaryTextStyles();
 }
 
 #endif // MU_ENGRAVING_TEXTSTYLE_H

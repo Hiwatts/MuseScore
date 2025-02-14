@@ -26,21 +26,39 @@
 #include <QDir>
 #include <QCoreApplication>
 
-#include "config.h"
 #include "settings.h"
+
+#include "muse_framework_config.h"
+
 #include "log.h"
 
-using namespace mu;
-using namespace mu::framework;
+using namespace muse;
 
 static const Settings::Key BACKUP_KEY("global", "application/backup/subfolder");
+static const Settings::Key DEV_MODE_ENABLED_KEY("global", "application/devModeEnabled");
+static const Settings::Key METRIC_UNIT_KEY("global", "application/metricUnit");
+static const Settings::Key HIGH_RESOLUTION_TIMERS("global", "application/highResolutionTimers");
 
-io::path GlobalConfiguration::appBinPath() const
+static const std::string MUSESCORE_URL("https://www.musescore.org/");
+static const std::string MUSEHUB_WEB_URL("https://www.musehub.com/");
+
+void GlobalConfiguration::init()
 {
-    return io::path(QCoreApplication::applicationDirPath());
+    settings()->setDefaultValue(DEV_MODE_ENABLED_KEY, Val(application()->unstable()));
+    settings()->setDefaultValue(HIGH_RESOLUTION_TIMERS, Val(false));
 }
 
-io::path GlobalConfiguration::appDataPath() const
+io::path_t GlobalConfiguration::appBinPath() const
+{
+    return QCoreApplication::applicationFilePath();
+}
+
+io::path_t GlobalConfiguration::appBinDirPath() const
+{
+    return io::path_t(QCoreApplication::applicationDirPath());
+}
+
+io::path_t GlobalConfiguration::appDataPath() const
 {
     if (m_appDataPath.empty()) {
         m_appDataPath = resolveAppDataPath();
@@ -51,7 +69,7 @@ io::path GlobalConfiguration::appDataPath() const
 QString GlobalConfiguration::resolveAppDataPath() const
 {
 #ifdef Q_OS_WIN
-    QDir dir(QCoreApplication::applicationDirPath() + QString("/../" INSTALL_NAME));
+    QDir dir(QCoreApplication::applicationDirPath() + QString("/../"));
     return dir.absolutePath() + "/";
 #elif defined(Q_OS_MAC)
     QDir dir(QCoreApplication::applicationDirPath() + QString("/../Resources"));
@@ -60,21 +78,21 @@ QString GlobalConfiguration::resolveAppDataPath() const
     return "/files/share";
 #else
     // Try relative path (needed for portable AppImage and non-standard installations)
-    QDir dir(QCoreApplication::applicationDirPath() + QString("/../share/" INSTALL_NAME));
+    QDir dir(QCoreApplication::applicationDirPath() + QString("/../share/" MUSE_APP_INSTALL_NAME));
     if (dir.exists()) {
         return dir.absolutePath() + "/";
     }
     // Otherwise fall back to default location (e.g. if binary has moved relative to share)
-    return QString(INSTPREFIX "/share/" INSTALL_NAME);
+    return QString(MUSE_APP_INSTALL_PREFIX "/share/" MUSE_APP_INSTALL_NAME);
 #endif
 }
 
-io::path GlobalConfiguration::appConfigPath() const
+io::path_t GlobalConfiguration::appConfigPath() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
 }
 
-io::path GlobalConfiguration::userAppDataPath() const
+io::path_t GlobalConfiguration::userAppDataPath() const
 {
     if (m_userAppDataPath.empty()) {
         m_userAppDataPath = resolveUserAppDataPath();
@@ -84,10 +102,8 @@ io::path GlobalConfiguration::userAppDataPath() const
 
 QString GlobalConfiguration::resolveUserAppDataPath() const
 {
-#if defined(WIN_PORTABLE)
-    return QDir::cleanPath(QString("%1/../../../Data/settings")
-                           .arg(QCoreApplication::applicationDirPath())
-                           .arg(QCoreApplication::applicationName()));
+#ifdef WIN_PORTABLE
+    return QDir::cleanPath(QString("%1/../../../Data/settings").arg(QCoreApplication::applicationDirPath()));
 #elif defined(Q_OS_WASM)
     return QString("/files/data");
 #else
@@ -95,20 +111,32 @@ QString GlobalConfiguration::resolveUserAppDataPath() const
 #endif
 }
 
-io::path GlobalConfiguration::userBackupPath() const
+io::path_t GlobalConfiguration::userBackupPath() const
 {
     return settings()->value(BACKUP_KEY).toString();
 }
 
-io::path GlobalConfiguration::userDataPath() const
+io::path_t GlobalConfiguration::userDataPath() const
 {
-    static io::path p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/MuseScore";
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + QCoreApplication::applicationName();
     return p;
 }
 
-io::path GlobalConfiguration::homePath() const
+io::path_t GlobalConfiguration::homePath() const
 {
-    static io::path p = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    return p;
+}
+
+io::path_t GlobalConfiguration::downloadsPath() const
+{
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    return p;
+}
+
+io::path_t GlobalConfiguration::genericDataPath() const
+{
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     return p;
 }
 
@@ -120,4 +148,39 @@ bool GlobalConfiguration::useFactorySettings() const
 bool GlobalConfiguration::enableExperimental() const
 {
     return false;
+}
+
+bool GlobalConfiguration::devModeEnabled() const
+{
+    return settings()->value(DEV_MODE_ENABLED_KEY).toBool();
+}
+
+void GlobalConfiguration::setDevModeEnabled(bool enabled)
+{
+    settings()->setSharedValue(DEV_MODE_ENABLED_KEY, Val(enabled));
+}
+
+bool GlobalConfiguration::metricUnit() const
+{
+    return settings()->value(METRIC_UNIT_KEY).toBool();
+}
+
+void GlobalConfiguration::setMetricUnit(bool metricUnit)
+{
+    settings()->setSharedValue(METRIC_UNIT_KEY, Val(metricUnit));
+}
+
+std::string GlobalConfiguration::museScoreUrl() const
+{
+    return MUSESCORE_URL;
+}
+
+std::string GlobalConfiguration::museHubWebUrl() const
+{
+    return MUSEHUB_WEB_URL;
+}
+
+bool GlobalConfiguration::highResolutionTimers() const
+{
+    return settings()->value(HIGH_RESOLUTION_TIMERS).toBool();
 }
