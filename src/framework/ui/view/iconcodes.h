@@ -20,10 +20,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UI_ICONCODE_H
-#define MU_UI_ICONCODE_H
+#ifndef MUSE_UI_ICONCODE_H
+#define MUSE_UI_ICONCODE_H
 
 #include <QObject>
+#include <QMetaEnum>
 
 #ifdef WARNING
 #undef WARNING
@@ -42,13 +43,13 @@
 #undef FILE_OPEN
 #endif
 
-namespace mu::ui {
+namespace muse::ui {
 /**
  * @brief The IconCode class simplifies access to the icons from the icon font
  *
  * @details Each enum value is a UTF-16-like address of the icon in the icon font.
  *          The current icon-font (MusescoreIcon.ttf) is located in the 'MuseScore/fonts/mscore' folder,
- *          The most actual version can be found by this persistent URL: @link https://www.dropbox.com/s/ip59ren10u69hr7/MusescoreIcon.ttf?dl=0
+ *          The most actual version can be found by this persistent URL: @link https://www.dropbox.com/s/srfpt78uy7aazz1/MusescoreIcon.ttf?dl=0
  */
 
 class IconCode
@@ -57,6 +58,7 @@ class IconCode
 
 public:
     enum class Code : char16_t {
+        SMALL_ARROW_LEFT = 0xEF0F,
         SMALL_ARROW_UP = 0xEF10,
         SMALL_ARROW_RIGHT = 0xEF11,
         SMALL_ARROW_DOWN = 0xEF12,
@@ -99,8 +101,8 @@ public:
         ARROW_UP = 0xEF37,
         POSITION_ARROWS = 0xEF38,
         TEXT_ALIGN_BASELINE = 0xEF39,
-        TEXT_ALIGN_ABOVE = 0xEF3A,
-        TEXT_ALIGN_UNDER = 0xEF3B,
+        TEXT_ALIGN_BOTTOM = 0xEF3A,
+        TEXT_ALIGN_TOP = 0xEF3B,
         TEXT_ALIGN_MIDDLE = 0xEF3C,
         TEXT_ALIGN_LEFT = 0xEF3D,
         TEXT_ALIGN_CENTER = 0xEF3E,
@@ -108,6 +110,7 @@ public:
         TEXT_ITALIC = 0xEF40,
         TEXT_UNDERLINE = 0xEF41,
         TEXT_BOLD = 0xEF42,
+        TEXT_STRIKE = 0xF424,
         APPLY_GLOBAL_STYLE = 0xEF43,
         HAIRPIN = 0xEF44,
         ACCIDENTAL_SHARP = 0xEF45,
@@ -120,13 +123,13 @@ public:
         TEXT_SUBSCRIPT = 0xEF4C,
         TEXT_SUPERSCRIPT = 0xEF4D,
         AUDIO = 0xEF4E,
-        VISIBILITY_ON = 0xEF53,
-        VISIBILITY_OFF = 0xEF54,
+        EYE_OPEN = 0xEF53,
+        EYE_CLOSED = 0xEF54,
         SETTINGS_COG = 0xEF55,
-        FEATHERED_RIGHT_HEIGHT = 0xEF56,
-        FEATHERED_LEFT_HEIGHT = 0xEF57,
-        BEAM_RIGHT_Y_POSITION = 0xEF5A,
-        BEAM_LEFT_Y_POSITION = 0xEF5B,
+        BEAM_FEATHERING_RIGHT_HEIGHT = 0xEF56,
+        BEAM_FEATHERING_LEFT_HEIGHT = 0xEF57,
+        BEAM_HEIGHT_LEFT = 0xEF5A,
+        BEAM_HEIGHT_RIGHT = 0xEF5B,
         LOCK_CLOSED = 0xEF5C,
         LOCK_OPEN = 0xEF5D,
         DOT_ABOVE_LINE = 0xEF5E,
@@ -161,18 +164,18 @@ public:
         AMBITUS_LEANING_RIGHT = 0xEF7B,
         BRACKET_PARENTHESES = 0xEF7C,
         BRACKET_PARENTHESES_SQUARE = 0xEF7D,
-        STAFF_TYPE_CHANGE = 0xEF7E,
         SPLIT_VIEW_HORIZONTAL = 0xEF7F,
         SPLIT_VIEW_VERTICAL = 0xEF80,
         KEY_SIGNATURE = 0xEF81,
         LINE_DASHED = 0xEF82,
+
         LINE_DOTTED = 0xEF83,
         LINE_NORMAL = 0xEF84,
         LINE_WITH_END_HOOK = 0xEF85,
         LINE_WITH_ANGLED_END_HOOK = 0xEF86,
         LINE_PEDAL_STAR_ENDING = 0xEF87,
-        BEAM_FEATHERING_LEFT = 0xEF88,
-        BEAM_FEATHERING_RIGHT = 0xEF89,
+        BEAM_FEATHERED_ACCELERATE = 0xEF88,
+        BEAM_FEATHERED_DECELERATE = 0xEF89,
 
         RIGHT_GAP = 0xEF90,
         LEFT_GAP = 0xEF91,
@@ -197,13 +200,14 @@ public:
         GRADUATION_CAP = 0xF19D,
 
         SCORE = 0xF319,
+        CLEF_TREBLE = 0xF31A,
 
         AUTO_TEXT = 0xF329,
-        NOTE_HEAD_EIGHTH = 0xF33A,
-        BEAM_START = 0xF33B,
-        BEAM_MIDDLE = 0xF33D,
-        BEAM_32 = 0xF33E,
-        BEAM_64 = 0xF33F,
+        BEAM_NONE = 0xF33A,
+        BEAM_BREAK_LEFT = 0xF33B,
+        BEAM_JOIN = 0xF33D,
+        BEAM_BREAK_INNER_8TH = 0xF33E,
+        BEAM_BREAK_INNER_16TH = 0xF33F,
 
         QUESTION_MARK = 0xF340,
 
@@ -211,6 +215,9 @@ public:
         NOTE_HEAD_HALF = 0xF342,
         NOTE_HEAD_WHOLE = 0xF343,
         NOTE_HEAD_BREVIS = 0xF344,
+        NOTE_HEAD = 0xF42F,
+        NOTE_HEAD_PARENTHESES = 0xF430,
+
         PLAY_REPEATS = 0xF345,
         BARLINE_WINGED = 0xF34C,
         BARLINE_UNWINGED = 0xF34D,
@@ -289,16 +296,25 @@ public:
         NOTE_DOTTED_4 = 0xF397,
 
         COPY = 0xF398,
+        PASTE = 0xF399,
+        CUT = 0xF39A,
+
+        CHEVRON_RIGHT = 0xF39B,
+        CHEVRON_LEFT = 0xF39C,
 
         NOTE_PLUS = 0xF39D,
         NOTE_TO_RIGHT = 0xF39E,
         RHYTHM_ONLY = 0xF39F,
-        RE_PITH = 0xF3A0,
+        RE_PITCH = 0xF3A0,
         FOOT_PEDAL = 0xF3A1,
 
         TOOLBAR_GRIP = 0xF3A2,
 
+        GRID = 0xF3A4,
+
         PAGE = 0xF3A5,
+
+        LIST = 0xF3AA,
 
         CAMERA = 0xF3AE,
 
@@ -307,7 +323,11 @@ public:
         PAN_SCORE = 0xF3B0,
         COUNT_IN = 0xF3B1,
 
+        GLOBE = 0xF3B6,
         PRINT = 0xF3B7,
+
+        DOWN = 0xF3C1,
+        UP = 0xF3C2,
 
         LOOP_IN = 0xF3C7,
         LOOP_OUT = 0xF3C8,
@@ -321,13 +341,165 @@ public:
         MUTE = 0xF3D5,
         SOLO = 0xF3D6,
 
+        OTTAVA = 0xF40D,
+        PALM_MUTE = 0xF40E,
+        LET_RING = 0xF40F,
+        VOLTA = 0xF410,
+        VIBRATO = 0xF411,
+        DIMINUENDO = 0xF414,
+        CRESCENDO = 0xF415,
+
+        MICROPHONE = 0xF41B,
+
+        APP_MINIMIZE = 0xF41C,
+        APP_MAXIMIZE = 0xF41D,
+        APP_UNMAXIMIZE = 0xF41E,
+        APP_CLOSE = 0xF41F,
+
         NOTEFLAGS_TRADITIONAL = 0xF420,
         NOTEFLAGS_STRAIGHT = 0xF421,
 
-        NONE
+        TUPLET_NUMBER_WITH_BRACKETS = 0xF422,
+        TUPLET_NUMBER_ONLY = 0xF423,
+
+        USE_WIDE_BEAMS_REGULAR = 0xF425,
+        USE_WIDE_BEAMS_WIDE = 0xF426,
+
+        ACCIACCATURA = 0xF427,
+        APPOGGIATURA = 0xF428,
+        GRACE4 = 0xF429,
+        GRACE16 = 0xF42A,
+        GRACE32 = 0xF42B,
+        GRACE8_AFTER = 0xF42C,
+        GRACE16_AFTER = 0xF42D,
+        GRACE32_AFTER = 0xF42E,
+
+        MEASURE_REPEAT = 0xF431,
+
+        INSERT_ONE_MEASURE = 0xF432,
+        STAFF_TYPE_CHANGE = 0xF433,
+
+        LINE_WIDE_DASHED = 0xF434,
+
+        CLOUD = 0xF435,
+
+        ZOOM_TOGGLE = 0xF437,
+        FIT_SELECTION = 0xF438,
+        FIT_PROJECT = 0xF439,
+        SILENCE_AUDIO_SELECTION = 0xF43A,
+        TRIM_AUDIO_OUTSIDE_SELECTION = 0xF43B,
+
+        WAVEFORM = 0xF43C,
+        CROSS_STAFF_BEAMING = 0xF43D,
+
+        MAGNET = 0xF43E,
+
+        TEMPO_CHANGE = 0xF43F,
+
+        PLUGIN = 0xF440,
+        LYRICS = 0xF441,
+        LEARN = 0xF441,
+        SPECTROGRAM = 0xF442,
+        SPECTROGRAM_BOX_SELECTION = 0xF443,
+        BRUSH = 0xF444,
+
+        PLAY_FILL = 0xF446,
+        STOP_FILL = 0xF447,
+        REWIND_START_FILL = 0xF448,
+        REWIND_END_FILL = 0xF449,
+        RECORD_FILL = 0xF44A,
+        PAUSE_FILL = 0xF44B,
+
+        REST_8TH = 0xF44C,
+        CIRCLE = 0xF44D,
+
+        SHARE_AUDIO = 0xF44F,
+
+        DYNAMIC_CENTER_1 = 0xF451,
+        DYNAMIC_CENTER_2 = 0xF452,
+        EXPRESSION = 0xF453,
+
+        CLOUD_FILL = 0xF454,
+        BRAILLE = 0xF455,
+
+        AUTOMATION = 0xF45C,
+
+        GUITAR_BEND_REGULAR = 0xF45F,
+        GUITAR_PRE_BEND = 0xF460,
+        GUITAR_GRACE_NOTE_BEND = 0xF461,
+        GUITAR_SLIGHT_BEND = 0xF462,
+        GUITAR_BEND_STYLE_1 = 0xF463,
+        GUITAR_BEND_STYLE_FULL = 0xF464,
+
+        WORKSPACE = 0xF46B,
+
+        TIE_OUTSIDE = 0xF45D,
+        TIE_INSIDE = 0xF45E,
+        TIE_CHORD_OUTSIDE = 0xF466,
+        TIE_CHORD_INSIDE = 0xF467,
+
+        SINGLE_NOTE = 0xF46C,
+
+        TRIANGLE_SYMBOL = 0xF46D,
+
+        FRETBOARD_VERTICAL = 0xF46F,
+        FRETBOARD_EXTENDED = 0xF470,
+        FRETBOARD_HORIZONTAL = 0xF471,
+        FRETBOARD_BARRE_LINE = 0xF472,
+        FRETBOARD_BARRE_SLUR = 0xF473,
+
+        BPM = 0xF474,
+        CLOCK = 0xF475,
+
+        PLAYHEAD = 0xF478,
+        PLAYHEAD_FILLED = 0xF47A,
+
+        NOTE_ANCHORED_LINE = 0xF47B,
+
+        NOTE_LV = 0xF47C,
+
+        LV_OUTSIDE = 0xF47D,
+        LV_INSIDE = 0xF47E,
+        LV_CHORD_OUTSIDE = 0xF47F,
+        LV_CHORD_INSIDE = 0xF480,
+
+        PERCUSSION = 0xF479,
+
+        SYSTEM_LOCK_START = 0xF481,
+        SYSTEM_LOCK_END = 0xF482,
+
+        LINE_BREAK = 0xF483,
+        PAGE_BREAK = 0xF484,
+        SECTION_BREAK2 = 0xF485,
+        NO_BREAK = 0xF486,
+        SYSTEM_LOCK = 0xF487,
+
+        TIMESIG_STANDARD = 0XF488,
+        TIMESIG_NARROW = 0xF489,
+        TIMESIG_SANSSERIF = 0xF48A,
+
+        ALIGN_LEFT = 0xF48B,
+        ALIGN_HORIZONTAL_CENTER = 0xF48C,
+        ALIGN_RIGHT = 0xF48D,
+
+        ALIGN_TOP = 0xF48E,
+        ALIGN_VERTICAL_CENTER = 0xF48F,
+
+        FRET_FRAME = 0xF491,
+        DURATION_CURSOR = 0xF492,
+
+        NONE = 0xFFFF
     };
 
     Q_ENUM(Code)
+
+    static Code fromString(const char* key)
+    {
+        bool ok = false;
+        QMetaEnum me = QMetaEnum::fromType<Code>();
+        int val = me.keyToValue(key, &ok);
+        return ok ? static_cast<Code>(val) : Code::NONE;
+    }
 };
 
 static inline QChar iconCodeToChar(IconCode::Code code)
@@ -336,4 +508,4 @@ static inline QChar iconCodeToChar(IconCode::Code code)
 }
 }
 
-#endif // MU_UI_ICONCODE_H
+#endif // MUSE_UI_ICONCODE_H

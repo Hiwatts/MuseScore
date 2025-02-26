@@ -5,7 +5,7 @@
 
 #include "fontproviderstub.h"
 
-#include "engraving/libmscore/score.h"
+#include "engraving/dom/score.h"
 #include "engraving/compat/scoreaccess.h"
 
 int main(int argc, char* argv[])
@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
 
     Ms::MasterScore* s = mu::engraving::compat::ScoreAccess::createMasterScore();
     qDebug() << "score: " << s;
+
 
     return a.exec();
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,210 +22,250 @@
 #ifndef MU_NOTATION_NOTATIONACTIONCONTROLLER_H
 #define MU_NOTATION_NOTATIONACTIONCONTROLLER_H
 
-#include "modularity/ioc.h"
-#include "actions/iactionsdispatcher.h"
+#include "async/asyncable.h"
 #include "actions/actionable.h"
 #include "actions/actiontypes.h"
-#include "async/asyncable.h"
-#include "context/iglobalcontext.h"
-#include "inotation.h"
+
+#include "modularity/ioc.h"
 #include "iinteractive.h"
+#include "actions/iactionsdispatcher.h"
+#include "ui/iuiactionsregister.h"
+#include "context/iglobalcontext.h"
+#include "context/iuicontextresolver.h"
 #include "playback/iplaybackcontroller.h"
-#include "playback/iplaybackconfiguration.h"
+#include "engraving/iengravingconfiguration.h"
 #include "inotationconfiguration.h"
 
+#include "inotation.h"
+
 namespace mu::notation {
-class NotationActionController : public actions::Actionable, public async::Asyncable
+class NotationActionController : public muse::actions::Actionable, public muse::async::Asyncable
 {
-    INJECT(notation, actions::IActionsDispatcher, dispatcher)
-    INJECT(notation, context::IGlobalContext, globalContext)
-    INJECT(notation, framework::IInteractive, interactive)
-    INJECT(notation, playback::IPlaybackController, playbackController)
-    INJECT(notation, playback::IPlaybackConfiguration, playbackConfiguration)
-    INJECT(notation, INotationConfiguration, configuration)
+    INJECT(muse::actions::IActionsDispatcher, dispatcher)
+    INJECT(muse::ui::IUiActionsRegister, actionRegister)
+    INJECT(context::IGlobalContext, globalContext)
+    INJECT(context::IUiContextResolver, uiContextResolver)
+    INJECT(muse::IInteractive, interactive)
+    INJECT(playback::IPlaybackController, playbackController)
+    INJECT(INotationConfiguration, configuration)
+    INJECT(engraving::IEngravingConfiguration, engravingConfiguration)
 
 public:
     void init();
 
-    bool canReceiveAction(const actions::ActionCode& code) const override;
+    bool canReceiveAction(const muse::actions::ActionCode& code) const override;
 
-    async::Notification currentNotationChanged() const;
+    muse::async::Notification currentNotationChanged() const;
 
     INotationNoteInputPtr currentNotationNoteInput() const;
-    async::Notification currentNotationNoteInputChanged() const;
+    muse::async::Notification currentNotationNoteInputChanged() const;
 
     INotationInteractionPtr currentNotationInteraction() const;
 
     INotationStylePtr currentNotationStyle() const;
-    async::Notification currentNotationStyleChanged() const;
+    muse::async::Notification currentNotationStyleChanged() const;
+
+    INotationAccessibilityPtr currentNotationAccessibility() const;
+
+    using EngravingDebuggingOptions = engraving::IEngravingConfiguration::DebuggingOptions;
+    static const std::unordered_map<muse::actions::ActionCode, bool EngravingDebuggingOptions::*> engravingDebuggingActions;
 
 private:
     INotationPtr currentNotation() const;
+    IMasterNotationPtr currentMasterNotation() const;
     INotationElementsPtr currentNotationElements() const;
     INotationSelectionPtr currentNotationSelection() const;
     INotationUndoStackPtr currentNotationUndoStack() const;
+    INotationMidiInputPtr currentNotationMidiInput() const;
+
+    mu::engraving::Score* currentNotationScore() const;
 
     void toggleNoteInput();
     void toggleNoteInputMethod(NoteInputMethod method);
-    void addNote(NoteName note, NoteAddingMode addingMode);
-    void addText(TextType type);
-    void addFiguredBass();
+    void toggleNoteInputInsert();
+    void handleNoteAction(NoteName note, NoteAddingMode addingMode);
+    void handleNoteAction(const muse::actions::ActionData& args);
     void padNote(const Pad& pad);
-    void putNote(const actions::ActionData& data);
-
-    void toggleVisible();
+    void putNote(const muse::actions::ActionData& args);
+    void removeNote(const muse::actions::ActionData& args);
+    void doubleNoteInputDuration();
+    void halveNoteInputDuration();
+    void realtimeAdvance();
 
     void toggleAccidental(AccidentalType type);
-    void putRestToSelection();
-    void putRest(DurationType duration);
-    void addArticulation(SymbolId articulationSymbolId);
+    void toggleArticulation(SymbolId articulationSymbolId);
 
+    void putTuplet(const muse::actions::ActionData& data);
+    void putTuplet(const TupletOptions& options);
     void putTuplet(int tupletCount);
-    void addBeamToSelectedChordRests(BeamMode mode);
-    void addBracketsToSelection(BracketsType type);
 
-    void moveAction(const actions::ActionCode& actionCode);
+    bool moveSelectionAvailable(MoveSelectionType type) const;
+    void moveSelection(MoveSelectionType type, MoveDirection direction);
+    void move(MoveDirection direction, bool quickly = false);
+    void moveInputNotes(bool up, bool quickly = false);
+    void movePitchDiatonic(MoveDirection direction, bool);
     void moveWithinChord(MoveDirection direction);
-    void moveText(INotationInteractionPtr interaction, const actions::ActionCode& actionCode);
-    void moveChordRestToStaff(MoveDirection direction);
     void selectTopOrBottomOfChord(MoveDirection direction);
 
-    void increaseDecreaseDuration(int steps, bool stepByDots);
-
-    void swapVoices(int voiceIndex1, int voiceIndex2);
-    void changeVoice(int voiceIndex);
+    void changeVoice(voice_idx_t voiceIndex);
 
     void cutSelection();
-    void copySelection();
-    void deleteSelection();
-    void swapSelection();
-    void flipSelection();
+    void repeatSelection();
     void addTie();
     void chordTie();
+    void addLaissezVib();
     void addSlur();
-    void addInterval(int interval);
-    void addFret(int fretIndex);
+    void addFret(int num);
 
-    void undo();
-    void redo();
+    void insertClef(mu::engraving::ClefType type);
 
-    void addChordToSelection(MoveDirection direction);
+    muse::IInteractive::Result showErrorMessage(const std::string& message) const;
+
+    bool isElementsSelected(const std::vector<ElementType>& elementsTypes) const;
+
+    void addText(TextStyleType type);
+    void addImage();
+    void addFiguredBass();
+    void addGuitarBend(GuitarBendType bendType);
+
     void selectAllSimilarElements();
     void selectAllSimilarElementsInStaff();
     void selectAllSimilarElementsInRange();
     void openSelectionMoreOptions();
-    void selectAll();
-    void selectSection();
-    void firstElement();
-    void lastElement();
 
-    void nextLyrics();
-    void previousLyrics();
-    void nextLyricsVerse();
-    void previousLyricsVerse();
-    void nextSyllable();
-    void addMelisma();
-    void addLyricsVerse();
+    void startEditSelectedElement(const muse::actions::ActionData& args);
+    void startEditSelectedText(const muse::actions::ActionData& args);
 
-    void toggleBold();
-    void toggleItalic();
-    void toggleUnderline();
-
-    void toggleLayoutBreak(LayoutBreakType breakType);
-
-    void splitMeasure();
-    void joinSelectedMeasures();
-    void selectMeasuresCountAndInsert();
-    void selectMeasuresCountAndAppend();
-
-    void insertBox(BoxType boxType);
-    void appendBox(BoxType boxType);
-    void insertBoxes(BoxType boxType, int count);
-    void appendBoxes(BoxType boxType, int count);
-    int firstSelectedBoxIndex() const;
-
-    void addOttava(OttavaType type);
-    void addHairpin(HairpinType type);
-    void addAnchoredNoteLine();
+    void addMeasures(const muse::actions::ActionData& actionData, AddBoxesTarget target);
+    void addBoxes(BoxType boxType, int count, AddBoxesTarget target);
 
     void addStretch(qreal value);
 
-    void explodeSelectedStaff();
-    void implodeSelectedStaff();
-    void realizeSelectedChordSymbols();
-    void removeSelectedRange();
-    void removeEmptyTrailingMeasures();
-    void fillSelectionWithSlashes();
-    void replaceSelectedNotesWithSlashes();
-    void spellPitches();
-    void regroupNotesAndRests();
-    void resequenceRehearsalMarks();
     void unrollRepeats();
-    void copyLyrics();
-    void addGraceNotesToSelectedNotes(GraceNoteType type);
-    void changeEnharmonicSpellingBoth();
-    void changeEnharmonicSpellingCurrent();
 
     void resetState();
     void resetStretch();
-    void resetTextStyleOverrides();
     void resetBeamMode();
-    void resetShapesAndPosition();
 
-    void openEditStyleDialog();
+    void openEditStyleDialog(const muse::actions::ActionData& args);
     void openPageSettingsDialog();
     void openStaffProperties();
+    void openEditStringsDialog();
     void openBreaksDialog();
-    void openScoreProperties();
     void openTransposeDialog();
     void openPartsDialog();
     void openTupletOtherDialog();
     void openStaffTextPropertiesDialog();
     void openMeasurePropertiesDialog();
     void openEditGridSizeDialog();
-    mu::io::path selectStyleFile(bool forLoad);
+    void openRealizeChordSymbolsDialog();
+    muse::io::path_t selectStyleFile(bool forLoad);
     void loadStyle();
     void saveStyle();
 
     void toggleScoreConfig(ScoreConfigType configType);
-    void toggleNavigator();
-    void toggleMixer();
     void toggleConcertPitch();
 
     void playSelectedElement(bool playChord = true);
 
     bool isEditingText() const;
-    bool isNotEditingText() const;
     bool isEditingLyrics() const;
+    bool isNoteInputMode() const;
+    bool isEditingElement() const;
+    bool isNotEditingElement() const;
+    bool isNotEditingOrHasPopup() const;
+    bool isNotNoteInputMode() const;
+
+    bool isToggleVisibleAllowed() const;
 
     void pasteSelection(PastingType type = PastingType::Default);
     Fraction resolvePastingScale(const INotationInteractionPtr& interaction, PastingType type) const;
 
     FilterElementsOptions elementsFilterOptions(const EngravingItem* element) const;
 
-    void startNoteInputIfNeed();
+    bool measureNavigationAvailable() const;
+    bool toggleLayoutBreakAvailable() const;
+
+    enum class TextNavigationType {
+        NearNoteOrRest,
+        NearBeat,
+        Fraction
+    };
+
+    bool textNavigationAvailable() const;
+    bool textNavigationByBeatsAvailable() const;
+    bool textNavigationByFractionAvailable() const;
+    bool resolveTextNavigationAvailable(TextNavigationType type = TextNavigationType::NearNoteOrRest) const;
+
+    void nextTextElement();
+    void prevTextElement();
+    void nextBeatTextElement();
+    void prevBeatTextElement();
+    void nextWord();
+    void navigateToTextElement(MoveDirection direction, bool nearNoteOrRest = false, bool moveOnly = true);
+    void navigateToTextElementByFraction(const Fraction& fraction);
+    void navigateToTextElementInNearMeasure(MoveDirection direction);
+
+    void startNoteInput();
 
     bool hasSelection() const;
+    mu::engraving::EngravingItem* selectedElement() const;
+    bool noteOrRestSelected() const;
+
+    const mu::engraving::Harmony* editedChordSymbol() const;
+
+    bool elementHasPopup(const EngravingItem* e) const;
+
     bool canUndo() const;
     bool canRedo() const;
+
     bool isNotationPage() const;
     bool isStandardStaff() const;
     bool isTablatureStaff() const;
-    void registerAction(const mu::actions::ActionCode&, void (NotationActionController::*)(const actions::ActionData& data),
-                        bool (NotationActionController::*)() const = &NotationActionController::isNotEditingText);
-    void registerAction(const mu::actions::ActionCode&, void (NotationActionController::*)(),
-                        bool (NotationActionController::*)() const = &NotationActionController::isNotEditingText);
-    void registerAction(const mu::actions::ActionCode&, std::function<void()>,
-                        bool (NotationActionController::*)() const = &NotationActionController::isNotEditingText);
-    void registerNoteInputAction(const mu::actions::ActionCode&, NoteInputMethod inputMethod);
-    void registerNoteAction(const mu::actions::ActionCode&, NoteName, NoteAddingMode addingMode = NoteAddingMode::NextChord);
-    void registerPadNoteAction(const mu::actions::ActionCode&, Pad padding);
-    void registerLyricsAction(const mu::actions::ActionCode&, void (NotationActionController::*)());
-    void registerTextAction(const mu::actions::ActionCode&, void (NotationActionController::*)());
-    void registerMoveAction(const mu::actions::ActionCode&);
+    void registerAction(const muse::actions::ActionCode&, void (NotationActionController::*)(const muse::actions::ActionData& data),
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+    void registerAction(const muse::actions::ActionCode&, void (NotationActionController::*)(),
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+    void registerAction(const muse::actions::ActionCode&, std::function<void()>,
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+    void registerAction(const muse::actions::ActionCode&, std::function<void(const muse::actions::ActionData& data)>,
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+    void registerAction(const muse::actions::ActionCode&, void (NotationActionController::*)(MoveDirection, bool), MoveDirection, bool,
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotEditingElement);
 
-    async::Notification m_currentNotationNoteInputChanged;
-    std::map<mu::actions::ActionCode, bool (NotationActionController::*)() const> m_isEnabledMap;
+    void registerNoteInputAction(const muse::actions::ActionCode&, NoteInputMethod inputMethod);
+    void registerNoteAction(const muse::actions::ActionCode&, NoteName, NoteAddingMode addingMode = NoteAddingMode::NextChord);
+
+    void registerPadNoteAction(const muse::actions::ActionCode&, Pad padding);
+    void registerTabPadNoteAction(const muse::actions::ActionCode&, Pad padding);
+
+    enum PlayMode {
+        NoPlay, PlayNote, PlayChord
+    };
+
+    void registerMoveSelectionAction(const muse::actions::ActionCode& code, MoveSelectionType type, MoveDirection direction,
+                                     PlayMode playMode = PlayMode::NoPlay);
+
+    void registerAction(const muse::actions::ActionCode&, void (INotationInteraction::*)(), bool (NotationActionController::*)() const);
+    void registerAction(const muse::actions::ActionCode&, void (INotationInteraction::*)(), PlayMode = PlayMode::NoPlay,
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+    template<typename P1>
+    void registerAction(const muse::actions::ActionCode&, void (INotationInteraction::*)(P1), P1, PlayMode = PlayMode::NoPlay,
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+    template<typename P1>
+    void registerAction(const muse::actions::ActionCode&, void (INotationInteraction::*)(P1), P1,
+                        bool (NotationActionController::*)() const);
+    template<typename P1, typename P2, typename Q1, typename Q2>
+    void registerAction(const muse::actions::ActionCode&, void (INotationInteraction::*)(P1, P2), Q1, Q2, PlayMode = PlayMode::NoPlay,
+                        bool (NotationActionController::*)() const = &NotationActionController::isNotationPage);
+
+    void notifyAccessibilityAboutActionTriggered(const muse::actions::ActionCode& actionCode);
+    void notifyAccessibilityAboutVoiceInfo(const std::string& info);
+
+    muse::async::Notification m_currentNotationNoteInputChanged;
+
+    using IsActionEnabledFunc = std::function<bool ()>;
+    std::map<muse::actions::ActionCode, IsActionEnabledFunc> m_isEnabledMap;
 };
 }
 

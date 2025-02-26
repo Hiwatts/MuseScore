@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,38 +24,35 @@
 
 #include <QObject>
 
+#include "async/asyncable.h"
 #include "modularity/ioc.h"
-#include "extensions/iextensionsconfiguration.h"
-#include "iappshellconfiguration.h"
+#include "update/iupdateconfiguration.h"
 
 namespace mu::appshell {
-class UpdatePreferencesModel : public QObject
+class UpdatePreferencesModel : public QObject, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(appshell, IAppShellConfiguration, configuration)
-    INJECT(appshell, extensions::IExtensionsConfiguration, extensionsConfiguration)
-
     Q_PROPERTY(
         bool needCheckForNewAppVersion READ needCheckForNewAppVersion WRITE setNeedCheckForNewAppVersion NOTIFY needCheckForNewAppVersionChanged)
-    Q_PROPERTY(
-        bool needCheckForNewExtensionsVersion READ needCheckForNewExtensionsVersion WRITE setNeedCheckForNewExtensionsVersion NOTIFY needCheckForNewExtensionsVersionChanged)
+
+    muse::Inject<muse::update::IUpdateConfiguration> updateConfiguration = { this };
 
 public:
     explicit UpdatePreferencesModel(QObject* parent = nullptr);
 
+    Q_INVOKABLE void load();
+
     bool needCheckForNewAppVersion() const;
-    bool needCheckForNewExtensionsVersion() const;
 
     Q_INVOKABLE bool isAppUpdatable() const;
+    Q_INVOKABLE QString museScorePrivacyPolicyUrl() const;
 
 public slots:
     void setNeedCheckForNewAppVersion(bool value);
-    void setNeedCheckForNewExtensionsVersion(bool value);
 
 signals:
     void needCheckForNewAppVersionChanged(bool value);
-    void needCheckForNewExtensionsVersionChanged(bool value);
 };
 }
 

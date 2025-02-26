@@ -20,9 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "sinesource.h"
+
 #include <cmath>
 
-using namespace mu::audio;
+using namespace muse::audio;
 
 SineSource::SineSource()
 {
@@ -30,7 +31,7 @@ SineSource::SineSource()
 
 unsigned int SineSource::audioChannelsCount() const
 {
-    return 1;
+    return 2;
 }
 
 samples_t SineSource::process(float* buffer, samples_t samplesPerChannel)

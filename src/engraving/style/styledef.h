@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,13 +25,13 @@
 
 #include <array>
 #include <vector>
-#include <QVariant>
 
-#include "config.h"
+#include "global/types/string.h"
 
-namespace Ms {
-enum class Pid : int;
+#include "../types/propertyvalue.h"
+#include "../dom/property.h"
 
+namespace mu::engraving {
 // Needs to be duplicated here and in symid.h since moc doesn't handle macros from #include'd files
 #ifdef SCRIPT_INTERFACE
 #define BEGIN_QT_REGISTERED_ENUM(Name) \
@@ -94,14 +94,15 @@ enum class Sid {
     lyricsPlacement,
     lyricsPosAbove,
     lyricsPosBelow,
-    lyricsMinTopDistance,
-    lyricsMinBottomDistance,
-    lyricsMinDistance,
+    lyricsMinTopDistance, // actual meaning: distance to elements on same staff
+    lyricsMinBottomDistance, // actual meaning: distance to elements on other staff
+    lyricsMinDistance, // actual meaning: min horizontal spacing of lyrics-to-lyrics
     lyricsLineHeight,
     lyricsDashMinLength,
     lyricsDashMaxLength,
     lyricsDashMaxDistance,
     lyricsDashForce,
+    lyricsDashFirstAndLastGapAreHalf,
     lyricsAlignVerseNumber,
     lyricsLineThickness,
     lyricsMelismaAlign,
@@ -109,6 +110,12 @@ enum class Sid {
     lyricsDashPad,
     lyricsDashLineThickness,
     lyricsDashYposRatio,
+
+    lyricsShowDashIfSyllableOnFirstNote,
+    lyricsMelismaForce,
+    lyricsMelismaMinLength,
+    lyricsDashPosAtStartOfSystem,
+    lyricsAvoidBarlines,
 
     lyricsOddFontFace,
     lyricsOddFontSize,
@@ -157,6 +164,7 @@ enum class Sid {
     repeatBarTips,
     startBarlineSingle,
     startBarlineMultiple,
+    maskBarlinesForText,
 
     bracketWidth,
     bracketDistance,
@@ -175,7 +183,6 @@ enum class Sid {
     keysigLeftMargin,
     ambitusMargin,
     timesigLeftMargin,
-    timesigScale,
 
     midClefKeyRightMargin,
     clefKeyRightMargin,
@@ -190,11 +197,37 @@ enum class Sid {
     clefBarlineDistance,
     timesigBarlineDistance,
 
+    timeSigPlacement,
+
+    timeSigCenterOnBarline,
+    timeSigVSMarginCentered,
+    timeSigVSMarginNonCentered,
+    timeSigCenterAcrossStaveGroup,
+
+    timeSigNormalStyle,
+    timeSigNormalScale,
+    timeSigNormalScaleLock,
+    timeSigNormalNumDist,
+    timeSigNormalY,
+    timeSigAboveStyle,
+    timeSigAboveScale,
+    timeSigAboveScaleLock,
+    timeSigAboveNumDist,
+    timeSigAboveY,
+    timeSigAcrossStyle,
+    timeSigAcrossScale,
+    timeSigAcrossScaleLock,
+    timeSigAcrossNumDist,
+    timeSigAcrossY,
+
     useStraightNoteFlags,
     stemWidth,
     shortenStem,
-    shortStemProgression,
+    stemLength,
+    stemLengthSmall,
+    shortStemStartLocation,
     shortestStem,
+    combineVoice,
     beginRepeatLeftMargin,
     minNoteDistance,
     barNoteDistance,
@@ -211,14 +244,25 @@ enum class Sid {
     staffLineWidth,
     ledgerLineWidth,
     ledgerLineLength,
+    stemSlashPosition,
+    stemSlashAngle,
+    stemSlashThickness,
     accidentalDistance,
     accidentalNoteDistance,
     bracketedAccidentalPadding,
     alignAccidentalsLeft,
+    accidentalOrderFollowsNoteDisplacement,
+    alignAccidentalOctavesAcrossSubChords,
+    keepAccidentalSecondsTogether,
+    alignOffsetOctaveAccidentals,
+    keysigAccidentalDistance,
+    keysigNaturalDistance,
     beamWidth,
-    beamDistance,
+    useWideBeams,
     beamMinLen,
     beamNoSlope,
+    snapCustomBeamsToGrid,
+    frenchStyleBeams,
 
     dotMag,
     dotNoteDistance,
@@ -232,6 +276,9 @@ enum class Sid {
     articulationAnchorDefault,
     articulationAnchorLuteFingering,
     articulationAnchorOther,
+    articulationStemHAlign,
+    articulationKeepTogether,
+    trillAlwaysShowCueNote,
     lastSystemFillLimit,
 
     hairpinPlacement,
@@ -261,19 +308,25 @@ enum class Sid {
     hairpinCrescContText,
     hairpinDecrescContText,
     hairpinLineStyle,
+    hairpinDashLineLen,
+    hairpinDashGapLen,
     hairpinLineLineStyle,
+    hairpinLineDashLineLen,
+    hairpinLineDashGapLen,
 
     pedalPlacement,
     pedalPosAbove,
     pedalPosBelow,
     pedalLineWidth,
     pedalLineStyle,
-    pedalBeginTextOffset,
+    pedalDashLineLen,
+    pedalDashGapLen,
     pedalHookHeight,
     pedalFontFace,
     pedalFontSize,
     pedalLineSpacing,
     pedalFontSpatiumDependent,
+    pedalMusicalSymbolsScale,
     pedalFontStyle,
     pedalColor,
     pedalTextAlign,
@@ -283,6 +336,12 @@ enum class Sid {
     pedalFrameRound,
     pedalFrameFgColor,
     pedalFrameBgColor,
+    pedalText,
+    pedalHookText,
+    pedalContinueText,
+    pedalContinueHookText,
+    pedalEndText,
+    pedalRosetteEndText,
 
     trillPlacement,
     trillPosAbove,
@@ -301,7 +360,6 @@ enum class Sid {
     harmonyPlacement,
     romanNumeralPlacement,
     nashvilleNumberPlacement,
-    harmonyPlay,
     harmonyVoiceLiteral,
     harmonyVoicing,
     harmonyDuration,
@@ -385,11 +443,19 @@ enum class Sid {
     fretFrets,
     fretNut,
     fretDotSize,
+    fretDotSpatiumSize,
     fretStringSpacing,
     fretFretSpacing,
     fretOrientation,
     maxFretShiftAbove,
     maxFretShiftBelow,
+    fretNutThickness,
+    fretUseCustomSuffix,
+    fretCustomSuffix,
+    barreAppearanceSlur,
+    barreLineWidth,
+    fretShowFingerings,
+    fretStyleExtended,
 
     showPageNumber,
     showPageNumberOne,
@@ -401,14 +467,21 @@ enum class Sid {
     measureNumberAllStaves,
 
     smallNoteMag,
+    scaleRythmicSpacingForSmallNotes,
     graceNoteMag,
+    graceToMainNoteDist,
+    graceToGraceNoteDist,
     smallStaffMag,
     smallClefMag,
     genClef,
+    hideTabClefAfterFirst,
     genKeysig,
     genCourtesyTimesig,
     genCourtesyKeysig,
     genCourtesyClef,
+
+    keySigCourtesyBarlineMode,
+    timeSigCourtesyBarlineMode,
 
     swingRatio,
     swingUnit,
@@ -430,10 +503,18 @@ enum class Sid {
     chordModifierMag,
     chordModifierAdjust,
     concertPitch,
+    multiVoiceRestTwoSpaceOffset,
+    mergeMatchingRests,
     createMultiMeasureRests,
     minEmptyMeasures,
+    singleMeasureMMRestUseNormalRest,
+    singleMeasureMMRestShowNumber,
     minMMRestWidth,
+    mmRestConstantWidth,
+    mmRestReferenceWidth,
+    mmRestMaxWidthIncrease,
     mmRestNumberPos,
+    mmRestBetweenStaves,
     mmRestNumberMaskHBar,
     multiMeasureRestMargin,
     mmRestHBarThickness,
@@ -447,28 +528,50 @@ enum class Sid {
     enableIndentationOnFirstSystem,
     firstSystemIndentationValue,
     alwaysShowBracketsWhenEmptyStavesAreHidden,
+    alwaysShowSquareBracketsWhenEmptyStavesAreHidden,
     hideInstrumentNameIfOneInstrument,
+    firstSystemInstNameVisibility,
+    subsSystemInstNameVisibility,
     gateTime,
     tenutoGateTime,
     staccatoGateTime,
     slurGateTime,
 
-    ArpeggioNoteDistance,
-    ArpeggioAccidentalDistance,
-    ArpeggioAccidentalDistanceMin,
-    ArpeggioLineWidth,
-    ArpeggioHookLen,
-    ArpeggioHiddenInStdIfTab,
+    arpeggioNoteDistance,
+    arpeggioAccidentalDistance,
+    arpeggioAccidentalDistanceMin,
+    arpeggioLineWidth,
+    arpeggioHookLen,
+    arpeggioHiddenInStdIfTab,
 
-    SlurEndWidth,
-    SlurMidWidth,
-    SlurDottedWidth,
-    MinTieLength,
-    SlurMinDistance,
+    slurEndWidth,
+    slurMidWidth,
+    slurDottedWidth,
+    tieEndWidth,
+    tieMidWidth,
+    tieDottedWidth,
+    minTieLength,
+    minHangingTieLength,
+    minStraightGlissandoLength,
+    minWigglyGlissandoLength,
+    slurMinDistance,
+    tieMinDistance,
+    laissezVibMinDistance,
+    headerToLineStartDistance,   // determines start point of "dangling" lines (ties, gliss, lyrics...) when preceded by header clefs/timesigs/keysigs
+    lineEndToBarlineDistance,  // determines end point of "dangling" lines (ties, gliss, lyrics...) in relation to barlines
 
-    SectionPause,
-    MusicalSymbolFont,
-    MusicalTextFont,
+    tiePlacementSingleNote,
+    tiePlacementChord,
+    tieDotsPlacement,
+    tieMinShoulderHeight,
+    tieMaxShoulderHeight,
+
+    minLaissezVibLength,
+    laissezVibUseSmuflSym,
+
+    sectionPause,
+    musicalSymbolFont,
+    musicalTextFont,
 
     showHeader,
     headerFirstPage,
@@ -494,6 +597,8 @@ enum class Sid {
     voltaHook,
     voltaLineWidth,
     voltaLineStyle,
+    voltaDashLineLen,
+    voltaDashGapLen,
     voltaFontFace,
     voltaFontSize,
     voltaLineSpacing,
@@ -548,14 +653,18 @@ enum class Sid {
     ottavaHookBelow,
     ottavaLineWidth,
     ottavaLineStyle,
+    ottavaDashLineLen,
+    ottavaDashGapLen,
     ottavaNumbersOnly,
     ottavaFontFace,
     ottavaFontSize,
     ottavaLineSpacing,
     ottavaFontSpatiumDependent,
+    ottavaMusicalSymbolsScale,
     ottavaFontStyle,
     ottavaColor,
-    ottavaTextAlign,
+    ottavaTextAlignAbove,
+    ottavaTextAlignBelow,
     ottavaFrameType,
     ottavaFramePadding,
     ottavaFrameWidth,
@@ -567,10 +676,12 @@ enum class Sid {
 
     tremoloWidth,
     tremoloBoxHeight,
-    tremoloStrokeWidth,
+    tremoloLineWidth,
     tremoloDistance,
     tremoloStyle,
     tremoloStrokeLengthMultiplier,
+    tremoloNoteSidePadding,
+    tremoloOutSidePadding,
     // TODO tremoloMaxBeamLength,
 
     linearStretch,
@@ -578,7 +689,7 @@ enum class Sid {
     keySigNaturals,
 
     tupletMaxSlope,
-    tupletOufOfStaff,
+    tupletOutOfStaff,
     tupletVHeadDistance,
     tupletVStemDistance,
     tupletStemLeftDistance,
@@ -593,9 +704,11 @@ enum class Sid {
     tupletFontSize,
     tupletLineSpacing,
     tupletFontSpatiumDependent,
+    tupletMusicalSymbolsScale,
     tupletFontStyle,
     tupletColor,
     tupletAlign,
+    tupletUseSymbols,
     tupletBracketHookHeight,
     tupletOffset,
     tupletFrameType,
@@ -605,20 +718,29 @@ enum class Sid {
     tupletFrameFgColor,
     tupletFrameBgColor,
 
-    barreLineWidth,
     scaleBarlines,
     barGraceDistance,
 
     minVerticalDistance,
+    skylineMinHorizontalClearance,
     ornamentStyle,
     spatium,
 
     autoplaceHairpinDynamicsDistance,
 
+    dynamicsHairpinVoiceBasedPlacement,
+    dynamicsHairpinsAutoCenterOnGrandStaff,
+    dynamicsHairpinsAboveForVocalStaves,
+
+    dynamicsOverrideFont,
+    dynamicsFont,
+    dynamicsSize,
     dynamicsPlacement,
     dynamicsPosAbove,
     dynamicsPosBelow,
-
+    avoidBarLines,
+    snapToDynamics,
+    centerOnNotehead,
     dynamicsMinDistance,
     autoplaceVerticalAlignRange,
 
@@ -787,6 +909,48 @@ enum class Sid {
     stringNumberFrameFgColor,
     stringNumberFrameBgColor,
     stringNumberOffset,
+    preferSameStringForTranspose,
+
+    stringTuningsFontSize,
+
+    harpPedalDiagramFontFace,
+    harpPedalDiagramFontSize,
+    harpPedalDiagramLineSpacing,
+    harpPedalDiagramFontSpatiumDependent,
+    harpPedalDiagramMusicalSymbolsScale,
+    harpPedalDiagramFontStyle,
+    harpPedalDiagramColor,
+    harpPedalDiagramAlign,
+    harpPedalDiagramFrameType,
+    harpPedalDiagramFramePadding,
+    harpPedalDiagramFrameWidth,
+    harpPedalDiagramFrameRound,
+    harpPedalDiagramFrameFgColor,
+    harpPedalDiagramFrameBgColor,
+    harpPedalDiagramOffset,
+    harpPedalDiagramPlacement,
+    harpPedalDiagramPosAbove,
+    harpPedalDiagramPosBelow,
+    harpPedalDiagramMinDistance,
+
+    harpPedalTextDiagramFontFace,
+    harpPedalTextDiagramFontSize,
+    harpPedalTextDiagramLineSpacing,
+    harpPedalTextDiagramFontSpatiumDependent,
+    harpPedalTextDiagramFontStyle,
+    harpPedalTextDiagramColor,
+    harpPedalTextDiagramAlign,
+    harpPedalTextDiagramFrameType,
+    harpPedalTextDiagramFramePadding,
+    harpPedalTextDiagramFrameWidth,
+    harpPedalTextDiagramFrameRound,
+    harpPedalTextDiagramFrameFgColor,
+    harpPedalTextDiagramFrameBgColor,
+    harpPedalTextDiagramOffset,
+    harpPedalTextDiagramPlacement,
+    harpPedalTextDiagramPosAbove,
+    harpPedalTextDiagramPosBelow,
+    harpPedalTextDiagramMinDistance,
 
     longInstrumentFontFace,
     longInstrumentFontSize,
@@ -856,12 +1020,15 @@ enum class Sid {
     expressionAlign,
     expressionPlacement,
     expressionOffset,
+    expressionPosAbove,
+    expressionPosBelow,
     expressionFrameType,
     expressionFramePadding,
     expressionFrameWidth,
     expressionFrameRound,
     expressionFrameFgColor,
     expressionFrameBgColor,
+    expressionMinDistance,
 
     tempoFontFace,
     tempoFontSize,
@@ -881,6 +1048,29 @@ enum class Sid {
     tempoFrameRound,
     tempoFrameFgColor,
     tempoFrameBgColor,
+
+    tempoChangeFontFace,
+    tempoChangeFontSize,
+    tempoChangeLineSpacing,
+    tempoChangeFontSpatiumDependent,
+    tempoChangeFontStyle,
+    tempoChangeColor,
+    tempoChangeAlign,
+    tempoChangeSystemFlag,
+    tempoChangePlacement,
+    tempoChangePosAbove,
+    tempoChangePosBelow,
+    tempoChangeMinDistance,
+    tempoChangeFrameType,
+    tempoChangeFramePadding,
+    tempoChangeFrameWidth,
+    tempoChangeFrameRound,
+    tempoChangeFrameFgColor,
+    tempoChangeFrameBgColor,
+    tempoChangeLineWidth,
+    tempoChangeLineStyle,
+    tempoChangeDashLineLen,
+    tempoChangeDashGapLen,
 
     metronomeFontFace,
     metronomeFontSize,
@@ -909,6 +1099,7 @@ enum class Sid {
     measureNumberOffsetType,
     measureNumberVPlacement,
     measureNumberHPlacement,
+    measureNumberMinDistance,
     measureNumberAlign,
     measureNumberFrameType,
     measureNumberFramePadding,
@@ -937,6 +1128,7 @@ enum class Sid {
     mmRestRangeFrameRound,
     mmRestRangeFrameFgColor,
     mmRestRangeFrameBgColor,
+    mmRestRangeMinDistance,
 
     translatorFontFace,
     translatorFontSize,
@@ -990,6 +1182,36 @@ enum class Sid {
     staffTextFrameRound,
     staffTextFrameFgColor,
     staffTextFrameBgColor,
+
+    fretDiagramFingeringFontFace,
+    fretDiagramFingeringFontSize,
+    fretDiagramFingeringLineSpacing,
+    fretDiagramFingeringFontSpatiumDependent,
+    fretDiagramFingeringFontStyle,
+    fretDiagramFingeringColor,
+    fretDiagramFingeringAlign,
+    fretDiagramFingeringPosAbove,
+    fretDiagramFingeringFrameType,
+    fretDiagramFingeringFramePadding,
+    fretDiagramFingeringFrameWidth,
+    fretDiagramFingeringFrameRound,
+    fretDiagramFingeringFrameFgColor,
+    fretDiagramFingeringFrameBgColor,
+
+    fretDiagramFretNumberFontFace,
+    fretDiagramFretNumberFontSize,
+    fretDiagramFretNumberLineSpacing,
+    fretDiagramFretNumberFontSpatiumDependent,
+    fretDiagramFretNumberFontStyle,
+    fretDiagramFretNumberColor,
+    fretDiagramFretNumberAlign,
+    fretDiagramFretNumberPosAbove,
+    fretDiagramFretNumberFrameType,
+    fretDiagramFretNumberFramePadding,
+    fretDiagramFretNumberFrameWidth,
+    fretDiagramFretNumberFrameRound,
+    fretDiagramFretNumberFrameFgColor,
+    fretDiagramFretNumberFrameBgColor,
 
     rehearsalMarkFontFace,
     rehearsalMarkFontSize,
@@ -1071,6 +1293,27 @@ enum class Sid {
     systemTextLineTextAlign,
     systemTextLineSystemFlag,
 
+    noteLinePlacement,
+    noteLineFontFace,
+    noteLineFontSize,
+    noteLineLineSpacing,
+    noteLineFontSpatiumDependent,
+    noteLineFontStyle,
+    noteLineColor,
+    noteLineAlign,
+    noteLineOffset,
+    noteLineFrameType,
+    noteLineFramePadding,
+    noteLineFrameWidth,
+    noteLineFrameRound,
+    noteLineFrameFgColor,
+    noteLineFrameBgColor,
+
+    noteLineWidth,
+    noteLineStyle,
+    noteLineDashLineLen,
+    noteLineDashGapLen,
+
     glissandoFontFace,
     glissandoFontSize,
     glissandoLineSpacing,
@@ -1087,6 +1330,14 @@ enum class Sid {
     glissandoFrameBgColor,
     glissandoLineWidth,
     glissandoText,
+    glissandoStyle,
+    glissandoStyleHarp,
+
+    glissandoType,
+    glissandoLineStyle,
+    glissandoDashLineLen,
+    glissandoDashGapLen,
+    glissandoShowText,
 
     bendFontFace,
     bendFontSize,
@@ -1104,6 +1355,15 @@ enum class Sid {
     bendFrameBgColor,
     bendLineWidth,
     bendArrowWidth,
+
+    guitarBendLineWidth,
+    guitarBendLineWidthTab,
+    guitarBendHeightAboveTABStaff,
+    guitarBendPartialBendHeight,
+    guitarBendUseFull,
+    guitarBendArrowWidth,
+    guitarBendArrowHeight,
+    useCueSizeFretForGraceBends,
 
     headerFontFace,
     headerFontSize,
@@ -1134,6 +1394,36 @@ enum class Sid {
     footerFrameRound,
     footerFrameFgColor,
     footerFrameBgColor,
+
+    copyrightFontFace,
+    copyrightFontSize,
+    copyrightLineSpacing,
+    copyrightFontSpatiumDependent,
+    copyrightFontStyle,
+    copyrightColor,
+    copyrightAlign,
+    copyrightOffset,
+    copyrightFrameType,
+    copyrightFramePadding,
+    copyrightFrameWidth,
+    copyrightFrameRound,
+    copyrightFrameFgColor,
+    copyrightFrameBgColor,
+
+    pageNumberFontFace,
+    pageNumberFontSize,
+    pageNumberLineSpacing,
+    pageNumberFontSpatiumDependent,
+    pageNumberFontStyle,
+    pageNumberColor,
+    pageNumberAlign,
+    pageNumberOffset,
+    pageNumberFrameType,
+    pageNumberFramePadding,
+    pageNumberFrameWidth,
+    pageNumberFrameRound,
+    pageNumberFrameFgColor,
+    pageNumberFrameBgColor,
 
     instrumentChangeFontFace,
     instrumentChangeFontSize,
@@ -1397,7 +1687,8 @@ enum class Sid {
     letRingPosBelow,
     letRingLineWidth,
     letRingLineStyle,
-    letRingBeginTextOffset,
+    letRingDashLineLen,
+    letRingDashGapLen,
     letRingText,
     letRingFrameType,
     letRingFramePadding,
@@ -1420,7 +1711,8 @@ enum class Sid {
     palmMutePosBelow,
     palmMuteLineWidth,
     palmMuteLineStyle,
-    palmMuteBeginTextOffset,
+    palmMuteDashLineLen,
+    palmMuteDashGapLen,
     palmMuteText,
     palmMuteFrameType,
     palmMuteFramePadding,
@@ -1452,24 +1744,82 @@ enum class Sid {
     figuredBassMinDistance,
     tupletMinDistance,
 
+    /// Display options for tab elements (simple and common styles)
+
+    slurShowTabSimple,
+    slurShowTabCommon,
+    fermataShowTabSimple,
+    fermataShowTabCommon,
+    dynamicsShowTabSimple,
+    dynamicsShowTabCommon,
+    hairpinShowTabSimple,
+    hairpinShowTabCommon,
+    accentShowTabSimple,
+    accentShowTabCommon,
+    staccatoShowTabSimple,
+    staccatoShowTabCommon,
+    harmonicMarkShowTabSimple,
+    harmonicMarkShowTabCommon,
+    letRingShowTabSimple,
+    letRingShowTabCommon,
+    palmMuteShowTabSimple,
+    palmMuteShowTabCommon,
+    rasgueadoShowTabSimple,
+    rasgueadoShowTabCommon,
+    mordentShowTabSimple,
+    mordentShowTabCommon,
+    turnShowTabSimple,
+    turnShowTabCommon,
+    wahShowTabSimple,
+    wahShowTabCommon,
+    golpeShowTabSimple,
+    golpeShowTabCommon,
+
+    tabShowTiedFret,
+    tabParenthesizeTiedFret,
+    parenthesizeTiedFretIfArticulation,
+
+    tabFretPadding,
+
+    chordlineThickness,
+
+    dummyMusicalSymbolsScale,
+
     autoplaceEnabled,
     defaultsVersion,
+
+    changesBeforeBarlineRepeats,
+    changesBeforeBarlineOtherJumps,
+
+    placeClefsBeforeRepeats,
+    changesBetweenEndStartRepeat,
+
+    showCourtesiesRepeats,
+    useParensRepeatCourtesies,
+
+    showCourtesiesOtherJumps,
+    useParensOtherJumpCourtesies,
+
+    showCourtesiesAfterCancellingRepeats,
+    useParensRepeatCourtesiesAfterCancelling,
+
+    showCourtesiesAfterCancellingOtherJumps,
+    useParensOtherJumpCourtesiesAfterCancelling,
+
+    smallParens,
 
     STYLES
     ///\}
 };
 END_QT_REGISTERED_ENUM(Sid)
 
-inline uint qHash(Sid id)
-{
-    return static_cast<uint>(id);
-}
+using StyleIdSet = std::unordered_set<Sid>;
 
 //---------------------------------------------------------
 //   VerticalAlignRange
 //---------------------------------------------------------
 
-enum class VerticalAlignRange {
+enum class VerticalAlignRange : unsigned char {
     SEGMENT, MEASURE, SYSTEM
 };
 
@@ -1496,15 +1846,15 @@ private:
 
     struct StyleValue {
         Sid _idx;
-        const char* _name;         // xml name for read()/write()
-        QVariant _defaultValue;
+        muse::AsciiStringView _name;         // xml name for read()/write()
+        PropertyValue _defaultValue;
 
     public:
         Sid  styleIdx() const { return _idx; }
         int idx() const { return int(_idx); }
-        const char* valueType() const { return _defaultValue.typeName(); }
-        const char* name() const { return _name; }
-        const QVariant& defaultValue() const { return _defaultValue; }
+        const muse::AsciiStringView& name() const { return _name; }
+        P_TYPE valueType() const { return _defaultValue.type(); }
+        const PropertyValue& defaultValue() const { return _defaultValue; }
     };
 
     static const std::array<StyleValue, size_t(Sid::STYLES)> styleValues;

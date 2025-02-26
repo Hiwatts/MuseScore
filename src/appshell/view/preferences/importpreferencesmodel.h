@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,34 +31,37 @@
 #include "importexport/guitarpro/iguitarproconfiguration.h"
 #include "importexport/ove/ioveconfiguration.h"
 #include "importexport/midi/imidiconfiguration.h"
+#include "importexport/mei/imeiconfiguration.h"
 #include "notation/inotationconfiguration.h"
 
 namespace mu::appshell {
-class ImportPreferencesModel : public QObject, public async::Asyncable
+class ImportPreferencesModel : public QObject, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
-
-    INJECT(appshell, iex::musicxml::IMusicXmlConfiguration, musicXmlConfiguration)
-    INJECT(appshell, iex::guitarpro::IGuitarProConfiguration, guitarProConfiguration)
-    INJECT(appshell, iex::ove::IOveConfiguration, oveConfiguration)
-    INJECT(appshell, iex::midi::IMidiImportExportConfiguration, midiImportExportConfiguration)
-    INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
 
     Q_PROPERTY(QString styleFileImportPath READ styleFileImportPath WRITE setStyleFileImportPath NOTIFY styleFileImportPathChanged)
 
     Q_PROPERTY(
-        QString currentGuitarProCharset READ currentGuitarProCharset WRITE setCurrentGuitarProCharset NOTIFY currentGuitarProCharsetChanged)
-    Q_PROPERTY(
-        QString currentOvertuneCharset READ currentOvertuneCharset WRITE setCurrentOvertuneCharset NOTIFY currentOvertuneCharsetChanged)
+        QString currentOvertureCharset READ currentOvertureCharset WRITE setCurrentOvertureCharset NOTIFY currentOvertureCharsetChanged)
 
     Q_PROPERTY(bool importLayout READ importLayout WRITE setImportLayout NOTIFY importLayoutChanged)
     Q_PROPERTY(bool importBreaks READ importBreaks WRITE setImportBreaks NOTIFY importBreaksChanged)
     Q_PROPERTY(bool needUseDefaultFont READ needUseDefaultFont WRITE setNeedUseDefaultFont NOTIFY needUseDefaultFontChanged)
+    Q_PROPERTY(bool inferTextType READ inferTextType WRITE setInferTextType NOTIFY inferTextTypeChanged)
+
+    Q_PROPERTY(bool meiImportLayout READ meiImportLayout WRITE setMeiImportLayout NOTIFY meiImportLayoutChanged)
 
     Q_PROPERTY(int currentShortestNote READ currentShortestNote WRITE setCurrentShortestNote NOTIFY currentShortestNoteChanged)
 
     Q_PROPERTY(
         bool needAskAboutApplyingNewStyle READ needAskAboutApplyingNewStyle WRITE setNeedAskAboutApplyingNewStyle NOTIFY needAskAboutApplyingNewStyleChanged)
+
+    muse::Inject<iex::musicxml::IMusicXmlConfiguration> musicXmlConfiguration = { this };
+    muse::Inject<iex::guitarpro::IGuitarProConfiguration> guitarProConfiguration = { this };
+    muse::Inject<iex::ove::IOveConfiguration> oveConfiguration = { this };
+    muse::Inject<iex::midi::IMidiImportExportConfiguration> midiImportExportConfiguration = { this };
+    muse::Inject<iex::mei::IMeiConfiguration> meiConfiguration = { this };
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
 
 public:
     explicit ImportPreferencesModel(QObject* parent = nullptr);
@@ -67,47 +70,49 @@ public:
 
     Q_INVOKABLE QVariantList charsets() const;
     Q_INVOKABLE QVariantList shortestNotes() const;
-    Q_INVOKABLE QString stylePathFilter() const;
+    Q_INVOKABLE QStringList stylePathFilter() const;
     Q_INVOKABLE QString styleChooseTitle() const;
     Q_INVOKABLE QString fileDirectory(const QString& filePath) const;
 
     QString styleFileImportPath() const;
-    QString currentGuitarProCharset() const;
-    QString currentOvertuneCharset() const;
+    QString currentOvertureCharset() const;
 
     bool importLayout() const;
     bool importBreaks() const;
     bool needUseDefaultFont() const;
+    bool inferTextType() const;
 
     int currentShortestNote() const;
 
     bool needAskAboutApplyingNewStyle() const;
 
+    bool meiImportLayout() const;
+
 public slots:
     void setStyleFileImportPath(QString path);
-    void setCurrentGuitarProCharset(QString charset);
-    void setCurrentOvertuneCharset(QString charset);
+    void setCurrentOvertureCharset(QString charset);
 
     void setImportLayout(bool import);
     void setImportBreaks(bool import);
     void setNeedUseDefaultFont(bool value);
+    void setInferTextType(bool value);
 
     void setCurrentShortestNote(int note);
 
     void setNeedAskAboutApplyingNewStyle(bool value);
 
+    void setMeiImportLayout(bool import);
+
 signals:
     void styleFileImportPathChanged(QString styleFileImportPath);
-    void currentGuitarProCharsetChanged(QString currentGuitarProCharset);
-    void currentOvertuneCharsetChanged(QString currentOvertuneCharset);
+    void currentOvertureCharsetChanged(QString currentOvertureCharset);
     void importLayoutChanged(bool importLayout);
     void importBreaksChanged(bool importBreaks);
     void needUseDefaultFontChanged(bool needUseDefaultFont);
+    void inferTextTypeChanged(bool inferTextType);
     void currentShortestNoteChanged(int currentShortestNote);
     void needAskAboutApplyingNewStyleChanged(bool needAskAboutApplyingNewStyle);
-
-private:
-    int division() const;
+    void meiImportLayoutChanged(bool importLayout);
 };
 }
 

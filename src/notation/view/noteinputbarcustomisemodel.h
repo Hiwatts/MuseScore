@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,17 +31,23 @@
 
 class QItemSelectionModel;
 
+#if (defined(_MSCVER) || defined(_MSC_VER))
+// unreferenced function with internal linkage has been removed
+#pragma warning(disable: 4505)
+#endif
+
 namespace mu::notation {
 class NoteInputBarCustomiseItem;
-class NoteInputBarCustomiseModel : public uicomponents::SelectableItemListModel, public async::Asyncable
+class NoteInputBarCustomiseModel : public muse::uicomponents::SelectableItemListModel, public muse::Injectable,
+    public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(notation, ui::IUiConfiguration, uiConfiguration)
-    INJECT(notation, ui::IUiActionsRegister, actionsRegister)
-
     Q_PROPERTY(QItemSelectionModel * selectionModel READ selectionModel NOTIFY selectionChanged)
     Q_PROPERTY(bool isAddSeparatorAvailable READ isAddSeparatorAvailable NOTIFY isAddSeparatorAvailableChanged)
+
+    muse::Inject<muse::ui::IUiConfiguration> uiConfiguration = { this };
+    muse::Inject<muse::ui::IUiActionsRegister> actionsRegister = { this };
 
 public:
     explicit NoteInputBarCustomiseModel(QObject* parent = nullptr);
@@ -73,7 +79,7 @@ private:
     void updateAddSeparatorAvailability();
     void setIsAddSeparatorAvailable(bool isAddSeparatorAvailable);
 
-    NoteInputBarCustomiseItem* makeItem(const ui::UiAction& action, bool checked);
+    NoteInputBarCustomiseItem* makeItem(const muse::ui::UiAction& action, bool checked);
     NoteInputBarCustomiseItem* makeSeparatorItem();
 
     void saveActions();

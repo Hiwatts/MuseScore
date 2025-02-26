@@ -19,18 +19,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_SHORTCUTS_ISHORTCUTSREGISTER_H
-#define MU_SHORTCUTS_ISHORTCUTSREGISTER_H
+#ifndef MUSE_SHORTCUTS_ISHORTCUTSREGISTER_H
+#define MUSE_SHORTCUTS_ISHORTCUTSREGISTER_H
 
 #include <list>
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 #include "shortcutstypes.h"
 #include "async/notification.h"
-#include "ret.h"
+#include "types/ret.h"
 #include "io/path.h"
 
-namespace mu::shortcuts {
+namespace muse::shortcuts {
 class IShortcutsRegister : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IShortcutsRegister)
@@ -39,15 +39,27 @@ public:
 
     virtual const ShortcutList& shortcuts() const = 0;
     virtual Ret setShortcuts(const ShortcutList& shortcuts) = 0;
+    virtual void resetShortcuts() = 0;
     virtual async::Notification shortcutsChanged() const = 0;
+
+    virtual Ret setAdditionalShortcuts(const std::string& context, const ShortcutList& shortcuts) = 0;
 
     virtual const Shortcut& shortcut(const std::string& actionCode) const = 0;
     virtual const Shortcut& defaultShortcut(const std::string& actionCode) const = 0;
+
+    virtual bool isRegistered(const std::string& sequence) const = 0;
     virtual ShortcutList shortcutsForSequence(const std::string& sequence) const = 0;
 
-    virtual Ret importFromFile(const io::path& filePath) = 0;
-    virtual Ret exportToFile(const io::path& filePath) const = 0;
+    virtual Ret importFromFile(const io::path_t& filePath) = 0;
+    virtual Ret exportToFile(const io::path_t& filePath) const = 0;
+
+    virtual bool active() = 0;
+    virtual void setActive(bool active) = 0;
+    virtual async::Notification activeChanged() const = 0;
+
+    // for autobot tests
+    virtual void reload(bool onlyDef = false) = 0;
 };
 }
 
-#endif // MU_SHORTCUTS_ISHORTCUTSREGISTER_H
+#endif // MUSE_SHORTCUTS_ISHORTCUTSREGISTER_H

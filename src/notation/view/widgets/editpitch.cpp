@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,9 +20,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "editpitch.h"
-#include "widgetstatestore.h"
+
+#include <QKeyEvent>
+
+#include "translation.h"
+#include "ui/view/iconcodes.h"
+#include "ui/view/widgetstatestore.h"
+#include "ui/view/widgetnavigationfix.h"
 
 using namespace mu::notation;
+using namespace muse::ui;
 
 //---------------------------------------------------------
 //   EditPitch
@@ -33,20 +40,20 @@ EditPitch::EditPitch(QWidget* parent)
     : QDialog(parent)
 {
     setObjectName("EditPitchNew");
-    setupUi(this);
-    setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    setup();
+
     tableWidget->setCurrentCell(tableWidget->rowCount() - 1 - 5, 0);                  // select centre C by default
-    WidgetStateStore::restoreGeometry(this);
 }
 
 EditPitch::EditPitch(QWidget* parent, int midiCode)
     : QDialog(parent)
 {
     setObjectName("EditPitchEdit");
-    setupUi(this);
-    setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    setup();
+
     tableWidget->setCurrentCell(tableWidget->rowCount() - 1 - (midiCode / 12), midiCode % 12);
-    WidgetStateStore::restoreGeometry(this);
 }
 
 //---------------------------------------------------------
@@ -57,6 +64,34 @@ void EditPitch::hideEvent(QHideEvent* ev)
 {
     WidgetStateStore::saveGeometry(this);
     QWidget::hideEvent(ev);
+}
+
+bool EditPitch::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent* keyEvent = dynamic_cast<QKeyEvent*>(event);
+        if (keyEvent
+            && WidgetNavigationFix::fixNavigationForTableWidget(
+                WidgetNavigationFix::NavigationChain { tableWidget, buttonBox, buttonBox },
+                keyEvent->key())) {
+            return true;
+        }
+    }
+
+    return QDialog::eventFilter(obj, event);
+}
+
+void EditPitch::setup()
+{
+    setupUi(this);
+    setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    WidgetStateStore::restoreGeometry(this);
+
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
+
+    qApp->installEventFilter(this);
 }
 
 void EditPitch::accept()

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,32 +24,58 @@
 
 #include "istartupscenario.h"
 
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
 #include "iinteractive.h"
-#include "iappshellconfiguration.h"
 #include "actions/iactionsdispatcher.h"
+#include "multiinstances/imultiinstancesprovider.h"
+#include "iappshellconfiguration.h"
+#include "isessionsmanager.h"
+#include "project/iprojectautosaver.h"
+#include "audioplugins/iregisteraudiopluginsscenario.h"
 
 namespace mu::appshell {
-class StartupScenario : public IStartupScenario
+class StartupScenario : public IStartupScenario, public muse::Injectable, public muse::async::Asyncable
 {
-    INJECT(appshell, IAppShellConfiguration, configuration)
-    INJECT(appshell, framework::IInteractive, interactive)
-    INJECT(appshell, actions::IActionsDispatcher, dispatcher)
+    muse::Inject<muse::IInteractive> interactive = { this };
+    muse::Inject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::Inject<muse::mi::IMultiInstancesProvider> multiInstancesProvider = { this };
+    muse::Inject<IAppShellConfiguration> configuration = { this };
+    muse::Inject<ISessionsManager> sessionsManager = { this };
+    muse::Inject<project::IProjectAutoSaver> projectAutoSaver = { this };
+    muse::Inject<muse::audioplugins::IRegisterAudioPluginsScenario> registerAudioPluginsScenario = { this };
 
 public:
 
-    void setSessionType(const QString& sessionType) override;
-    void setStartupScorePath(const io::path& path) override;
-    void run() override;
+    StartupScenario(const muse::modularity::ContextPtr& iocCtx)
+        : muse::Injectable(iocCtx) {}
+
+    void setStartupType(const std::optional<std::string>& type) override;
+
+    bool isStartWithNewFileAsSecondaryInstance() const override;
+
+    const project::ProjectFile& startupScoreFile() const override;
+    void setStartupScoreFile(const std::optional<project::ProjectFile>& file) override;
+
+    void runOnSplashScreen() override;
+    void runAfterSplashScreen() override;
+    bool startupCompleted() const override;
 
 private:
-    StartupSessionType sessionTypeTromString(const QString& str) const;
-    std::string startupPageUri(StartupSessionType sessionType) const;
+    void onStartupPageOpened(StartupModeType modeType);
 
-    void openScore(const io::path& path);
+    StartupModeType resolveStartupModeType() const;
+    muse::Uri startupPageUri(StartupModeType modeType) const;
 
-    QString m_sessionType;
-    io::path m_startupScorePath;
+    void openScore(const project::ProjectFile& file);
+
+    void restoreLastSession();
+    void removeProjectsUnsavedChanges(const muse::io::paths_t& projectsPaths);
+
+    std::string m_startupTypeStr;
+    project::ProjectFile m_startupScoreFile;
+    bool m_startupCompleted = false;
 };
 }
 

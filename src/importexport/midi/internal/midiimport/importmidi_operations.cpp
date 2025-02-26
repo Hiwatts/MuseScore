@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,10 +21,12 @@
  */
 #include "importmidi_operations.h"
 
+#include <QFile>
 #include <QXmlStreamReader>
-#include <QDebug>
 
-namespace Ms {
+#include "log.h"
+
+namespace mu::iex::midi {
 MidiOperations::Data midiImportOperations;
 
 namespace MidiOperations {
@@ -35,12 +37,12 @@ static int readBoolFromXml(QXmlStreamReader& xml)
     xml.readNext();
 
     if (xml.tokenType() == QXmlStreamReader::Characters) {
-        if (xml.text() == "true") {
+        if (xml.text() == u"true") {
             value = 1;
-        } else if (xml.text() == "false") {
+        } else if (xml.text() == u"false") {
             value = 0;
         } else {
-            qDebug() << "Load MIDI import operations from file: unknown" << name << "value";
+            LOGD() << "Load MIDI import operations from file: unknown" << name << "value";
         }
     }
     return value;
@@ -56,7 +58,7 @@ static void setOperationsFromFile(const QString& fileName, Opers& opers)
 
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug("Load MIDI import operations from file: cannot open input file");
+        LOGD("Load MIDI import operations from file: cannot open input file");
         return;
     }
 
@@ -71,11 +73,11 @@ static void setOperationsFromFile(const QString& fileName, Opers& opers)
         if (token != QXmlStreamReader::StartElement) {          // like <elem>
             continue;
         }
-        if (xml.name() == "MidiOptions") {
+        if (xml.name() == u"MidiOptions") {
             continue;
         }
 
-        if (xml.name() == "QuantValue") {
+        if (xml.name() == u"QuantValue") {
             xml.readNext();
             if (xml.tokenType() == QXmlStreamReader::Characters) {
                 bool ok = false;
@@ -110,13 +112,13 @@ static void setOperationsFromFile(const QString& fileName, Opers& opers)
                         opers.quantValue.setDefaultValue(QuantValue::Q_1024, false);
                         break;
                     default:
-                        qDebug("Load MIDI import operations from file: "
-                               "unknown max quantization value");
+                        LOGD("Load MIDI import operations from file: "
+                             "unknown max quantization value");
                         break;
                     }
                 }
             }
-        } else if (xml.name() == "VoiceCount") {
+        } else if (xml.name() == u"VoiceCount") {
             xml.readNext();
             if (xml.tokenType() == QXmlStreamReader::Characters) {
                 bool ok = false;
@@ -136,83 +138,83 @@ static void setOperationsFromFile(const QString& fileName, Opers& opers)
                         opers.maxVoiceCount.setDefaultValue(VoiceCount::V_4, false);
                         break;
                     default:
-                        qDebug("Load MIDI import operations from file: "
-                               "unknown max voice count");
+                        LOGD("Load MIDI import operations from file: "
+                             "unknown max voice count");
                         break;
                     }
                 }
             }
-        } else if (xml.name() == "Duplets") {
+        } else if (xml.name() == u"Duplets") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.search2plets.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "Triplets") {
+        } else if (xml.name() == u"Triplets") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.search3plets.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "Quadruplets") {
+        } else if (xml.name() == u"Quadruplets") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.search4plets.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "Quintuplets") {
+        } else if (xml.name() == u"Quintuplets") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.search5plets.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "Septuplets") {
+        } else if (xml.name() == u"Septuplets") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.search7plets.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "Nonuplets") {
+        } else if (xml.name() == u"Nonuplets") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.search9plets.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "HumanPerformance") {
+        } else if (xml.name() == u"HumanPerformance") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.isHumanPerformance.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "MeasureCount2xLess") {
+        } else if (xml.name() == u"MeasureCount2xLess") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.measureCount2xLess.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "SplitStaff") {
+        } else if (xml.name() == u"SplitStaff") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.doStaffSplit.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "ClefChanges") {
+        } else if (xml.name() == u"ClefChanges") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.changeClef.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "SimplifyDurations") {
+        } else if (xml.name() == u"SimplifyDurations") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.simplifyDurations.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "ShowStaccato") {
+        } else if (xml.name() == u"ShowStaccato") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.showStaccato.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "DottedNotes") {
+        } else if (xml.name() == u"DottedNotes") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.useDots.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "RecognizePickupBar") {
+        } else if (xml.name() == u"RecognizePickupBar") {
             const int value = readBoolFromXml(xml);
             if (value >= 0) {
                 opers.searchPickupMeasure.setDefaultValue(value, false);
             }
-        } else if (xml.name() == "Swing") {
+        } else if (xml.name() == u"Swing") {
             xml.readNext();
             if (xml.tokenType() == QXmlStreamReader::Characters) {
                 bool ok = false;
@@ -229,8 +231,8 @@ static void setOperationsFromFile(const QString& fileName, Opers& opers)
                         opers.swing.setDefaultValue(Swing::SWING, false);
                         break;
                     default:
-                        qDebug("Load MIDI import operations from file: "
-                               "unknown swing");
+                        LOGD("Load MIDI import operations from file: "
+                             "unknown swing");
                         break;
                     }
                 }
@@ -238,7 +240,7 @@ static void setOperationsFromFile(const QString& fileName, Opers& opers)
         }
     }
     if (xml.hasError()) {
-        qDebug("Load MIDI import operations from file: cannot parse input file");
+        LOGD("Load MIDI import operations from file: cannot parse input file");
         return;
     }
 
@@ -323,4 +325,4 @@ void Data::setOperationsFile(const QString& fileName)
     }
 }
 } // namespace MidiOperations
-} // namespace Ms
+} // namespace mu::iex::midi

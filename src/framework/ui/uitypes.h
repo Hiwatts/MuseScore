@@ -19,36 +19,63 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_UITYPES_H
-#define MU_UI_UITYPES_H
+#ifndef MUSE_UI_UITYPES_H
+#define MUSE_UI_UITYPES_H
 
 #include <vector>
-#include <optional>
-#include <cstring>
 #include <QString>
 #include <QMetaType>
+#include <QMap>
+#include <QQuickItem>
 
-#include "ret.h"
-#include "val.h"
-#include "actions/actiontypes.h"
-#include "view/iconcodes.h"
+#include "view/iconcodes.h" // IWYU pragma: export
+#include "workspace/workspacetypes.h"
 
-namespace mu::ui {
+namespace muse::ui {
+//! NOTE Same as QSGRendererInterface::Api
+enum class GraphicsApi {
+    Default,
+    Software,
+    OpenVG,
+    OpenGL,
+    Direct3D11,
+    Vulkan,
+    Metal,
+    Null
+};
+
 using ThemeCode = std::string;
 
-static const ThemeCode DARK_THEME_CODE("dark");
+inline ThemeCode themeCodeFromString(const QString& str)
+{
+    return str.toStdString();
+}
+
 static const ThemeCode LIGHT_THEME_CODE("light");
-static const ThemeCode HIGH_CONTRAST_BLACK_THEME_CODE("high_contrast_black");
+static const ThemeCode DARK_THEME_CODE("dark");
 static const ThemeCode HIGH_CONTRAST_WHITE_THEME_CODE("high_contrast_white");
+static const ThemeCode HIGH_CONTRAST_BLACK_THEME_CODE("high_contrast_black");
 
 inline std::vector<ThemeCode> allStandardThemeCodes()
 {
     return {
         LIGHT_THEME_CODE,
         DARK_THEME_CODE,
-        HIGH_CONTRAST_BLACK_THEME_CODE,
-        HIGH_CONTRAST_WHITE_THEME_CODE
+        HIGH_CONTRAST_WHITE_THEME_CODE,
+        HIGH_CONTRAST_BLACK_THEME_CODE
     };
+}
+
+inline bool isDarkTheme(const ThemeCode& themeCode)
+{
+    return themeCode == DARK_THEME_CODE
+           || themeCode == HIGH_CONTRAST_BLACK_THEME_CODE;
+}
+
+inline bool isHighContrastTheme(const ThemeCode& themeCode)
+{
+    return themeCode == HIGH_CONTRAST_WHITE_THEME_CODE
+           || themeCode == HIGH_CONTRAST_BLACK_THEME_CODE;
 }
 
 enum ThemeStyleKey
@@ -57,15 +84,23 @@ enum ThemeStyleKey
 
     BACKGROUND_PRIMARY_COLOR = 0,
     BACKGROUND_SECONDARY_COLOR,
+    BACKGROUND_TERTIARY_COLOR,
+    BACKGROUND_QUARTERNARY_COLOR,
     POPUP_BACKGROUND_COLOR,
+    PROJECT_TAB_COLOR,
     TEXT_FIELD_COLOR,
     ACCENT_COLOR,
     STROKE_COLOR,
+    STROKE_SECONDARY_COLOR,
     BUTTON_COLOR,
     FONT_PRIMARY_COLOR,
     FONT_SECONDARY_COLOR,
     LINK_COLOR,
     FOCUS_COLOR,
+    WHITE_COLOR,
+    BLACK_COLOR,
+    PLAY_COLOR,
+    RECORD_COLOR,
 
     BORDER_WIDTH,
     NAVIGATION_CONTROL_BORDER_WIDTH,
@@ -133,183 +168,10 @@ struct ContainerMeta
         : type(type), widgetMetaTypeId(widgetMetaTypeId) {}
 };
 
-// UiActions/Menu
-
-struct UiContext
-{
-    UiContext() = default;
-    constexpr UiContext(const char* ctx)
-        : const_data(ctx) {}
-
-    inline bool operator ==(const UiContext& ctx) const
-    {
-        return std::strcmp(const_data, ctx.const_data) == 0;
-    }
-
-    std::string toString() const { return std::string(const_data); }
-
-private:
-    const char* const_data = nullptr;
-};
-
-//! NOTE Only general UI contexts are declared here, which do not depend on the specifics of the application.
-//! Application-specific UI contexts are declared in the `context/uicontext.h` file
-static constexpr UiContext UiCtxUnknown = "UiCtxUnknown";
-static constexpr UiContext UiCtxAny = "UiCtxAny";
-
-enum class Checkable {
-    No = 0,
-    Yes
-};
-
-struct UiAction
-{
-    actions::ActionCode code;
-    UiContext context = UiCtxAny;
-    QString title;
-    QString description;
-    IconCode::Code iconCode = IconCode::Code::NONE;
-    Checkable checkable = Checkable::No;
-    std::string shortcut;
-
-    UiAction() = default;
-    UiAction(const actions::ActionCode& code, UiContext ctx, Checkable ch = Checkable::No)
-        : code(code), context(ctx), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, const char* desc, Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), description(desc), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, const char* desc, IconCode::Code icon,
-             Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), description(desc), iconCode(icon), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, IconCode::Code icon, Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), iconCode(icon), checkable(ch) {}
-
-    bool isValid() const
-    {
-        return !code.empty();
-    }
-};
-
-class UiActionList : public std::vector<UiAction>
-{
-public:
-    UiActionList() = default;
-    UiActionList(std::initializer_list<UiAction> l)
-        : std::vector<UiAction>(l) {}
-    UiActionList(std::vector<UiAction>::iterator b, std::vector<UiAction>::iterator e)
-        : std::vector<UiAction>(b, e) {}
-
-    bool contains(const actions::ActionCode& code) const
-    {
-        auto it = std::find_if(cbegin(), cend(), [code](const UiAction& a) {
-            return a.code == code;
-        });
-        return it != cend();
-    }
-
-    std::optional<size_t> indexOf(const actions::ActionCode& code) const
-    {
-        for (size_t i = 0; i < size(); ++i) {
-            if (at(i).code == code) {
-                return i;
-            }
-        }
-
-        return std::nullopt;
-    }
-};
-
-struct UiActionState
-{
-    bool enabled = false;
-    bool checked = false;
-
-    inline bool operator ==(const UiActionState& st) const
-    {
-        return st.enabled == enabled && st.checked == checked;
-    }
-
-    inline bool operator !=(const UiActionState& st) const
-    {
-        return !this->operator ==(st);
-    }
-
-    static UiActionState make_disabled(bool checked = false)
-    {
-        return UiActionState { false, checked };
-    }
-
-    static UiActionState make_enabled(bool checked = false)
-    {
-        return UiActionState { true, checked };
-    }
-};
-
-struct MenuItem : public UiAction
-{
-    QString id;
-    QString section;
-    UiActionState state;
-    bool selectable = false;
-    bool selected = false;
-    actions::ActionData args;
-    QList<MenuItem> subitems;
-
-    MenuItem() = default;
-    MenuItem(const UiAction& a)
-        : UiAction(a)
-    {
-        id = QString::fromStdString(a.code);
-    }
-
-    QVariantMap toMap() const
-    {
-        QVariantList subitemsVariantList;
-        for (const MenuItem& item: subitems) {
-            subitemsVariantList << item.toMap();
-        }
-
-        return {
-            { "id", id },
-            { "code", QString::fromStdString(code) },
-            { "shortcut", QString::fromStdString(shortcut) },
-            { "title", title },
-            { "description", description },
-            { "section", section },
-            { "icon", static_cast<int>(iconCode) },
-            { "enabled", state.enabled },
-            { "checkable", checkable == Checkable::Yes },
-            { "checked", state.checked },
-            { "selectable", selectable },
-            { "selected", selected },
-            { "subitems", subitemsVariantList }
-        };
-    }
-
-    bool isValid() const
-    {
-        return !id.isEmpty();
-    }
-};
-using MenuItemList = QList<MenuItem>;
-
-struct ToolConfig
-{
-    struct Item
-    {
-        actions::ActionCode action;
-        bool show = true;
-
-        Item() = default;
-        Item(const actions::ActionCode& a, bool sh)
-            : action(a), show(sh) {}
-    };
-
-    QList<Item> items;
-
-    bool isValid() const { return !items.isEmpty(); }
-};
+// workspaces
+inline const workspace::DataKey WS_UiSettings("ui_settings");
+inline const workspace::DataKey WS_UiStates("ui_states");
+inline const workspace::DataKey WS_UiToolConfigs("ui_toolconfigs");
 }
 
-#endif // MU_UI_UITYPES_H
+#endif // MUSE_UI_UITYPES_H

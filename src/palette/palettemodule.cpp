@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,37 +25,37 @@
 
 #include "log.h"
 
-#include "config.h"
 #include "modularity/ioc.h"
 #include "ui/iuiengine.h"
 #include "ui/iinteractiveuriregister.h"
 #include "ui/iuiactionsregister.h"
+#include "accessibility/iqaccessibleinterfaceregister.h"
 
 #include "internal/paletteconfiguration.h"
 #include "internal/paletteuiactions.h"
 #include "internal/paletteactionscontroller.h"
 #include "internal/paletteworkspacesetup.h"
 #include "internal/paletteprovider.h"
+#include "internal/palettecell.h"
 
 #include "view/paletterootmodel.h"
 #include "view/palettepropertiesmodel.h"
 #include "view/palettecellpropertiesmodel.h"
+#include "view/palettespanelcontextmenumodel.h"
 #include "view/drumsetpanelview.h"
 
 #include "view/widgets/masterpalette.h"
 #include "view/widgets/specialcharactersdialog.h"
-#include "view/widgets/editdrumsetdialog.h"
+#include "view/widgets/customizekitdialog.h"
 #include "view/widgets/timesignaturepropertiesdialog.h"
+#include "view/widgets/keyedit.h"
+#include "view/widgets/timedialog.h"
 
 using namespace mu::palette;
-using namespace mu::modularity;
-using namespace mu::ui;
-
-static std::shared_ptr<Ms::PaletteProvider> s_paletteProvider = std::make_shared<Ms::PaletteProvider>();
-static std::shared_ptr<PaletteActionsController> s_actionsController = std::make_shared<PaletteActionsController>();
-static std::shared_ptr<PaletteUiActions> s_paletteUiActions = std::make_shared<PaletteUiActions>(s_actionsController);
-static std::shared_ptr<PaletteConfiguration> s_configuration = std::make_shared<PaletteConfiguration>();
-static std::shared_ptr<PaletteWorkspaceSetup> s_paletteWorkspaceSetup = std::make_shared<PaletteWorkspaceSetup>();
+using namespace muse;
+using namespace muse::modularity;
+using namespace muse::ui;
+using namespace muse::accessibility;
 
 static void palette_init_qrc()
 {
@@ -69,36 +69,40 @@ std::string PaletteModule::moduleName() const
 
 void PaletteModule::registerExports()
 {
-    ioc()->registerExport<IPaletteProvider>(moduleName(), s_paletteProvider);
-    ioc()->registerExport<IPaletteConfiguration>(moduleName(), s_configuration);
+    m_paletteProvider = std::make_shared<PaletteProvider>();
+    m_actionsController = std::make_shared<PaletteActionsController>();
+    m_paletteUiActions = std::make_shared<PaletteUiActions>(m_actionsController);
+    m_configuration = std::make_shared<PaletteConfiguration>();
+    m_paletteWorkspaceSetup = std::make_shared<PaletteWorkspaceSetup>();
+
+    ioc()->registerExport<IPaletteProvider>(moduleName(), m_paletteProvider);
+    ioc()->registerExport<IPaletteConfiguration>(moduleName(), m_configuration);
 }
 
 void PaletteModule::resolveImports()
 {
-    auto ar = ioc()->resolve<ui::IUiActionsRegister>(moduleName());
+    auto ar = ioc()->resolve<muse::ui::IUiActionsRegister>(moduleName());
     if (ar) {
-        ar->reg(s_paletteUiActions);
+        ar->reg(m_paletteUiActions);
     }
 
     auto ir = ioc()->resolve<IInteractiveUriRegister>(moduleName());
     if (ir) {
-        ir->registerUri(Uri("musescore://palette/masterpalette"),
-                        ContainerMeta(ContainerType::QWidgetDialog, Ms::MasterPalette::static_metaTypeId()));
+        ir->registerWidgetUri<MasterPalette>(Uri("musescore://palette/masterpalette"));
+        ir->registerWidgetUri<SpecialCharactersDialog>(Uri("musescore://palette/specialcharacters"));
+        ir->registerWidgetUri<TimeSignaturePropertiesDialog>(Uri("musescore://palette/timesignatureproperties"));
+        ir->registerWidgetUri<CustomizeKitDialog>(Uri("musescore://palette/customizekit"));
+        ir->registerWidgetUri<KeyEditor>(Uri("musescore://notation/keysignatures"));
+        ir->registerWidgetUri<TimeDialog>(Uri("musescore://notation/timesignatures"));
 
-        ir->registerUri(Uri("musescore://palette/specialcharacters"),
-                        ContainerMeta(ContainerType::QWidgetDialog, Ms::SpecialCharactersDialog::static_metaTypeId()));
+        ir->registerQmlUri(Uri("musescore://palette/properties"), "MuseScore/Palette/PalettePropertiesDialog.qml");
+        ir->registerQmlUri(Uri("musescore://palette/cellproperties"), "MuseScore/Palette/PaletteCellPropertiesDialog.qml");
+    }
 
-        ir->registerUri(Uri("musescore://palette/timesignatureproperties"),
-                        ContainerMeta(ContainerType::QWidgetDialog, Ms::TimeSignaturePropertiesDialog::static_metaTypeId()));
-
-        ir->registerUri(Uri("musescore://palette/editdrumset"),
-                        ContainerMeta(ContainerType::QWidgetDialog, Ms::EditDrumsetDialog::static_metaTypeId()));
-
-        ir->registerUri(Uri("musescore://palette/properties"),
-                        ContainerMeta(ContainerType::QmlDialog, "MuseScore/Palette/PalettePropertiesDialog.qml"));
-
-        ir->registerUri(Uri("musescore://palette/cellproperties"),
-                        ContainerMeta(ContainerType::QmlDialog, "MuseScore/Palette/PaletteCellPropertiesDialog.qml"));
+    auto accr = ioc()->resolve<IQAccessibleInterfaceRegister>(moduleName());
+    if (accr) {
+        accr->registerInterfaceGetter("mu::palette::PaletteWidget", PaletteWidget::accessibleInterface);
+        accr->registerInterfaceGetter("mu::palette::PaletteCell", PaletteCell::accessibleInterface);
     }
 }
 
@@ -109,55 +113,52 @@ void PaletteModule::registerResources()
 
 void PaletteModule::registerUiTypes()
 {
-    using namespace Ms;
+    using namespace mu::engraving;
 
     qmlRegisterUncreatableType<PaletteProvider>("MuseScore.Palette", 1, 0, "PaletteProvider", "Cannot create");
-    qmlRegisterUncreatableType<AbstractPaletteController>("MuseScore.Palette", 1, 0, "PaletteController", "Cannot ...");
-    qmlRegisterUncreatableType<PaletteElementEditor>("MuseScore.Palette", 1, 0, "PaletteElementEditor", "Cannot ...");
+    qmlRegisterUncreatableType<AbstractPaletteController>("MuseScore.Palette", 1, 0, "PaletteController", "Cannot …");
+    qmlRegisterUncreatableType<PaletteElementEditor>("MuseScore.Palette", 1, 0, "PaletteElementEditor", "Cannot …");
     qmlRegisterUncreatableType<PaletteTreeModel>("MuseScore.Palette", 1, 0, "PaletteTreeModel",  "Cannot create");
     qmlRegisterUncreatableType<FilterPaletteTreeModel>("MuseScore.Palette", 1, 0, "FilterPaletteTreeModel", "Cannot");
+    qmlRegisterType<PalettesPanelContextMenuModel>("MuseScore.Palette", 1, 0, "PalettesPanelContextMenuModel");
 
     qmlRegisterType<PaletteRootModel>("MuseScore.Palette", 1, 0, "PaletteRootModel");
     qmlRegisterType<PalettePropertiesModel>("MuseScore.Palette", 1, 0, "PalettePropertiesModel");
     qmlRegisterType<PaletteCellPropertiesModel>("MuseScore.Palette", 1, 0, "PaletteCellPropertiesModel");
     qmlRegisterType<DrumsetPanelView>("MuseScore.Palette", 1, 0, "DrumsetPanelView");
 
-    qRegisterMetaType<SpecialCharactersDialog>("SpecialCharactersDialog");
-    qRegisterMetaType<TimeSignaturePropertiesDialog>("TimeSignaturePropertiesDialog");
-    qRegisterMetaType<Ms::EditDrumsetDialog>("EditDrumsetDialog");
-
-    ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(palette_QML_IMPORT);
+    ioc()->resolve<muse::ui::IUiEngine>(moduleName())->addSourceImportPath(palette_QML_IMPORT);
 }
 
-void PaletteModule::onInit(const framework::IApplication::RunMode& mode)
+void PaletteModule::onInit(const IApplication::RunMode& mode)
 {
-    if (framework::IApplication::RunMode::Editor != mode) {
+    if (IApplication::RunMode::GuiApp != mode) {
         return;
     }
 
-    s_configuration->init();
-    s_actionsController->init();
-    s_paletteUiActions->init();
-    s_paletteProvider->init();
+    m_configuration->init();
+    m_actionsController->init();
+    m_paletteUiActions->init();
+    m_paletteProvider->init();
 }
 
-void PaletteModule::onAllInited(const framework::IApplication::RunMode& mode)
+void PaletteModule::onAllInited(const IApplication::RunMode& mode)
 {
-    if (framework::IApplication::RunMode::Editor != mode) {
+    if (IApplication::RunMode::GuiApp != mode) {
         return;
     }
 
     //! NOTE We need to be sure that the workspaces are initialized.
     //! So, we loads these settings on onAllInited
-    s_paletteWorkspaceSetup->setup();
+    m_paletteWorkspaceSetup->setup();
 }
 
 void PaletteModule::onDeinit()
 {
-    s_paletteWorkspaceSetup.reset();
-    s_configuration.reset();
-    s_paletteUiActions.reset();
+    m_paletteWorkspaceSetup.reset();
+    m_configuration.reset();
+    m_paletteUiActions.reset();
 
-    ioc()->unregisterExportIfRegistered<IPaletteProvider>(moduleName(), s_paletteProvider);
-    s_paletteProvider.reset();
+    ioc()->unregisterIfRegistered<IPaletteProvider>(moduleName(), m_paletteProvider);
+    m_paletteProvider.reset();
 }

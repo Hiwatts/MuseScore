@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,14 +21,14 @@
  */
 import QtQuick 2.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 
 InspectorPropertyView {
     id: root
 
     visible: Boolean(propertyItem)
 
-    navigationRowEnd: navigationRowStart + 2
+    navigationName: "TextSection"
 
     function focusOnFirst() {
         textField.navigation.requestActive()
@@ -40,12 +40,12 @@ InspectorPropertyView {
         currentText: root.propertyItem ? root.propertyItem.value : ""
         enabled: root.propertyItem ? root.propertyItem.isEnabled : false
 
+        navigation.name: root.navigationName + " TextInputField"
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRowStart + 1
-        navigation.enabled: root.enabled && root.navigationEnabled && root.visible
         navigation.accessible.name: root.titleText + " " + currentText
 
-        onCurrentTextEdited: {
+        onTextEditingFinished: function(newTextValue) {
             if (root.propertyItem) {
                 root.propertyItem.value = newTextValue
             }

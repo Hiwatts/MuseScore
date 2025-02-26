@@ -18,41 +18,114 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#add_subdirectory(global)
-add_subdirectory(ui)
-add_subdirectory(uicomponents)
-add_subdirectory(fonts)
-add_subdirectory(actions)
-add_subdirectory(accessibility)
+# should be first to work pch
+if (MUSE_MODULE_GLOBAL)
+    add_subdirectory(global)
+endif()
 
-if (BUILD_SHORTCUTS_MODULE)
-    add_subdirectory(shortcuts)
-endif (BUILD_SHORTCUTS_MODULE)
+if (MUSE_MODULE_ACCESSIBILITY)
+    add_subdirectory(accessibility)
+endif()
 
-if (BUILD_NETWORK_MODULE)
-    add_subdirectory(network)
-endif (BUILD_NETWORK_MODULE)
+if (MUSE_MODULE_ACTIONS)
+    add_subdirectory(actions)
+endif()
 
-if (BUILD_SYSTEM_MODULE)
-    add_subdirectory(system)
-endif (BUILD_SYSTEM_MODULE)
-
-if (BUILD_AUDIO_MODULE)
+if (MUSE_MODULE_AUDIO)
     add_subdirectory(audio)
-endif (BUILD_AUDIO_MODULE)
+endif()
 
-add_subdirectory(midi)
+if (MUSE_MODULE_AUDIOPLUGINS)
+    add_subdirectory(audioplugins)
+endif()
 
-if (BUILD_TELEMETRY_MODULE)
-      add_subdirectory(telemetry)
-endif (BUILD_TELEMETRY_MODULE)
+if (MUSE_MODULE_AUTOBOT)
+    add_subdirectory(autobot)
+endif()
 
-if (BUILD_UNIT_TESTS)
-    add_subdirectory(global/tests)
-    add_subdirectory(system/tests)
-    add_subdirectory(ui/tests)
-endif(BUILD_UNIT_TESTS)
+if (MUSE_MODULE_CLOUD)
+    add_subdirectory(cloud)
+endif()
 
-if (BUILD_VST)
+if (MUSE_MODULE_DIAGNOSTICS)
+    add_subdirectory(diagnostics)
+endif()
+
+if (MUSE_MODULE_DRAW)
+    add_subdirectory(draw)
+endif()
+
+if (MUSE_MODULE_MIDI)
+    add_subdirectory(midi)
+endif()
+
+if (MUSE_MODULE_MPE)
+    add_subdirectory(mpe)
+endif()
+
+if (MUSE_MODULE_MUSESAMPLER)
+    add_subdirectory(musesampler)
+endif()
+
+if (MUSE_MODULE_UI)
+    add_subdirectory(ui)
+    add_subdirectory(uicomponents)
+    add_subdirectory(dockwindow)
+endif()
+
+if (MUSE_MODULE_NETWORK)
+    add_subdirectory(network)
+endif()
+
+if (MUSE_MODULE_SHORTCUTS)
+    add_subdirectory(shortcuts)
+endif()
+
+if (MUSE_MODULE_TOURS)
+    add_subdirectory(tours)
+endif()
+
+if (MUSE_MODULE_MULTIINSTANCES)
+    add_subdirectory(multiinstances)
+endif()
+
+if (MUSE_MODULE_LANGUAGES)
+    add_subdirectory(languages)
+endif()
+
+if (MUSE_MODULE_LEARN)
+    add_subdirectory(learn)
+endif()
+
+if (MUSE_MODULE_EXTENSIONS)
+    add_subdirectory(extensions)
+endif()
+
+if (MUSE_MODULE_WORKSPACE)
+    add_subdirectory(workspace)
+endif()
+
+if (MUSE_MODULE_VST)
     add_subdirectory(vst)
-endif(BUILD_VST)
+endif()
+
+if (MUSE_MODULE_UPDATE)
+    add_subdirectory(update)
+endif()
+
+# Tests
+if (MUSE_ENABLE_UNIT_TESTS)
+    define_property(TARGET PROPERTY OUTPUT_XML
+        BRIEF_DOCS "List XML files outputted by google test."
+        FULL_DOCS "List XML files outputted by google test."
+    )
+
+    set(INSTALL_GTEST OFF)
+    add_subdirectory(testing/thirdparty/googletest)
+endif()
+
+# Stubs
+add_subdirectory(stubs)
+
+
+

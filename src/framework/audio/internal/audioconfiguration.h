@@ -19,19 +19,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_AUDIOCONFIGURATION_H
-#define MU_AUDIO_AUDIOCONFIGURATION_H
+#ifndef MUSE_AUDIO_AUDIOCONFIGURATION_H
+#define MUSE_AUDIO_AUDIOCONFIGURATION_H
+
+#include "global/modularity/ioc.h"
+#include "global/io/ifilesystem.h"
+#include "global/iglobalconfiguration.h"
 
 #include "../iaudioconfiguration.h"
-#include "modularity/ioc.h"
-#include "iglobalconfiguration.h"
 
-namespace mu::audio {
-class AudioConfiguration : public IAudioConfiguration
+namespace muse::audio {
+class AudioConfiguration : public IAudioConfiguration, public Injectable
 {
-    INJECT(audio, framework::IGlobalConfiguration, globalConfiguration)
+    Inject<IGlobalConfiguration> globalConfiguration = { this };
+    Inject<io::IFileSystem> fileSystem = { this };
+
 public:
-    AudioConfiguration() = default;
+    AudioConfiguration(const modularity::ContextPtr& iocCtx)
+        : Injectable(iocCtx) {}
 
     void init();
 
@@ -40,34 +45,51 @@ public:
     std::string currentAudioApi() const override;
     void setCurrentAudioApi(const std::string& name) override;
 
+    std::string audioOutputDeviceId() const override;
+    void setAudioOutputDeviceId(const std::string& deviceId) override;
+    async::Notification audioOutputDeviceIdChanged() const override;
+
     audioch_t audioChannelsCount() const override;
+
     unsigned int driverBufferSize() const override;
+    void setDriverBufferSize(unsigned int size) override;
+    async::Notification driverBufferSizeChanged() const override;
 
-    io::paths soundFontDirectories() const override;
-    async::Channel<io::paths> soundFontDirectoriesChanged() const override;
+    msecs_t audioWorkerInterval(const samples_t samples, const sample_rate_t sampleRate) const override;
+    samples_t minSamplesToReserve(RenderMode mode) const override;
 
-    bool isShowControlsInMixer() const override;
-    void setIsShowControlsInMixer(bool show) override;
+    samples_t samplesToPreallocate() const override;
+    async::Channel<samples_t> samplesToPreallocateChanged() const override;
 
+    unsigned int sampleRate() const override;
+    void setSampleRate(unsigned int sampleRate) override;
+    async::Notification sampleRateChanged() const override;
+
+    size_t desiredAudioThreadNumber() const override;
+    size_t minTrackCountForMultithreading() const override;
+
+    // synthesizers
     AudioInputParams defaultAudioInputParams() const override;
 
-    const synth::SynthesizerState& defaultSynthesizerState() const;
-    const synth::SynthesizerState& synthesizerState() const override;
-    Ret saveSynthesizerState(const synth::SynthesizerState& state) override;
-    async::Notification synthesizerStateChanged() const override;
-    async::Notification synthesizerStateGroupChanged(const std::string& groupName) const override;
+    io::paths_t soundFontDirectories() const override;
+    io::paths_t userSoundFontDirectories() const override;
+    void setUserSoundFontDirectories(const io::paths_t& paths) override;
+    async::Channel<io::paths_t> soundFontDirectoriesChanged() const override;
+
+    bool shouldMeasureInputLag() const override;
 
 private:
-    async::Channel<io::paths> m_soundFontDirsChanged;
+    void updateSamplesToPreallocate();
 
-    io::path stateFilePath() const;
-    bool readState(const io::path& path, synth::SynthesizerState& state) const;
-    bool writeState(const io::path& path, const synth::SynthesizerState& state);
+    async::Channel<io::paths_t> m_soundFontDirsChanged;
+    async::Channel<samples_t> m_samplesToPreallocateChanged;
 
-    mutable synth::SynthesizerState m_state;
-    async::Notification m_synthesizerStateChanged;
-    mutable std::map<std::string, async::Notification> m_synthesizerStateGroupChanged;
+    async::Notification m_audioOutputDeviceIdChanged;
+    async::Notification m_driverBufferSizeChanged;
+    async::Notification m_driverSampleRateChanged;
+
+    samples_t m_samplesToPreallocate = 0;
 };
 }
 
-#endif // MU_AUDIO_AUDIOCONFIGURATION_H
+#endif // MUSE_AUDIO_AUDIOCONFIGURATION_H

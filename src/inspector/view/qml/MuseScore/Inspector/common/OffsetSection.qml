@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,29 +20,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 InspectorPropertyView {
     id: root
 
-    property PropertyItem horizontalOffset: null
-    property PropertyItem verticalOffset: null
-
     property alias horizontalOffsetControl: horizontalOffsetControl
     property alias verticalOffsetControl: verticalOffsetControl
-
-    navigationRowEnd: verticalOffsetControl.navigation.row
+    property bool isVerticalOffsetAvailable: true
 
     titleText: qsTrc("inspector", "Offset")
-    propertyItem: root.horizontalOffset
 
-    visible: Boolean(horizontalOffset) || Boolean(verticalOffset)
+    navigationName: "OffsetSection"
+    navigationRowEnd: verticalOffsetControl.navigation.row
 
-    RowLayout {
+    Row {
         id: row
 
         height: childrenRect.height
@@ -53,31 +48,29 @@ InspectorPropertyView {
         IncrementalPropertyControl {
             id: horizontalOffsetControl
 
-            Layout.preferredWidth: parent.width / 2 - row.spacing / 2
+            width: parent.width / 2 - row.spacing / 2
 
             navigation.name: "HorizontalOffsetControl"
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 1
-            navigation.enabled: root.enabled && root.navigationEnabled && root.visible
             navigation.accessible.name: root.titleText + " " + qsTrc("inspector", "Horizontal") + " " + currentValue
 
             icon: IconCode.HORIZONTAL
 
-            enabled: Boolean(root.horizontalOffset) && root.horizontalOffset.isEnabled
-            visible: Boolean(root.horizontalOffset) && root.horizontalOffset.isVisible
+            isIndeterminate: root.propertyItem && enabled ? root.propertyItem.isUndefined : false
+            currentValue: root.propertyItem ? root.propertyItem.x : 0
 
-            isIndeterminate: root.horizontalOffset && enabled ? root.horizontalOffset.isUndefined : false
-            currentValue: root.horizontalOffset ? root.horizontalOffset.value : 0
-
-            onValueEdited: {
-                root.horizontalOffset.value = newValue
+            onValueEditingFinished: function(newValue) {
+                root.propertyItem.x = newValue
             }
         }
 
         IncrementalPropertyControl {
             id: verticalOffsetControl
 
-            Layout.preferredWidth: parent.width / 2 - row.spacing / 2
+            enabled: root.isVerticalOffsetAvailable
+
+            width: parent.width / 2 - row.spacing / 2
 
             navigation.name: "VerticalOffsetControl"
             navigation.panel: root.navigationPanel
@@ -86,14 +79,11 @@ InspectorPropertyView {
 
             icon: IconCode.VERTICAL
 
-            enabled: Boolean(root.verticalOffset) && root.verticalOffset.isEnabled
-            visible: Boolean(root.verticalOffset) && root.verticalOffset.isVisible
+            isIndeterminate: root.propertyItem && enabled ? root.propertyItem.isUndefined : false
+            currentValue: root.propertyItem ? root.propertyItem.y : 0
 
-            isIndeterminate: root.verticalOffset && enabled ? root.verticalOffset.isUndefined : false
-            currentValue: root.verticalOffset ? root.verticalOffset.value : 0
-
-            onValueEdited: {
-                root.verticalOffset.value = newValue
+            onValueEditingFinished: function(newValue) {
+                root.propertyItem.y = newValue
             }
         }
     }

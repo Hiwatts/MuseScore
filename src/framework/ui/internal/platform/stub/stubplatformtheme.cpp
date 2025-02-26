@@ -5,7 +5,7 @@
  * MuseScore
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2022 MuseScore BVBA and others
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 
 #include "stubplatformtheme.h"
 
-using namespace mu::ui;
-using namespace mu::async;
+using namespace muse::ui;
+using namespace muse::async;
 
 void StubPlatformTheme::startListening()
 {
@@ -38,20 +38,25 @@ bool StubPlatformTheme::isFollowSystemThemeAvailable() const
     return false;
 }
 
-ThemeCode StubPlatformTheme::themeCode() const
+bool StubPlatformTheme::isSystemThemeDark() const
 {
-    return LIGHT_THEME_CODE;
+    return false;
 }
 
-Channel<ThemeCode> StubPlatformTheme::themeCodeChanged() const
+bool StubPlatformTheme::isGlobalMenuAvailable() const
 {
-    return m_channel;
+    return false;
 }
 
-void StubPlatformTheme::applyPlatformStyleOnAppForTheme(ThemeCode)
+Notification StubPlatformTheme::platformThemeChanged() const
+{
+    return m_platformThemeChanged;
+}
+
+void StubPlatformTheme::applyPlatformStyleOnAppForTheme(const ThemeCode&)
 {
 }
 
-void StubPlatformTheme::applyPlatformStyleOnWindowForTheme(QWindow*, ThemeCode)
+void StubPlatformTheme::applyPlatformStyleOnWindowForTheme(QWindow*, const ThemeCode&)
 {
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,11 +21,11 @@
  */
 #include "noteheadgroupsmodel.h"
 
-#include "engraving/libmscore/note.h"
-#include "engraving/libmscore/scorefont.h"
+#include "engraving/dom/note.h"
+#include "engraving/types/typesconv.h"
 
 using namespace mu::inspector;
-using namespace Ms;
+using namespace mu::engraving;
 
 NoteheadGroupsModel::NoteheadGroupsModel(QObject* parent)
     : QAbstractListModel(parent)
@@ -43,7 +43,7 @@ QHash<int, QByteArray> NoteheadGroupsModel::roleNames() const
 
 int NoteheadGroupsModel::rowCount(const QModelIndex&) const
 {
-    return static_cast<int>(NoteHead::Group::HEAD_DO_WALKER);
+    return static_cast<int>(NoteHeadGroup::HEAD_DO_WALKER);
 }
 
 QVariant NoteheadGroupsModel::data(const QModelIndex& index, int role) const
@@ -53,16 +53,16 @@ QVariant NoteheadGroupsModel::data(const QModelIndex& index, int role) const
     }
 
     int row = index.row();
-    auto group = static_cast<NoteHead::Group>(row);
+    auto group = static_cast<NoteHeadGroup>(row);
 
     switch (role) {
     case HeadGroupRole:
         return row;
     case HintRole:
-        return NoteHead::group2userName(group);
+        return TConv::translatedUserName(group).toQString();
     case IconCodeRole: {
-        auto type = (group == NoteHead::Group::HEAD_BREVIS_ALT) ? NoteHead::Type::HEAD_BREVIS : NoteHead::Type::HEAD_QUARTER;
-        return ScoreFont::fallbackFont()->symCode(Note::noteHead(0, group, type));
+        auto type = (group == NoteHeadGroup::HEAD_BREVIS_ALT) ? NoteHeadType::HEAD_BREVIS : NoteHeadType::HEAD_QUARTER;
+        return engravingFonts()->fallbackFont()->symCode(Note::noteHead(0, group, type));
     }
     default: break;
     }

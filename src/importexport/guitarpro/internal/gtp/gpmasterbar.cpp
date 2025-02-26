@@ -1,6 +1,4 @@
 #include "gpmasterbar.h"
 
-namespace Ms {
-namespace  {
-}
-}
+namespace mu::iex::guitarpro {
+} // namespace mu::iex::guitarpro

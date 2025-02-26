@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# MuseScore-CLA-applies
+# MuseScore-Studio-CLA-applies
 #
-# MuseScore
+# MuseScore Studio
 # Music Composition & Notation
 #
-# Copyright (C) 2021 MuseScore BVBA and others
+# Copyright (C) 2021 MuseScore Limited
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -17,7 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-set(MODULE "inspector")
+declare_module("inspector")
 
 set(MODULE_QRC ${CMAKE_CURRENT_LIST_DIR}/view/inspector_resources.qrc )
 
@@ -42,12 +42,13 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/types/noteheadtypes.h
     ${CMAKE_CURRENT_LIST_DIR}/types/ornamenttypes.h
     ${CMAKE_CURRENT_LIST_DIR}/types/linetypes.h
-    ${CMAKE_CURRENT_LIST_DIR}/types/scoreappearancetypes.h
-    ${CMAKE_CURRENT_LIST_DIR}/types/stemtypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/types/directiontypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/types/slurtietypes.h
     ${CMAKE_CURRENT_LIST_DIR}/types/texttypes.h
     ${CMAKE_CURRENT_LIST_DIR}/types/commontypes.h
     ${CMAKE_CURRENT_LIST_DIR}/types/tremolobartypes.h
     ${CMAKE_CURRENT_LIST_DIR}/types/tremolotypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/types/voicetypes.h
     ${CMAKE_CURRENT_LIST_DIR}/models/iinspectormodelcreator.h
     ${CMAKE_CURRENT_LIST_DIR}/models/inspectormodelcreator.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/inspectormodelcreator.h
@@ -59,6 +60,10 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/inspectorlistmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/propertyitem.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/propertyitem.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/pointfpropertyitem.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/pointfpropertyitem.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/inspectormodelwithvoiceandpositionoptions.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/inspectormodelwithvoiceandpositionoptions.h
     ${CMAKE_CURRENT_LIST_DIR}/models/general/generalsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/general/generalsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/general/appearance/appearancesettingsmodel.cpp
@@ -69,26 +74,30 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/arpeggioplaybackmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/breathplaybackmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/breathplaybackmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/dynamicplaybackmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/dynamicplaybackmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/fermataplaybackmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/fermataplaybackmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/glissandoplaybackmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/glissandoplaybackmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/hairpinplaybackmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/hairpinplaybackmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/noteplaybackmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/noteplaybackmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/gradualtempochangeplaybackmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/general/playback/internal_models/gradualtempochangeplaybackmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/measures/measuressettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/measures/measuressettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/score/scoreappearancesettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/score/scoreappearancesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/score/scoredisplaysettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/score/scoredisplaysettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/score/internal/pagetypelistmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/score/internal/pagetypelistmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/parts/partssettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/parts/partssettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/text/textsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/text/textsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/widgets/fretcanvas.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/widgets/fretcanvas.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgets/bendgridcanvas.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgets/bendgridcanvas.h
     ${CMAKE_CURRENT_LIST_DIR}/view/widgets/gridcanvas.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/widgets/gridcanvas.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notationsettingsproxymodel.cpp
@@ -103,10 +112,10 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/barlines/barlinesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/barlines/barlinesettingsproxymodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/barlines/barlinesettingsproxymodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/beams/beammodesmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/beams/beammodesmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/bends/bendsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/bends/bendsettingsmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/brackets/bracesettingsmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/brackets/bracesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/brackets/bracketsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/brackets/bracketsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/chordsymbols/chordsymbolsettingsmodel.cpp
@@ -115,6 +124,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/clefs/clefsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/hairpinlinesettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/hairpinlinesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/slurandtiesettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/slurandtiesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/fermatas/fermatasettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/fermatas/fermatasettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/frames/horizontalframesettingsmodel.cpp
@@ -123,6 +134,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/frames/textframesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/frames/verticalframesettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/frames/verticalframesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/frames/fretframesettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/frames/fretframesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/fretdiagrams/fretdiagramsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/fretdiagrams/fretdiagramsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/glissandosettingsmodel.cpp
@@ -139,8 +152,12 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/letringsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/palmmutesettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/palmmutesettingsmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/linesettingsmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/linesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/textlinesettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/textlinesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/gradualtempochangesettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/gradualtempochangesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/notelinesettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/notelinesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/images/imagesettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/images/imagesettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/jumps/jumpsettingsmodel.cpp
@@ -153,6 +170,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/ornaments/ornamentsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/pedalsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/lines/pedalsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lyrics/lyricssettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/lyrics/lyricssettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/sectionbreaks/sectionbreaksettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/sectionbreaks/sectionbreaksettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/spacers/spacersettingsmodel.cpp
@@ -161,6 +180,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/staffs/staffsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/stafftype/stafftypesettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/stafftype/stafftypesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/symbols/symbolsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/symbols/symbolsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/tempos/temposettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/tempos/temposettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/timesignatures/timesignaturesettingsmodel.cpp
@@ -172,9 +193,9 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/notesettingsproxymodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/notesettingsproxymodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/beams/beamsettingsmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/beams/beamsettingsmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/beams/internal/beammodesmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/beams/internal/beammodesmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/beams/beamsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/chords/chordsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/chords/chordsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/hooks/hooksettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/hooks/hooksettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/notes/noteheads/noteheadsettingsmodel.cpp
@@ -187,6 +208,20 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/mmrests/mmrestsettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/measurerepeats/measurerepeatsettingsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/notation/measurerepeats/measurerepeatsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/tuplets/tupletsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/tuplets/tupletsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/instrumentname/instrumentnamesettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/instrumentname/instrumentnamesettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/rests/beams/restbeamsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/rests/beams/restbeamsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/rests/restsettingsproxymodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/rests/restsettingsproxymodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/dynamics/dynamicsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/dynamics/dynamicsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/expressions/expressionsettingsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/expressions/expressionsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/stringtunings/stringtuningssettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/models/notation/stringtunings/stringtuningssettingsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/models/inspectorpopupcontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/models/inspectorpopupcontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/services/elementrepositoryservice.cpp
@@ -196,17 +231,13 @@ set(MODULE_SRC
 
 set(MODULE_UI ${inspector_UI} )
 
-set(MODULE_INCLUDE
-    ${PROJECT_SOURCE_DIR}/src/engraving/libmscore
-    )
-
 if (NOT MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9.0)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-copy")
 endif (NOT MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9.0)
 
 set(MODULE_LINK
+    muse::uicomponents
     engraving
     )
 
-set(MODULE_USE_UNITBUILD ON)
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
+setup_module()

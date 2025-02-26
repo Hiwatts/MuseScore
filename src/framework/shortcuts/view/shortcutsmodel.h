@@ -20,8 +20,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_SHORTCUTS_SHORTCUTSMODEL_H
-#define MU_SHORTCUTS_SHORTCUTSMODEL_H
+#ifndef MUSE_SHORTCUTS_SHORTCUTSMODEL_H
+#define MUSE_SHORTCUTS_SHORTCUTSMODEL_H
 
 #include <QAbstractListModel>
 #include <QItemSelection>
@@ -36,19 +36,19 @@
 
 class QItemSelection;
 
-namespace mu::shortcuts {
-class ShortcutsModel : public QAbstractListModel, public async::Asyncable
+namespace muse::shortcuts {
+class ShortcutsModel : public QAbstractListModel, public Injectable, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(shortcuts, IShortcutsRegister, shortcutsRegister)
-    INJECT(shortcuts, ui::IUiActionsRegister, uiactionsRegister)
-    INJECT(shortcuts, framework::IInteractive, interactive)
-    INJECT(shortcuts, IShortcutsConfiguration, configuration)
-    INJECT(shortcuts, framework::IGlobalConfiguration, globalConfiguration)
-
     Q_PROPERTY(QItemSelection selection READ selection WRITE setSelection NOTIFY selectionChanged)
-    Q_PROPERTY(QString currentSequence READ currentSequence NOTIFY selectionChanged)
+    Q_PROPERTY(QVariant currentShortcut READ currentShortcut NOTIFY selectionChanged)
+
+    Inject<IShortcutsRegister> shortcutsRegister = { this };
+    Inject<ui::IUiActionsRegister> uiactionsRegister = { this };
+    Inject<IInteractive> interactive = { this };
+    Inject<IShortcutsConfiguration> configuration = { this };
+    Inject<IGlobalConfiguration> globalConfiguration = { this };
 
 public:
     explicit ShortcutsModel(QObject* parent = nullptr);
@@ -58,15 +58,16 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     QItemSelection selection() const;
-    QString currentSequence() const;
+    QVariant currentShortcut() const;
 
     Q_INVOKABLE void load();
     Q_INVOKABLE bool apply();
+    Q_INVOKABLE void reset();
 
     Q_INVOKABLE void importShortcutsFromFile();
     Q_INVOKABLE void exportShortcutsToFile();
 
-    Q_INVOKABLE void applySequenceToCurrentShortcut(const QString& newSequence);
+    Q_INVOKABLE void applySequenceToCurrentShortcut(const QString& newSequence, int conflictShortcutIndex = -1);
 
     Q_INVOKABLE void clearSelectedShortcuts();
     Q_INVOKABLE void resetToDefaultSelectedShortcuts();
@@ -80,11 +81,13 @@ signals:
     void selectionChanged();
 
 private:
-    const ui::UiAction& action(const std::string& actionCode) const;
-    QString actionTitle(const std::string& actionCode) const;
+    const muse::ui::UiAction& action(const std::string& actionCode) const;
+    QString actionText(const std::string& actionCode) const;
 
     QModelIndex currentShortcutIndex() const;
     void notifyAboutShortcutChanged(const QModelIndex& index);
+
+    QVariant shortcutToObject(const Shortcut& shortcut) const;
 
     enum Roles {
         RoleTitle = Qt::UserRole + 1,
@@ -98,4 +101,4 @@ private:
 };
 }
 
-#endif // MU_SHORTCUTS_SHORTCUTSMODEL_H
+#endif // MUSE_SHORTCUTS_SHORTCUTSMODEL_H

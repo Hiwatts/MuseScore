@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,12 +24,14 @@
 
 #include "importmidi_operation.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Staff;
+}
 
+namespace mu::iex::midi {
 namespace Swing {
-void detectSwing(Staff* staff, MidiOperations::Swing swingType);
+void detectSwing(engraving::Staff* staff, MidiOperations::Swing swingType);
 } // namespace Swing
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_SWING_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,22 +24,16 @@
 
 #include "models/abstractinspectorproxymodel.h"
 
+#if (defined(_MSCVER) || defined(_MSC_VER))
+// unreferenced function with internal linkage has been removed
+#pragma warning(disable: 4505)
+#endif
+
 namespace mu::inspector {
 class PlaybackProxyModel : public AbstractInspectorProxyModel
 {
-    Q_OBJECT
-
-    Q_PROPERTY(bool hasDynamicsSettings READ hasDynamicsSettings NOTIFY isEmptyChanged)
-    Q_PROPERTY(bool hasGeneralSettings READ hasGeneralSettings NOTIFY isEmptyChanged)
-
 public:
     explicit PlaybackProxyModel(QObject* parent, IElementRepositoryService* repository);
-
-    bool hasGeneralSettings() const;
-    bool hasDynamicsSettings() const;
-
-private:
-    bool isGropEmpty(const QList<InspectorModelType>& group) const;
 };
 }
 

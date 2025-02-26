@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,20 +29,20 @@ PaletteRootModel::PaletteRootModel(QObject* parent)
     dispatcher()->reg(this, "palette-search", [this]() {
         emit paletteSearchRequested();
     });
+    dispatcher()->reg(this, "apply-current-palette-element", [this]() {
+        emit applyCurrentPaletteElementRequested();
+    });
 }
 
-bool PaletteRootModel::paletteEnabled() const
+PaletteRootModel::~PaletteRootModel()
 {
-    // TODO?
-    return true;
+    PaletteProvider* provider = paletteProvider_property();
+    if (provider) {
+        provider->setSearching(false);
+    }
 }
 
-Ms::PaletteProvider* PaletteRootModel::paletteProvider_property() const
+PaletteProvider* PaletteRootModel::paletteProvider_property() const
 {
-    return dynamic_cast<Ms::PaletteProvider*>(paletteProvider().get());
-}
-
-bool PaletteRootModel::needShowShadowOverlay() const
-{
-    return m_needShowShadowOverlay;
+    return dynamic_cast<PaletteProvider*>(paletteProvider().get());
 }

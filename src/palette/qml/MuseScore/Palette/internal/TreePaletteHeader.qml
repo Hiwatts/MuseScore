@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,8 +23,8 @@ import QtQuick 2.8
 import QtQuick.Controls 2.1
 
 import MuseScore.Palette 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 Item {
     id: root
@@ -44,6 +44,14 @@ Item {
 
     property NavigationPanel navigationPanel: null
     property int navigationRow: 0
+
+    function closeContextMenu() {
+        if (!menuButton.isMenuOpened) {
+            return
+        }
+
+        menuButton.toggleMenu(null)
+    }
 
     signal toggleExpandRequested()
     signal enableEditingToggled(bool val)
@@ -68,6 +76,11 @@ Item {
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRow
         navigation.column: 1
+        navigation.accessible.name: root.expanded
+                                    //: Collapse a tree item
+                                    ? qsTrc("global", "Collapse")
+                                    //: Expand a tree item
+                                    : qsTrc("global", "Expand")
 
         onClicked: root.toggleExpandRequested()
     }
@@ -119,7 +132,17 @@ Item {
         acceptedButtons: Qt.RightButton
 
         onClicked: {
-            menuButton.toggleMenu(this, mouseX, mouseY)
+            contextMenuLoader.show(Qt.point(mouseX, mouseY))
+        }
+
+        ContextMenuLoader {
+            id: contextMenuLoader
+
+            items: menuButton.menuModel
+
+            onHandleMenuItem: function(itemId) {
+                menuButton.menuItemClicked(itemId)
+            }
         }
     }
 
@@ -142,7 +165,7 @@ Item {
         navigation.column: 3
 
         menuModel: [
-            {id: "hide", title: root.custom ? qsTrc("palette", "Hide/delete palette") : qsTrc("palette", "Hide palette") },
+            {id: "hide", title: root.custom ? qsTrc("palette", "Hide/Delete palette") : qsTrc("palette", "Hide palette") },
             {id: "new", title: qsTrc("palette", "Insert new palette") },
             {id: "", title: "" }, // separator
             {id: "edit", title: qsTrc("palette", "Enable editing"), checkable: true, checked: root.editingEnabled },
@@ -154,7 +177,11 @@ Item {
             {id: "properties", title: qsTrc("palette", "Palette properties…") },
         ]
 
-        onHandleMenuItem: {
+        onHandleMenuItem: function(itemId) {
+            menuItemClicked(itemId)
+        }
+
+        function menuItemClicked(itemId) {
             switch(itemId) {
             case "hide": root.hidePaletteRequested(); break
             case "new": root.insertNewPaletteRequested(); break

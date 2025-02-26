@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,12 +21,9 @@
  */
 #include "instrumentsettingsmodel.h"
 
-#include "log.h"
-#include "translation.h"
-
+using namespace muse;
 using namespace mu::instrumentsscene;
 using namespace mu::notation;
-using namespace mu::framework;
 
 InstrumentSettingsModel::InstrumentSettingsModel(QObject* parent)
     : QObject(parent)
@@ -42,15 +39,15 @@ void InstrumentSettingsModel::load(const QVariant& instrument)
     QVariantMap map = instrument.toMap();
     m_instrumentKey.partId = ID(map["partId"]);
     m_instrumentKey.instrumentId = map["instrumentId"].toString();
-    m_partName = map["partName"].toString();
+    m_instrumentKey.tick = Part::MAIN_INSTRUMENT_TICK;
 
     const Part* part = notationParts()->part(m_instrumentKey.partId);
     if (!part) {
         return;
     }
 
-    m_instrumentName = part->instrument()->name();
-    m_instrumentAbbreviature = part->instrument()->abbreviature();
+    m_instrumentName = part->instrument()->nameAsPlainText();
+    m_instrumentAbbreviature = part->instrument()->abbreviatureAsPlainText();
 
     context()->currentNotationChanged().onNotify(this, [this]() {
         emit isMainScoreChanged();
@@ -59,58 +56,9 @@ void InstrumentSettingsModel::load(const QVariant& instrument)
     emit dataChanged();
 }
 
-void InstrumentSettingsModel::replaceInstrument()
-{
-    if (!masterNotationParts()) {
-        return;
-    }
-
-    RetVal<Instrument> selectedInstrument = selectInstrumentsScenario()->selectInstrument(m_instrumentKey);
-    if (!selectedInstrument.ret) {
-        LOGE() << selectedInstrument.ret.toString();
-        return;
-    }
-
-    const Instrument& newInstrument = selectedInstrument.val;
-    masterNotationParts()->replaceInstrument(m_instrumentKey, newInstrument);
-
-    m_instrumentKey.instrumentId = newInstrument.id();
-    m_instrumentName = newInstrument.name();
-    m_instrumentAbbreviature = newInstrument.abbreviature();
-
-    emit dataChanged();
-}
-
-void InstrumentSettingsModel::resetAllFormatting()
-{
-    if (!masterNotationParts() || !notationParts()) {
-        return;
-    }
-
-    std::string title = mu::trc("instruments", "Are you sure you want to reset all formatting?");
-    std::string body = mu::trc("instruments", "This action can not be undone");
-
-    IInteractive::Button button = interactive()->question(title, body, {
-        IInteractive::Button::No,
-        IInteractive::Button::Yes
-    }).standardButton();
-
-    if (button == IInteractive::Button::No) {
-        return;
-    }
-
-    const Part* masterPart = masterNotationParts()->part(m_instrumentKey.partId);
-    notationParts()->replacePart(m_instrumentKey.partId, masterPart->clone());
-}
-
 QString InstrumentSettingsModel::instrumentName() const
 {
     return m_instrumentName;
-}
-
-QString InstrumentSettingsModel::partName() const
-{
-    return m_partName;
 }
 
 QString InstrumentSettingsModel::abbreviature() const
@@ -131,16 +79,6 @@ void InstrumentSettingsModel::setInstrumentName(const QString& name)
 
     m_instrumentName = name;
     notationParts()->setInstrumentName(m_instrumentKey, name);
-}
-
-void InstrumentSettingsModel::setPartName(const QString& name)
-{
-    if (m_partName == name || !notationParts()) {
-        return;
-    }
-
-    m_partName = name;
-    notationParts()->setPartName(m_instrumentKey.partId, name);
 }
 
 void InstrumentSettingsModel::setAbbreviature(const QString& abbreviature)
@@ -167,11 +105,5 @@ INotationPtr InstrumentSettingsModel::currentMasterNotation() const
 INotationPartsPtr InstrumentSettingsModel::notationParts() const
 {
     INotationPtr notation = currentNotation();
-    return notation ? notation->parts() : nullptr;
-}
-
-INotationPartsPtr InstrumentSettingsModel::masterNotationParts() const
-{
-    INotationPtr notation = currentMasterNotation();
     return notation ? notation->parts() : nullptr;
 }

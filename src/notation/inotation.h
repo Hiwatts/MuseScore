@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,9 +22,14 @@
 #ifndef MU_NOTATION_INOTATION_H
 #define MU_NOTATION_INOTATION_H
 
+#include <QString>
+
 #include "async/notification.h"
 #include "internal/inotationundostack.h"
 #include "notationtypes.h"
+#include "inotationpainting.h"
+#include "inotationviewstate.h"
+#include "inotationsolomutestate.h"
 #include "inotationstyle.h"
 #include "inotationplayback.h"
 #include "inotationelements.h"
@@ -34,12 +39,10 @@
 #include "inotationparts.h"
 #include "notationtypes.h"
 
-class QString;
-class QRect;
-
 namespace mu::notation {
 class INotation;
 using INotationPtr = std::shared_ptr<INotation>;
+using INotationWeakPtr = std::weak_ptr<INotation>;
 using INotationPtrList = std::vector<INotationPtr>;
 
 class INotation
@@ -47,14 +50,37 @@ class INotation
 public:
     virtual ~INotation() = default;
 
-    virtual QString title() const = 0;
+    /// For MasterScores: the filename without extension
+    /// For Scores: the excerpt name
+    virtual QString name() const = 0;
 
-    virtual void setViewMode(const ViewMode& vm) = 0;
+    /// Filename without extension
+    virtual QString projectName() const = 0;
+    virtual QString projectNameAndPartName() const = 0;
+
+    /// Title from score meta information; uses filename as fallback
+    virtual QString workTitle() const = 0;
+    virtual QString projectWorkTitle() const = 0;
+    virtual QString projectWorkTitleAndPartName() const = 0;
+
+    virtual bool isOpen() const = 0;
+    virtual void setIsOpen(bool opened) = 0;
+    virtual muse::async::Notification openChanged() const = 0;
+
+    virtual bool hasVisibleParts() const = 0;
+
+    virtual bool isMaster() const = 0;
+
+    // draw
     virtual ViewMode viewMode() const = 0;
-    virtual void paint(mu::draw::Painter* painter, const RectF& frameRect) = 0;
+    virtual void setViewMode(const ViewMode& viewMode) = 0;
+    virtual muse::async::Notification viewModeChanged() const = 0;
 
-    virtual ValCh<bool> opened() const = 0;
-    virtual void setOpened(bool opened) = 0;
+    virtual INotationPaintingPtr painting() const = 0;
+    virtual INotationViewStatePtr viewState() const = 0;
+
+    // solo-mute state
+    virtual INotationSoloMuteStatePtr soloMuteState() const = 0;
 
     // input (mouse)
     virtual INotationInteractionPtr interaction() const = 0;
@@ -68,9 +94,6 @@ public:
     // styles
     virtual INotationStylePtr style() const = 0;
 
-    // playback (midi)
-    virtual INotationPlaybackPtr playback() const = 0;
-
     // elements
     virtual INotationElementsPtr elements() const = 0;
 
@@ -81,7 +104,7 @@ public:
     virtual INotationPartsPtr parts() const = 0;
 
     // notify
-    virtual async::Notification notationChanged() const = 0;
+    virtual muse::async::Notification notationChanged() const = 0;
 };
 }
 

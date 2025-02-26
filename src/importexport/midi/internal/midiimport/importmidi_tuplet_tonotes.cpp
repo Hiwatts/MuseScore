@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,21 +21,23 @@
  */
 #include "importmidi_tuplet_tonotes.h"
 
-#include <QDebug>
-
 #include "importmidi_tuplet.h"
 #include "importmidi_fraction.h"
 #include "importmidi_inner.h"
-#include "libmscore/staff.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/fraction.h"
-#include "libmscore/duration.h"
-#include "libmscore/measure.h"
-#include "libmscore/tuplet.h"
-#include "libmscore/mscore.h"
-#include "libmscore/chordrest.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/types/fraction.h"
+#include "engraving/dom/durationelement.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/tuplet.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/chordrest.h"
 
-namespace Ms {
+#include "log.h"
+
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiTuplet {
 void addElementToTuplet(int voice,
                         const ReducedFraction& onTime,
@@ -47,8 +49,8 @@ void addElementToTuplet(int voice,
 
 #ifdef QT_DEBUG
     if (foundTuplets.size() > 1) {
-        qDebug() << "Measure number (from 1):" << el->measure()->no() + 1
-                 << ", staff index (from 0):" << el->staff()->idx();
+        LOGD() << "Measure number (from 1):" << el->measure()->no() + 1
+               << ", staff index (from 0):" << el->staff()->idx();
 
         Q_ASSERT_X(false, "MidiTuplet::addElementToTuplet",
                    "More than one tuplet contains specified duration");
@@ -66,7 +68,7 @@ void createTupletNotes(
     const std::multimap<ReducedFraction, TupletData>& tuplets)
 {
     Score* score = staff->score();
-    const int track = staff->idx() * VOICES;
+    const track_idx_t track = staff->idx() * VOICES;
 
     for (const auto& tupletEvent: tuplets) {
         const auto& tupletData = tupletEvent.second;
@@ -97,18 +99,18 @@ void createTupletNotes(
 
 #ifdef QT_DEBUG
 
-void printInvalidTupletLocation(int measureIndex, int staffIndex)
+static void printInvalidTupletLocation(int measureIndex, staff_idx_t staffIndex)
 {
-    qDebug() << "Tuplet is invalid; measure number (from 1):"
-             << measureIndex + 1
-             << ", staff index (from 0):" << staffIndex;
+    LOGD() << "Tuplet is invalid; measure number (from 1):"
+           << measureIndex + 1
+           << ", staff index (from 0):" << staffIndex;
 }
 
 bool haveTupletsEnoughElements(const Staff* staff)
 {
-    const int strack = staff->idx() * VOICES;
+    const track_idx_t strack = staff->idx() * VOICES;
 
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         for (Segment* seg = staff->score()->firstSegment(SegmentType::All); seg; seg = seg->next1()) {
             if (seg->segmentType() == SegmentType::ChordRest) {
                 const ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
@@ -141,4 +143,4 @@ bool haveTupletsEnoughElements(const Staff* staff)
 
 #endif
 } // namespace MidiTuplet
-} // namespace Ms
+} // namespace mu::iex::midi

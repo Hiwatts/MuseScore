@@ -20,26 +20,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_IGETTRACKS_H
-#define MU_AUDIO_IGETTRACKS_H
+#ifndef MUSE_AUDIO_IGETTRACKS_H
+#define MUSE_AUDIO_IGETTRACKS_H
 
-#include "async/channel.h"
+#include "global/async/channel.h"
 
 #include "track.h"
 #include "audiotypes.h"
 
-namespace mu::audio {
+namespace muse::audio {
 class IGetTracks
 {
 public:
     virtual ~IGetTracks() = default;
 
     virtual TrackPtr track(const TrackId id) const = 0;
-    virtual TracksMap allTracks() const = 0;
+    virtual const TracksMap& allTracks() const = 0;
 
     virtual async::Channel<TrackPtr> trackAboutToBeAdded() const = 0;
     virtual async::Channel<TrackPtr> trackAboutToBeRemoved() const = 0;
 };
 }
 
-#endif // MU_AUDIO_IGETTRACKS_H
+#endif // MUSE_AUDIO_IGETTRACKS_H

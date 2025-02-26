@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 import "internal"
@@ -31,28 +31,40 @@ import "internal"
 Rectangle {
     id: root
 
+    required property InstrumentsOnScoreListModel instrumentsOnScoreModel
+
     property bool canSelectMultipleInstruments: true
     property string currentInstrumentId: ""
-    property string description: instrumentsModel.selectedInstrumentDescription
+    property string description: instrumentsModel.selectedInstrument ? instrumentsModel.selectedInstrument.description : ""
 
-    property bool hasSelectedInstruments: instrumentsOnScoreView.hasInstruments
+    readonly property bool hasSelectedInstruments: root.canSelectMultipleInstruments
+                                                   ? instrumentsOnScoreModel.count > 0
+                                                   : Boolean(instrumentsModel.selectedInstrument)
 
     property NavigationSection navigationSection: null
 
+    property alias navigation: instrumentsView.navigation
+
+    signal submitRequested()
+
     function instruments() {
         if (root.canSelectMultipleInstruments) {
-            return instrumentsOnScoreView.instruments()
+            return root.instrumentsOnScoreModel.instruments()
         }
 
-        return instrumentsModel.selectedInstruments()
+        return [ instrumentsModel.selectedInstrument ]
     }
 
     function currentOrder() {
         if (root.canSelectMultipleInstruments) {
-            return instrumentsOnScoreView.currentOrder()
+            return root.instrumentsOnScoreModel.currentOrder()
         }
 
         return undefined
+    }
+
+    function focusOnFirst() {
+        familyView.focusOnFirst()
     }
 
     color: ui.theme.backgroundPrimaryColor
@@ -60,8 +72,8 @@ Rectangle {
     InstrumentListModel {
         id: instrumentsModel
 
-        onFocusRequested: {
-            familyView.focusGroup(groupIndex)
+        onFocusRequested: function(groupIndex, instrumentIndex) {
+            familyView.scrollToGroup(groupIndex)
             instrumentsView.focusInstrument(instrumentIndex)
         }
     }
@@ -70,8 +82,7 @@ Rectangle {
         id: prv
 
         function addSelectedInstrumentsToScore() {
-            var selectedInstruments = instrumentsModel.selectedInstruments()
-            instrumentsOnScoreView.addInstruments(selectedInstruments)
+            root.instrumentsOnScoreModel.addInstruments(instrumentsModel.selectedInstrumentIdList())
 
             Qt.callLater(instrumentsOnScoreView.scrollViewToEnd)
         }
@@ -103,14 +114,20 @@ Rectangle {
             currentGenreIndex: instrumentsModel.currentGenreIndex
             currentGroupIndex: instrumentsModel.currentGroupIndex
 
-            onGenreSelected: {
+            onGenreSelected: function(newIndex) {
                 instrumentsModel.currentGenreIndex = newIndex
                 instrumentsView.clearSearch()
             }
 
-            onGroupSelected: {
+            onGroupSelected: function(newIndex) {
                 instrumentsModel.currentGroupIndex = newIndex
-                instrumentsView.clearSearch()
+
+                if (instrumentsView.searching) {
+                    instrumentsModel.saveCurrentGroup()
+                    instrumentsView.clearSearch()
+                }
+
+                focusGroupNavigation(newIndex)
             }
         }
 
@@ -130,7 +147,11 @@ Rectangle {
             instrumentsModel: instrumentsModel
 
             onAddSelectedInstrumentsToScoreRequested: {
-                prv.addSelectedInstrumentsToScore()
+                if (root.canSelectMultipleInstruments) {
+                    prv.addSelectedInstrumentsToScore()
+                } else {
+                    root.submitRequested()
+                }
             }
         }
 
@@ -143,15 +164,16 @@ Rectangle {
             NavigationPanel {
                 id: navSelectPanel
                 name: "SelectPanel"
+                enabled: root.enabled && root.visible
                 section: root.navigationSection
                 order: 4
-                enabled: root.visible
             }
 
             navigation.name: "Select"
             navigation.panel: navSelectPanel
             navigation.order: 1
-            navigation.accessible.name: qsTrc("project", "Select instrument")
+
+            toolTipTitle: qsTrc("instruments", "Add selected instruments to score")
 
             visible: root.canSelectMultipleInstruments
 
@@ -181,6 +203,8 @@ Rectangle {
 
             Layout.fillWidth: true
             Layout.fillHeight: true
+
+            instrumentsOnScoreModel: root.instrumentsOnScoreModel
         }
 
         SeparatorLine {
@@ -199,35 +223,39 @@ Rectangle {
             NavigationPanel {
                 id: navUpDownPanel
                 name: "UpDownSelected"
+                enabled: root.enabled && root.visible
                 section: root.navigationSection
                 order: 6
                 direction: NavigationPanel.Vertical
-                enabled: root.visible
             }
 
             FlatButton {
-                enabled: instrumentsOnScoreView.isMovingUpAvailable
+                enabled: root.instrumentsOnScoreModel.isMovingUpAvailable
                 icon: IconCode.ARROW_UP
 
                 navigation.name: "Up"
                 navigation.panel: navUpDownPanel
                 navigation.row: 1
 
+                toolTipTitle: qsTrc("instruments", "Move selected instruments up")
+
                 onClicked: {
-                    instrumentsOnScoreView.moveSelectedInstrumentsUp()
+                    root.instrumentsOnScoreModel.moveSelectionUp()
                 }
             }
 
             FlatButton {
-                enabled: instrumentsOnScoreView.isMovingDownAvailable
+                enabled: root.instrumentsOnScoreModel.isMovingDownAvailable
                 icon: IconCode.ARROW_DOWN
 
                 navigation.name: "Down"
                 navigation.panel: navUpDownPanel
                 navigation.row: 2
 
+                toolTipTitle: qsTrc("instruments", "Move selected instruments down")
+
                 onClicked: {
-                    instrumentsOnScoreView.moveSelectedInstrumentsDown()
+                    root.instrumentsOnScoreModel.moveSelectionDown()
                 }
             }
         }

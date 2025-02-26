@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,25 +22,32 @@
 
 #include "exportmidi.h"
 
-#include "libmscore/masterscore.h"
-#include "libmscore/part.h"
-#include "libmscore/staff.h"
-#include "libmscore/tempo.h"
-#include "libmscore/sig.h"
-#include "libmscore/key.h"
-#include "libmscore/text.h"
-#include "libmscore/measure.h"
-#include "libmscore/repeatlist.h"
-#include "libmscore/synthesizerstate.h"
+#include "engraving/dom/key.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/repeatlist.h"
+#include "engraving/dom/sig.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/synthesizerstate.h"
+#include "engraving/dom/tempo.h"
 
-namespace Ms {
+#include "engraving/compat/midi/event.h"
+#include "engraving/compat/midi/compatmidirender.h"
+
+#include "log.h"
+
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 //---------------------------------------------------------
 //   writeHeader
 //---------------------------------------------------------
 
-void ExportMidi::writeHeader()
+void ExportMidi::writeHeader(const CompatMidiRendererInternal::Context& context)
 {
-    if (m_midiFile.tracks().isEmpty()) {
+    if (m_midiFile.tracks().empty()) {
         return;
     }
     MidiTrack& track  = m_midiFile.tracks().front();
@@ -53,17 +60,17 @@ void ExportMidi::writeHeader()
     for (auto& track1: m_midiFile.tracks()) {
         Staff* staff  = m_score->staff(staffIdx);
 
-        QByteArray partName = staff->partName().toUtf8();
-        int len = partName.length() + 1;
+        muse::ByteArray partName = staff->partName().toUtf8();
+        size_t len = partName.size() + 1;
         unsigned char* data = new unsigned char[len];
 
-        memcpy(data, partName.data(), len);
+        memcpy(data, partName.constData(), len);
 
         MidiEvent ev;
         ev.setType(ME_META);
         ev.setMetaType(META_TRACK_NAME);
         ev.setEData(data);
-        ev.setLen(len);
+        ev.setLen(static_cast<int>(len));
 
         track1.insert(0, ev);
 
@@ -104,8 +111,8 @@ void ExportMidi::writeHeader()
                 break;
             default:
                 n = 2;
-                qDebug("ExportMidi: unknown time signature %s",
-                       qPrintable(ts.print()));
+                LOGD("ExportMidi: unknown time signature %s",
+                     qPrintable(ts.toString()));
                 break;
             }
             data[1] = n;
@@ -117,7 +124,7 @@ void ExportMidi::writeHeader()
             ev.setMetaType(META_TIME_SIGNATURE);
             ev.setEData(data);
             ev.setLen(4);
-            track.insert(m_pauseMap.addPauseTicks(is->first + tickOffset), ev);
+            track.insert(CompatMidiRender::tick(context, is->first + tickOffset), ev);
         }
     }
 
@@ -143,15 +150,15 @@ void ExportMidi::writeHeader()
             for (auto ik = sk; ik != ek; ++ik) {
                 MidiEvent ev;
                 ev.setType(ME_META);
-                Key key       = ik->second.key();           // -7 -- +7
+                Key key = ik->second.concertKey();           // -7 -- +7
                 ev.setMetaType(META_KEY_SIGNATURE);
                 ev.setLen(2);
                 unsigned char* data = new unsigned char[2];
-                data[0]   = int(key);
-                data[1]   = 0;          // major
+                data[0] = int(key);
+                data[1] = 0;          // major
                 ev.setEData(data);
                 int tick = ik->first + tickOffset;
-                track1.insert(m_pauseMap.addPauseTicks(tick), ev);
+                track1.insert(CompatMidiRender::tick(context, tick), ev);
                 if (tick == 0) {
                     initialKeySigFound = true;
                 }
@@ -180,15 +187,19 @@ void ExportMidi::writeHeader()
     //     don't need to unwind or add pauses as this was done already
     //--------------------------------------------
 
-    TempoMap* tempomap = m_pauseMap.tempomapWithPauses;
-    qreal relTempo = tempomap->relTempo();
+    if (!context.applyCaesuras) {
+        return;
+    }
+
+    const TempoMap* tempomap = context.pauseMap->tempomapWithPauses();
+    BeatsPerSecond tempoMultiplier = tempomap->tempoMultiplier();
     for (auto it = tempomap->cbegin(); it != tempomap->cend(); ++it) {
         MidiEvent ev;
         ev.setType(ME_META);
         //
         // compute midi tempo: microseconds / quarter note
         //
-        int tempo = lrint((1.0 / (it->second.tempo * relTempo)) * 1000000.0);
+        int tempo = lrint((1.0 / it->second.tempo.val * tempoMultiplier.val) * 1000000.0);
 
         ev.setMetaType(META_TEMPO);
         ev.setLen(3);
@@ -215,21 +226,28 @@ void ExportMidi::writeHeader()
 
 bool ExportMidi::write(QIODevice* device, bool midiExpandRepeats, bool exportRPNs, const SynthesizerState& synthState)
 {
-    m_midiFile.setDivision(MScore::division);
+    m_midiFile.setDivision(Constants::DIVISION);
     m_midiFile.setFormat(1);
-    QList<MidiTrack>& tracks = m_midiFile.tracks();
+    std::vector<MidiTrack>& tracks = m_midiFile.tracks();
 
-    for (int i = 0; i < m_score->nstaves(); ++i) {
-        tracks.append(MidiTrack());
+    for (size_t i = 0; i < m_score->nstaves(); ++i) {
+        tracks.push_back(MidiTrack());
     }
 
-    EventMap events;
-    m_score->renderMidi(&events, false, midiExpandRepeats, synthState);
+    EventsHolder events;
+    CompatMidiRendererInternal::Context context;
+    context.eachStringHasChannel = false;
+    context.instrumentsHaveEffects = false;
+    context.harmonyChannelSetting = CompatMidiRendererInternal::HarmonyChannelSetting::DEFAULT;
+    context.sndController = CompatMidiRender::getControllerForSnd(m_score, synthState.ccToUse());
+    context.useDefaultArticulations = false;
+    context.applyCaesuras = true;
 
-    m_pauseMap.calculate(m_score);
-    writeHeader();
+    CompatMidiRender::renderScore(m_score, events, context, midiExpandRepeats);
 
-    int staffIdx = 0;
+    writeHeader(context);
+
+    staff_idx_t staffIdx = 0;
     for (auto& track: tracks) {
         Staff* staff = m_score->staff(staffIdx);
         Part* part   = staff->part();
@@ -238,13 +256,12 @@ bool ExportMidi::write(QIODevice* device, bool midiExpandRepeats, bool exportRPN
         track.setOutChannel(part->midiChannel());
 
         // Pass through the all instruments in the part
-        const InstrumentList* il = part->instruments();
-        for (auto j = il->begin(); j != il->end(); j++) {
+        for (const auto& pair : part->instruments()) {
             // Pass through the all channels of the instrument
             // "normal", "pizzicato", "tremolo" for Strings,
             // "normal", "mute" for Trumpet
-            for (const Channel* instrChan : j->second->channel()) {
-                const Channel* ch = part->masterScore()->playbackChannel(instrChan);
+            for (const InstrChannel* instrChan : pair.second->channel()) {
+                const InstrChannel* ch = part->masterScore()->playbackChannel(instrChan);
                 char port    = part->masterScore()->midiPort(ch->channel());
                 char channel = part->masterScore()->midiChannel(ch->channel());
 
@@ -290,55 +307,98 @@ bool ExportMidi::write(QIODevice* device, bool midiExpandRepeats, bool exportRPN
                     track.insert(0, ev);
                 }
 
-                for (auto i = events.begin(); i != events.end(); ++i) {
-                    const NPlayEvent& event = i->second;
-
-                    if (event.isMuted()) {
-                        continue;
-                    }
-                    if (event.discard() == staffIdx + 1 && event.velo() > 0) {
-                        // turn note off so we can restrike it in another track
-                        track.insert(m_pauseMap.addPauseTicks(i->first), MidiEvent(ME_NOTEON, channel,
-                                                                                   event.pitch(), 0));
-                    }
-
-                    if (event.getOriginatingStaff() != staffIdx) {
-                        continue;
-                    }
-
-                    if (event.discard() && event.velo() == 0) {
-                        // ignore noteoff but restrike noteon
-                        continue;
-                    }
-
-                    if (!exportRPNs && event.type() == ME_CONTROLLER && event.portamento()) {
-                        // ignore portamento control events if exportRPN isn't switched on
-                        continue;
-                    }
-
-                    char eventPort    = m_score->masterScore()->midiPort(event.channel());
-                    char eventChannel = m_score->masterScore()->midiChannel(event.channel());
-                    if (port != eventPort || channel != eventChannel) {
-                        continue;
-                    }
-
-                    if (event.type() == ME_NOTEON) {
-                        // use the note values instead of the event values if portamento is suppressed
-                        if (!exportRPNs && event.portamento()) {
-                            track.insert(m_pauseMap.addPauseTicks(i->first), MidiEvent(ME_NOTEON, channel,
-                                                                                       event.note()->pitch(), event.velo()));
-                        } else {
-                            track.insert(m_pauseMap.addPauseTicks(i->first), MidiEvent(ME_NOTEON, channel,
-                                                                                       event.pitch(), event.velo()));
+                for (size_t e = 0; e < events.size(); ++e) {
+                    auto& multimap = events[e];
+                    for (auto& item : multimap) {
+                        const NPlayEvent& event = item.second;
+                        if (event.isMuted()) {
+                            continue;
                         }
-                    } else if (event.type() == ME_CONTROLLER) {
-                        track.insert(m_pauseMap.addPauseTicks(i->first), MidiEvent(ME_CONTROLLER, channel,
-                                                                                   event.controller(), event.value()));
-                    } else if (event.type() == ME_PITCHBEND) {
-                        track.insert(m_pauseMap.addPauseTicks(i->first), MidiEvent(ME_PITCHBEND, channel,
-                                                                                   event.dataA(), event.dataB()));
-                    } else {
-                        qDebug("writeMidi: unknown midi event 0x%02x", event.type());
+                        if (event.discard() == staffIdx + 1 && event.velo() > 0) {
+                            // turn note off so we can restrike it in another track
+                            track.insert(CompatMidiRender::tick(context, item.first), MidiEvent(ME_NOTEON, channel,
+                                                                                                event.pitch(), 0));
+                        }
+
+                        staff_idx_t equivalentStaffIdx = staffIdx;
+                        for (Staff* st : m_score->masterScore()->staves()) {
+                            if (staff->id() == st->id()) {
+                                equivalentStaffIdx = st->idx();
+                            }
+                        }
+
+                        if (event.getOriginatingStaff() != equivalentStaffIdx) {
+                            continue;
+                        }
+
+                        if (event.discard() && event.velo() == 0) {
+                            // ignore noteoff but restrike noteon
+                            continue;
+                        }
+
+                        if (!exportRPNs && event.type() == ME_CONTROLLER && event.portamento()) {
+                            // ignore portamento control events if exportRPN isn't switched on
+                            continue;
+                        }
+
+                        char eventPort    = m_score->masterScore()->midiPort(event.channel());
+                        char eventChannel = m_score->masterScore()->midiChannel(event.channel());
+                        if (port != eventPort || channel != eventChannel) {
+                            continue;
+                        }
+
+                        if (event.type() == ME_NOTEON) {
+                            // use the note values instead of the event values if portamento is suppressed
+                            if (!exportRPNs && event.portamento()) {
+                                track.insert(CompatMidiRender::tick(context, item.first), MidiEvent(ME_NOTEON, channel,
+                                                                                                    event.note()->pitch(),
+                                                                                                    event.velo()));
+                            } else {
+                                track.insert(CompatMidiRender::tick(context, item.first), MidiEvent(ME_NOTEON, channel,
+                                                                                                    event.pitch(), event.velo()));
+                            }
+                        } else if (event.type() == ME_CONTROLLER) {
+                            track.insert(CompatMidiRender::tick(context, item.first), MidiEvent(ME_CONTROLLER, channel,
+                                                                                                event.controller(),
+                                                                                                event.value()));
+                        } else if (event.type() == ME_PITCHBEND) {
+                            track.insert(CompatMidiRender::tick(context, item.first), MidiEvent(ME_PITCHBEND, channel,
+                                                                                                event.dataA(), event.dataB()));
+                        } else {
+                            LOGD("writeMidi: unknown midi event 0x%02x", event.type());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Export lyrics
+        for (const RepeatSegment* rs : m_score->repeatList()) {
+            int startTick  = rs->tick;
+            int endTick    = startTick + rs->len();
+            int tickOffset = rs->utick - rs->tick;
+
+            SegmentType st = SegmentType::ChordRest;
+            for (Segment* seg = rs->firstMeasure()->first(st); seg && seg->tick().ticks() < endTick; seg = seg->next1(st)) {
+                for (track_idx_t i = part->startTrack(); i < part->endTrack(); ++i) {
+                    ChordRest* cr = toChordRest(seg->element(i));
+                    if (cr) {
+                        for (const auto& lyric : cr->lyrics()) {
+                            muse::ByteArray lyricText = lyric->plainText().toUtf8();
+                            size_t len = lyricText.size() + 1;
+                            unsigned char* data = new unsigned char[len];
+
+                            memcpy(data, lyricText.constData(), len);
+
+                            MidiEvent ev;
+                            ev.setType(ME_META);
+                            ev.setMetaType(META_LYRIC);
+                            ev.setEData(data);
+                            ev.setLen(static_cast<int>(len));
+
+                            int tick = cr->tick().ticks() + tickOffset;
+                            track.insert(CompatMidiRender::tick(context, tick), ev);
+                        }
                     }
                 }
             }
@@ -367,69 +427,5 @@ bool ExportMidi::write(const QString& name, bool midiExpandRepeats, bool exportR
 {
     SynthesizerState ss;
     return write(name, midiExpandRepeats, exportRPNs, ss);
-}
-
-//---------------------------------------------------------
-//   PauseMap::calculate
-//    MIDI files cannot contain pauses so insert extra ticks and tempo changes instead.
-//    The PauseMap and new TempoMap are fully unwound to account for pauses on repeats.
-//---------------------------------------------------------
-
-void ExportMidi::PauseMap::calculate(const Score* s)
-{
-    Q_ASSERT(s);
-    TimeSigMap* sigmap = s->sigmap();
-    TempoMap* tempomap = s->tempomap();
-
-    this->insert(std::pair<const int, int>(0, 0));    // can't start with a pause
-
-    tempomapWithPauses = new TempoMap();
-    tempomapWithPauses->setRelTempo(tempomap->relTempo());
-
-    for (const RepeatSegment* rs : s->repeatList()) {
-        int startTick  = rs->tick;
-        int endTick    = startTick + rs->len();
-        int tickOffset = rs->utick - rs->tick;
-
-        auto se = tempomap->lower_bound(startTick);
-        auto ee = tempomap->lower_bound(endTick + 1);   // +1 to include first tick of next RepeatSegment
-
-        for (auto it = se; it != ee; ++it) {
-            int tick = it->first;
-            int utick = tick + tickOffset;
-
-            if (it->second.pause == 0.0) {
-                // We have a regular tempo change. Don't include tempo change from first tick of next RepeatSegment (it will be included later).
-                if (tick != endTick) {
-                    tempomapWithPauses->insert(std::pair<const int, TEvent>(this->addPauseTicks(utick), it->second));
-                }
-            } else {
-                // We have a pause event. Don't include pauses from first tick of current RepeatSegment (it was included in the previous one).
-                if (tick != startTick) {
-                    Fraction timeSig(sigmap->timesig(tick).timesig());
-                    qreal quarterNotesPerMeasure = (4.0 * timeSig.numerator()) / timeSig.denominator();
-                    int ticksPerMeasure =  quarterNotesPerMeasure * MScore::division;           // store a full measure of ticks to keep barlines in same places
-                    tempomapWithPauses->setTempo(this->addPauseTicks(utick), quarterNotesPerMeasure / it->second.pause);           // new tempo for pause
-                    this->insert(std::pair<const int, int>(utick, ticksPerMeasure + this->offsetAtUTick(utick)));            // store running total of extra ticks
-                    tempomapWithPauses->setTempo(this->addPauseTicks(utick), it->second.tempo);           // restore previous tempo
-                }
-            }
-        }
-    }
-}
-
-//---------------------------------------------------------
-//   PauseMap::offsetAtUTick
-//    In total, how many extra ticks have been inserted prior to this utick.
-//---------------------------------------------------------
-
-int ExportMidi::PauseMap::offsetAtUTick(int utick) const
-{
-    Q_ASSERT(!this->empty());   // make sure calculate was called
-    auto i = upper_bound(utick);
-    if (i != begin()) {
-        --i;
-    }
-    return i->second;
 }
 }

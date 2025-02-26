@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,48 +22,37 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 import MuseScore.Project 1.0
 
 ExportSettingsPage {
     id: root
 
     property bool showBitRateControl: false
-
-    CheckBox {
-        width: parent.width
-        text: qsTrc("project", "Normalize")
-
-        navigation.name: "NormalizeAudioCheckbox"
-        navigation.panel: root.navigationPanel
-        navigation.row: root.navigationOrder + 1
-
-        checked: root.model.normalizeAudio
-        onClicked: {
-            root.model.normalizeAudio = !checked
-        }
-    }
+    property bool showSampleRateControl: true
 
     ExportOptionItem {
         id: sampleRateLabel
-        text: qsTrc("project", "Sample rate:")
+        visible: root.showSampleRateControl
+        text: qsTrc("project/export", "Sample rate:")
 
-        Dropdown {
+        StyledDropdown {
             Layout.preferredWidth: 126
 
             navigation.name: "SampleRatesDropdown"
             navigation.panel: root.navigationPanel
-            navigation.row: root.navigationOrder + 2
+            navigation.row: root.navigationOrder + 1
             navigation.accessible.name: sampleRateLabel.text + " " + currentText
 
-            model: root.model.availableSampleRates().map(function (sampleRate) {
-                return { text: qsTrc("project", "%1 Hz").arg(sampleRate), value: sampleRate }
+            model: root.model.availableSampleRates().map(function(sampleRate) {
+                return { text: qsTrc("project/export", "%1 Hz").arg(sampleRate), value: sampleRate }
             })
 
             currentIndex: indexOfValue(root.model.sampleRate)
-            onCurrentValueChanged: {
-                root.model.sampleRate = currentValue
+
+            onActivated: function(index, value) {
+                root.model.sampleRate = value
             }
         }
     }
@@ -71,30 +60,31 @@ ExportSettingsPage {
     ExportOptionItem {
         id: bitrateLabel
         visible: root.showBitRateControl
-        text: qsTrc("project", "Bitrate:")
+        text: qsTrc("project/export", "Bitrate:")
 
-        Dropdown {
+        StyledDropdown {
             Layout.preferredWidth: 126
 
             navigation.name: "BitratesDropdown"
             navigation.panel: root.navigationPanel
-            navigation.row: root.navigationOrder + 3
+            navigation.row: root.navigationOrder + 2
             navigation.accessible.name: bitrateLabel.text + " " + currentText
 
-            model: root.model.availableBitRates().map(function (bitRate) {
-                return { text: qsTrc("project", "%1 kBit/s").arg(bitRate), value: bitRate }
+            model: root.model.availableBitRates().map(function(bitRate) {
+                return { text: qsTrc("project/export", "%1 kBit/s").arg(bitRate), value: bitRate }
             })
 
             currentIndex: indexOfValue(root.model.bitRate)
-            onCurrentValueChanged: {
-                root.model.bitRate = currentValue
+
+            onActivated: function(index, value) {
+                root.model.bitRate = value
             }
         }
     }
 
     StyledTextLabel {
         width: parent.width
-        text: qsTrc("project", "Each selected part will be exported as a separate audio file.")
+        text: qsTrc("project/export", "Each selected part will be exported as a separate audio file.")
         horizontalAlignment: Text.AlignLeft
         wrapMode: Text.WordWrap
     }

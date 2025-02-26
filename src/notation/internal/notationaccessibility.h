@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,40 +29,36 @@
 #include "async/asyncable.h"
 #include "async/notification.h"
 
-namespace Ms {
-class Score;
-class Selection;
-}
-
-namespace mu {
-namespace notation {
+namespace mu::notation {
 class IGetScore;
-class NotationAccessibility : public INotationAccessibility, public async::Asyncable
+class Notation;
+class NotationAccessibility : public INotationAccessibility, public muse::async::Asyncable
 {
 public:
-    NotationAccessibility(const IGetScore* getScore, async::Notification selectionChangedNotification);
+    NotationAccessibility(const Notation* notation);
 
-    ValCh<std::string> accessibilityInfo() const override;
+    muse::ValCh<std::string> accessibilityInfo() const override;
+
+    void setMapToScreenFunc(const mu::engraving::AccessibleMapToScreenFunc& func) override;
+
+    void setEnabled(bool enabled) override;
+
+    void setTriggeredCommand(const std::string& command) override;
 
 private:
-    const Ms::Score* score() const;
-    const Ms::Selection* selection() const;
+    const engraving::Score* score() const;
+    const engraving::Selection* selection() const;
 
     void updateAccessibilityInfo();
+
     void setAccessibilityInfo(const QString& info);
 
     QString rangeAccessibilityInfo() const;
     QString singleElementAccessibilityInfo() const;
 
-    std::pair<int, float> barbeat(const EngravingItem* element) const;
-    QString formatSingleElementBarsAndBeats(const EngravingItem* element) const;
-    QString formatStartBarsAndBeats(const EngravingItem* element) const;
-    QString formatEndBarsAndBeats(const EngravingItem* element) const;
-
     const IGetScore* m_getScore = nullptr;
-    ValCh<std::string> m_accessibilityInfo;
+    muse::ValCh<std::string> m_accessibilityInfo;
 };
-}
 }
 
 #endif // MU_NOTATION_NOTATIONACCESSIBILITY_H

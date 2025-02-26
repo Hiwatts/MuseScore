@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,14 +29,12 @@ class HookSettingsModel : public AbstractInspectorModel
 {
     Q_OBJECT
 
-    Q_PROPERTY(PropertyItem * horizontalOffset READ horizontalOffset CONSTANT)
-    Q_PROPERTY(PropertyItem * verticalOffset READ verticalOffset CONSTANT)
+    Q_PROPERTY(PropertyItem * offset READ offset CONSTANT)
 
 public:
     explicit HookSettingsModel(QObject* parent, IElementRepositoryService* repository);
 
-    PropertyItem* horizontalOffset() const;
-    PropertyItem* verticalOffset() const;
+    PropertyItem* offset() const;
 
 protected:
     void createProperties() override;
@@ -45,9 +43,7 @@ protected:
     void resetProperties() override;
 
 private:
-
-    PropertyItem* m_horizontalOffset = nullptr;
-    PropertyItem* m_verticalOffset = nullptr;
+    PointFPropertyItem* m_offset = nullptr;
 };
 }
 

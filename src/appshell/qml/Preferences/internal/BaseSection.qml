@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,30 +21,30 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 Column {
     id: root
 
+    default property alias contentData: sectionContent.data
+
     width: parent.width
     spacing: 18
 
-    //! NOTE: Added to prevent components clipping when navigating
-    padding: 2
-
     property alias title: titleLabel.text
-    property int columnWidth: 216
-    property alias titleOpacity: titleLabel.opacity
+    property int columnWidth: 208
+    property int columnSpacing: 12
+    property int rowSpacing: 12
 
     property int navigationOrderStart: 0
     property NavigationPanel navigation: NavigationPanel {
         name: root.title
         direction: NavigationPanel.Vertical
         accessible.name: root.title
-        enabled: root.visible
+        enabled: root.enabled && root.visible
 
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
@@ -54,5 +54,11 @@ Column {
     StyledTextLabel {
         id: titleLabel
         font: ui.theme.bodyBoldFont
+    }
+
+    Column {
+        id: sectionContent
+        width: parent.width
+        spacing: root.rowSpacing
     }
 }

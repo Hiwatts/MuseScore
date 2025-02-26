@@ -20,10 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "uiconfiguration.h"
+#include "global/configreader.h"
 
+#include "async/async.h"
 #include "settings.h"
-#include "log.h"
-#include "translation.h"
 #include "themeconverter.h"
 
 #include <QScreen>
@@ -32,14 +32,19 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
-using namespace mu::ui;
-using namespace mu::framework;
-using namespace mu::async;
+#ifdef Q_OS_WIN
+#include <QOperatingSystemVersion>
+#endif
+
+#include "log.h"
+
+using namespace muse;
+using namespace muse::ui;
+using namespace muse::async;
 
 static const Settings::Key UI_THEMES_KEY("ui", "ui/application/themes");
-static const Settings::Key UI_PREVIOUS_GENERAL_THEME("ui", "ui/application/previousGeneralTheme");
-static const Settings::Key UI_PREVIOUS_HIGH_CONTRAST_THEME("ui", "ui/application/previousHighContrastTheme");
 static const Settings::Key UI_CURRENT_THEME_CODE_KEY("ui", "ui/application/currentThemeCode");
+static const Settings::Key UI_FOLLOW_SYSTEM_THEME_KEY("ui", "ui/application/followSystemTheme");
 static const Settings::Key UI_FONT_FAMILY_KEY("ui", "ui/theme/fontFamily");
 static const Settings::Key UI_FONT_SIZE_KEY("ui", "ui/theme/fontSize");
 static const Settings::Key UI_ICONS_FONT_FAMILY_KEY("ui", "ui/theme/iconsFontFamily");
@@ -48,124 +53,19 @@ static const Settings::Key UI_MUSICAL_FONT_SIZE_KEY("ui", "ui/theme/musicalFontS
 
 static const QString WINDOW_GEOMETRY_KEY("window");
 
-static const QMap<ThemeStyleKey, QVariant> LIGHT_THEME_VALUES {
-    { BACKGROUND_PRIMARY_COLOR, "#F5F5F6" },
-    { BACKGROUND_SECONDARY_COLOR, "#E6E9ED" },
-    { POPUP_BACKGROUND_COLOR, "#F5F5F6" },
-    { TEXT_FIELD_COLOR, "#FFFFFF" },
-    { ACCENT_COLOR, "#70AFEA" },
-    { STROKE_COLOR, "#CED1D4" },
-    { BUTTON_COLOR, "#CFD5DD" },
-    { FONT_PRIMARY_COLOR, "#111132" },
-    { FONT_SECONDARY_COLOR, "#FFFFFF" },
-    { LINK_COLOR, "#70AFEA" },
-    { FOCUS_COLOR, "#75507b" },
+static const int FLICKABLE_MAX_VELOCITY = 1500;
 
-    { BORDER_WIDTH, 0 },
-    { NAVIGATION_CONTROL_BORDER_WIDTH, 2.0 },
-
-    { ACCENT_OPACITY_NORMAL, 0.5 },
-    { ACCENT_OPACITY_HOVER, 0.3 },
-    { ACCENT_OPACITY_HIT, 0.7 },
-
-    { BUTTON_OPACITY_NORMAL, 0.7 },
-    { BUTTON_OPACITY_HOVER, 0.5 },
-    { BUTTON_OPACITY_HIT, 1.0 },
-
-    { ITEM_OPACITY_DISABLED, 0.3 }
-};
-
-static const QMap<ThemeStyleKey, QVariant> DARK_THEME_VALUES {
-    { BACKGROUND_PRIMARY_COLOR, "#2D2D30" },
-    { BACKGROUND_SECONDARY_COLOR, "#363638" },
-    { POPUP_BACKGROUND_COLOR, "#323236" },
-    { TEXT_FIELD_COLOR, "#242427" },
-    { ACCENT_COLOR, "#FF4848" },
-    { STROKE_COLOR, "#1E1E1E" },
-    { BUTTON_COLOR, "#595959" },
-    { FONT_PRIMARY_COLOR, "#EBEBEB" },
-    { FONT_SECONDARY_COLOR, "#BDBDBD" },
-    { LINK_COLOR, "#70AFEA" },
-    { FOCUS_COLOR, "#75507b" },
-
-    { BORDER_WIDTH, 0 },
-    { NAVIGATION_CONTROL_BORDER_WIDTH, 2.0 },
-
-    { ACCENT_OPACITY_NORMAL, 0.5 },
-    { ACCENT_OPACITY_HOVER, 0.3 },
-    { ACCENT_OPACITY_HIT, 0.7 },
-
-    { BUTTON_OPACITY_NORMAL, 0.7 },
-    { BUTTON_OPACITY_HOVER, 0.5 },
-    { BUTTON_OPACITY_HIT, 1.0 },
-
-    { ITEM_OPACITY_DISABLED, 0.3 }
-};
-
-static const QMap<ThemeStyleKey, QVariant> HIGH_CONTRAST_BLACK_THEME_VALUES {
-    { BACKGROUND_PRIMARY_COLOR, "#000000" },
-    { BACKGROUND_SECONDARY_COLOR, "#000000" },
-    { POPUP_BACKGROUND_COLOR, "#000000" },
-    { TEXT_FIELD_COLOR, "#000000" },
-    { ACCENT_COLOR, "#0071DA" },
-    { STROKE_COLOR, "#FFFFFF" },
-    { BUTTON_COLOR, "#000000" },
-    { FONT_PRIMARY_COLOR, "#FFFD38" },
-    { FONT_SECONDARY_COLOR, "#BDBDBD" },
-    { LINK_COLOR, "#70AFEA" },
-    { FOCUS_COLOR, "#75507b" },
-
-    { BORDER_WIDTH, 1.0 },
-    { NAVIGATION_CONTROL_BORDER_WIDTH, 2.0 },
-
-    { ACCENT_OPACITY_NORMAL, 0.5 },
-    { ACCENT_OPACITY_HOVER, 0.3 },
-    { ACCENT_OPACITY_HIT, 0.7 },
-
-    { BUTTON_OPACITY_NORMAL, 0.7 },
-    { BUTTON_OPACITY_HOVER, 0.5 },
-    { BUTTON_OPACITY_HIT, 1.0 },
-
-    { ITEM_OPACITY_DISABLED, 0.3 }
-};
-
-static const QMap<ThemeStyleKey, QVariant> HIGH_CONTRAST_WHITE_THEME_VALUES {
-    { BACKGROUND_PRIMARY_COLOR, "#FFFFFF" },
-    { BACKGROUND_SECONDARY_COLOR, "#FFFFFF" },
-    { POPUP_BACKGROUND_COLOR, "#FFFFFF" },
-    { TEXT_FIELD_COLOR, "#FFFFFF" },
-    { ACCENT_COLOR, "#00D87D" },
-    { STROKE_COLOR, "#000000" },
-    { BUTTON_COLOR, "#FFFFFF" },
-    { FONT_PRIMARY_COLOR, "#1E0073" },
-    { FONT_SECONDARY_COLOR, "#000000" },
-    { LINK_COLOR, "#70AFEA" },
-    { FOCUS_COLOR, "#75507b" },
-
-    { BORDER_WIDTH, 1.0 },
-    { NAVIGATION_CONTROL_BORDER_WIDTH, 2.0 },
-
-    { ACCENT_OPACITY_NORMAL, 0.5 },
-    { ACCENT_OPACITY_HOVER, 0.3 },
-    { ACCENT_OPACITY_HIT, 0.7 },
-
-    { BUTTON_OPACITY_NORMAL, 0.7 },
-    { BUTTON_OPACITY_HOVER, 0.5 },
-    { BUTTON_OPACITY_HIT, 1.0 },
-
-    { ITEM_OPACITY_DISABLED, 0.3 }
-};
+static const int TOOLTIP_DELAY = 500;
 
 void UiConfiguration::init()
 {
     settings()->setDefaultValue(UI_CURRENT_THEME_CODE_KEY, Val(LIGHT_THEME_CODE));
-    settings()->setDefaultValue(UI_PREVIOUS_GENERAL_THEME, Val(LIGHT_THEME_CODE));
-    settings()->setDefaultValue(UI_PREVIOUS_HIGH_CONTRAST_THEME, Val(HIGH_CONTRAST_BLACK_THEME_CODE));
-    settings()->setDefaultValue(UI_FONT_FAMILY_KEY, Val("Fira Sans"));
-    settings()->setDefaultValue(UI_FONT_SIZE_KEY, Val(12));
+    settings()->setDefaultValue(UI_FOLLOW_SYSTEM_THEME_KEY, Val(false));
+    settings()->setDefaultValue(UI_FONT_FAMILY_KEY, Val(defaultFontFamily()));
+    settings()->setDefaultValue(UI_FONT_SIZE_KEY, Val(defaultFontSize()));
     settings()->setDefaultValue(UI_ICONS_FONT_FAMILY_KEY, Val("MusescoreIcon"));
     settings()->setDefaultValue(UI_MUSICAL_FONT_FAMILY_KEY, Val("Leland"));
-    settings()->setDefaultValue(UI_MUSICAL_FONT_SIZE_KEY, Val(12));
+    settings()->setDefaultValue(UI_MUSICAL_FONT_SIZE_KEY, Val(24));
     settings()->setDefaultValue(UI_THEMES_KEY, Val(""));
 
     settings()->valueChanged(UI_THEMES_KEY).onReceive(this, [this](const Val&) {
@@ -175,6 +75,11 @@ void UiConfiguration::init()
 
     settings()->valueChanged(UI_CURRENT_THEME_CODE_KEY).onReceive(this, [this](const Val&) {
         notifyAboutCurrentThemeChanged();
+    });
+
+    settings()->valueChanged(UI_FOLLOW_SYSTEM_THEME_KEY).onReceive(this, [this](const Val& val) {
+        m_isFollowSystemTheme.set(val.toBool());
+        updateSystemThemeListeningStatus();
     });
 
     settings()->valueChanged(UI_FONT_FAMILY_KEY).onReceive(this, [this](const Val&) {
@@ -215,17 +120,15 @@ void UiConfiguration::deinit()
     platformTheme()->stopListening();
 }
 
-bool UiConfiguration::needFollowSystemTheme() const
-{
-    return settings()->value(UI_CURRENT_THEME_CODE_KEY).isNull()
-           && platformTheme()->isFollowSystemThemeAvailable();
-}
-
 void UiConfiguration::initThemes()
 {
-    platformTheme()->themeCodeChanged().onReceive(nullptr, [this](ThemeCode) {
-        notifyAboutCurrentThemeChanged();
+    m_isFollowSystemTheme.val = settings()->value(UI_FOLLOW_SYSTEM_THEME_KEY).toBool();
+
+    platformTheme()->platformThemeChanged().onNotify(this, [this]() {
+        synchThemeWithSystemIfNecessary();
     });
+
+    updateSystemThemeListeningStatus();
 
     for (const ThemeCode& codeKey : allStandardThemeCodes()) {
         m_themes.push_back(makeStandardTheme(codeKey));
@@ -237,12 +140,6 @@ void UiConfiguration::initThemes()
 
 void UiConfiguration::updateCurrentTheme()
 {
-    if (needFollowSystemTheme()) {
-        platformTheme()->startListening();
-    } else {
-        platformTheme()->stopListening();
-    }
-
     ThemeCode currentCodeKey = currentThemeCodeKey();
 
     for (size_t i = 0; i < m_themes.size(); ++i) {
@@ -280,6 +177,40 @@ void UiConfiguration::updateThemes()
     }
 }
 
+bool UiConfiguration::isFollowSystemThemeAvailable() const
+{
+    return platformTheme()->isFollowSystemThemeAvailable();
+}
+
+ValNt<bool> UiConfiguration::isFollowSystemTheme() const
+{
+    return m_isFollowSystemTheme;
+}
+
+void UiConfiguration::setFollowSystemTheme(bool follow)
+{
+    settings()->setSharedValue(UI_FOLLOW_SYSTEM_THEME_KEY, Val(follow));
+}
+
+void UiConfiguration::updateSystemThemeListeningStatus()
+{
+    if (isFollowSystemTheme().val) {
+        platformTheme()->startListening();
+        synchThemeWithSystemIfNecessary();
+    } else {
+        platformTheme()->stopListening();
+    }
+}
+
+void UiConfiguration::synchThemeWithSystemIfNecessary()
+{
+    if (!m_isFollowSystemTheme.val) {
+        return;
+    }
+
+    doSetIsDarkMode(platformTheme()->isSystemThemeDark());
+}
+
 void UiConfiguration::notifyAboutCurrentThemeChanged()
 {
     updateCurrentTheme();
@@ -291,19 +222,42 @@ ThemeInfo UiConfiguration::makeStandardTheme(const ThemeCode& codeKey) const
     ThemeInfo theme;
     theme.codeKey = codeKey;
 
-    if (codeKey == LIGHT_THEME_CODE) {
-        theme.title = trc("ui", "Light");
-        theme.values = LIGHT_THEME_VALUES;
-    } else if (codeKey == DARK_THEME_CODE) {
-        theme.title = trc("ui", "Dark");
-        theme.values = DARK_THEME_VALUES;
-    } else if (codeKey == HIGH_CONTRAST_BLACK_THEME_CODE) {
-        theme.title = trc("ui", "Black");
-        theme.values = HIGH_CONTRAST_BLACK_THEME_VALUES;
-    } else if (codeKey == HIGH_CONTRAST_WHITE_THEME_CODE) {
-        theme.title = trc("ui", "White");
-        theme.values = HIGH_CONTRAST_WHITE_THEME_VALUES;
-    }
+    Config config = ConfigReader::read(QString(":/configs/%1.cfg").arg(QString::fromStdString(codeKey)));
+
+    theme.values = {
+        { BACKGROUND_PRIMARY_COLOR, config.value("background_primary_color").toQString() },
+        { BACKGROUND_SECONDARY_COLOR, config.value("background_secondary_color").toQString() },
+        { BACKGROUND_TERTIARY_COLOR, config.value("background_tertiary_color").toQString() },
+        { BACKGROUND_QUARTERNARY_COLOR, config.value("background_quarternary_color").toQString() },
+        { POPUP_BACKGROUND_COLOR, config.value("popup_background_color").toQString() },
+        { PROJECT_TAB_COLOR, config.value("project_tab_color").toQString() },
+        { TEXT_FIELD_COLOR, config.value("text_field_color").toQString() },
+        { ACCENT_COLOR, config.value("accent_color").toQString() },
+        { STROKE_COLOR, config.value("stroke_color").toQString() },
+        { STROKE_SECONDARY_COLOR, config.value("stroke_secondary_color").toQString() },
+        { BUTTON_COLOR, config.value("button_color").toQString() },
+        { FONT_PRIMARY_COLOR, config.value("font_primary_color").toQString() },
+        { FONT_SECONDARY_COLOR, config.value("font_secondary_color").toQString() },
+        { LINK_COLOR, config.value("link_color").toQString() },
+        { FOCUS_COLOR, config.value("focus_color").toQString() },
+        { WHITE_COLOR, config.value("white_color").toQString() },
+        { BLACK_COLOR, config.value("black_color").toQString() },
+        { PLAY_COLOR, config.value("play_color").toQString() },
+        { RECORD_COLOR, config.value("record_color").toQString() },
+
+        { BORDER_WIDTH, config.value("border_width").toDouble() },
+        { NAVIGATION_CONTROL_BORDER_WIDTH, config.value("navigation_control_border_width").toDouble() },
+
+        { ACCENT_OPACITY_NORMAL, config.value("accent_opacity_normal").toDouble() },
+        { ACCENT_OPACITY_HOVER, config.value("accent_opacity_hover").toDouble() },
+        { ACCENT_OPACITY_HIT, config.value("accent_opacity_hit").toDouble() },
+
+        { BUTTON_OPACITY_NORMAL, config.value("button_opacity_normal").toDouble() },
+        { BUTTON_OPACITY_HOVER, config.value("button_opacity_hover").toDouble() },
+        { BUTTON_OPACITY_HIT, config.value("button_opacity_hit").toDouble() },
+
+        { ITEM_OPACITY_DISABLED, config.value("item_opacity_disabled").toDouble() }
+    };
 
     return theme;
 }
@@ -314,7 +268,7 @@ ThemeList UiConfiguration::readThemes() const
 
     ThemeList result;
 
-    QByteArray json = settings()->value(UI_THEMES_KEY).toQString().toUtf8();
+    QByteArray json = QByteArray::fromStdString(settings()->value(UI_THEMES_KEY).toString());
     if (json.isEmpty()) {
         return result;
     }
@@ -362,20 +316,25 @@ ThemeList UiConfiguration::themes() const
 
 QStringList UiConfiguration::possibleFontFamilies() const
 {
-    QFontDatabase db;
-    return db.families();
+    QStringList allFonts = QFontDatabase::families();
+    QStringList smuflFonts
+        = { "Bravura", "Campania", "Edwin", "Finale Broadway", "Finale Maestro", "Gootville", "Leland", "MScore", "MuseJazz", "Petaluma" };
+    for (const QString& font : smuflFonts) {
+        allFonts.removeAll(font);
+    }
+    return allFonts;
 }
 
 QStringList UiConfiguration::possibleAccentColors() const
 {
     static const QStringList lightAccentColors {
-        "#F36565",
-        "#F39048",
-        "#FFC52F",
-        "#63D47B",
+        "#F28585",
+        "#EDB17A",
+        "#E0CC87",
+        "#8BC9C5",
         "#70AFEA",
-        "#A488F2",
-        "#F87BDC"
+        "#A09EEF",
+        "#DBA0C7"
     };
 
     static const QStringList darkAccentColors {
@@ -388,29 +347,23 @@ QStringList UiConfiguration::possibleAccentColors() const
         "#E454C4"
     };
 
-    if (currentTheme().codeKey == DARK_THEME_CODE) {
+    if (isDarkMode()) {
         return darkAccentColors;
     }
 
     return lightAccentColors;
 }
 
-void UiConfiguration::resetCurrentThemeToDefault(const ThemeCode& codeKey)
+void UiConfiguration::resetThemes()
 {
-    for (ThemeInfo& theme : m_themes) {
-        if (theme.codeKey != codeKey) {
-            continue;
-        }
-
-        theme = makeStandardTheme(codeKey);
-        writeThemes(m_themes);
-
-        if (theme.codeKey == currentThemeCodeKey()) {
-            notifyAboutCurrentThemeChanged();
-        }
-
-        return;
+    m_themes.clear();
+    for (const ThemeCode& codeKey : allStandardThemeCodes()) {
+        m_themes.push_back(makeStandardTheme(codeKey));
     }
+
+    writeThemes(m_themes);
+
+    notifyAboutCurrentThemeChanged();
 }
 
 const ThemeInfo& UiConfiguration::currentTheme() const
@@ -420,40 +373,55 @@ const ThemeInfo& UiConfiguration::currentTheme() const
 
 ThemeCode UiConfiguration::currentThemeCodeKey() const
 {
-    if (needFollowSystemTheme()) {
-        return platformTheme()->themeCode();
-    }
-
     ThemeCode preferredThemeCode = settings()->value(UI_CURRENT_THEME_CODE_KEY).toString();
-
     return preferredThemeCode.empty() ? LIGHT_THEME_CODE : preferredThemeCode;
+}
+
+bool UiConfiguration::isDarkMode() const
+{
+    return isDarkTheme(currentThemeCodeKey());
+}
+
+void UiConfiguration::setIsDarkMode(bool dark)
+{
+    setFollowSystemTheme(false);
+
+    doSetIsDarkMode(dark);
+}
+
+void UiConfiguration::doSetIsDarkMode(bool dark)
+{
+    if (isHighContrast()) {
+        doSetCurrentTheme(dark ? HIGH_CONTRAST_BLACK_THEME_CODE : HIGH_CONTRAST_WHITE_THEME_CODE);
+    } else {
+        doSetCurrentTheme(dark ? DARK_THEME_CODE : LIGHT_THEME_CODE);
+    }
 }
 
 bool UiConfiguration::isHighContrast() const
 {
-    ThemeCode currentThemeCode = currentThemeCodeKey();
-
-    return currentThemeCode == HIGH_CONTRAST_BLACK_THEME_CODE || currentThemeCode == HIGH_CONTRAST_WHITE_THEME_CODE;
+    return isHighContrastTheme(currentThemeCodeKey());
 }
 
 void UiConfiguration::setIsHighContrast(bool highContrast)
 {
-    if (highContrast) {
-        setCurrentTheme(settings()->value(UI_PREVIOUS_HIGH_CONTRAST_THEME).toQString().QString::toStdString());
+    if (isDarkMode()) {
+        doSetCurrentTheme(highContrast ? HIGH_CONTRAST_BLACK_THEME_CODE : DARK_THEME_CODE);
     } else {
-        setCurrentTheme(settings()->value(UI_PREVIOUS_GENERAL_THEME).toQString().QString::toStdString());
+        doSetCurrentTheme(highContrast ? HIGH_CONTRAST_WHITE_THEME_CODE : LIGHT_THEME_CODE);
     }
 }
 
-void UiConfiguration::setCurrentTheme(const ThemeCode& codeKey)
+void UiConfiguration::setCurrentTheme(const ThemeCode& themeCode)
 {
-    if (isHighContrast()) {
-        settings()->setSharedValue(UI_PREVIOUS_HIGH_CONTRAST_THEME, Val(currentThemeCodeKey()));
-    } else {
-        settings()->setSharedValue(UI_PREVIOUS_GENERAL_THEME, Val(currentThemeCodeKey()));
-    }
+    setFollowSystemTheme(false);
 
-    settings()->setSharedValue(UI_CURRENT_THEME_CODE_KEY, Val(codeKey));
+    doSetCurrentTheme(themeCode);
+}
+
+void UiConfiguration::doSetCurrentTheme(const ThemeCode& themeCode)
+{
+    settings()->setSharedValue(UI_CURRENT_THEME_CODE_KEY, Val(themeCode));
 }
 
 void UiConfiguration::setCurrentThemeStyleValue(ThemeStyleKey key, const Val& val)
@@ -475,7 +443,7 @@ void UiConfiguration::setCurrentThemeStyleValue(ThemeStyleKey key, const Val& va
     writeThemes(modifiedThemes);
 }
 
-Notification UiConfiguration::currentThemeChanged() const
+muse::async::Notification UiConfiguration::currentThemeChanged() const
 {
     return m_currentThemeChanged;
 }
@@ -518,7 +486,7 @@ void UiConfiguration::setBodyFontSize(int size)
     settings()->setSharedValue(UI_FONT_SIZE_KEY, Val(size));
 }
 
-Notification UiConfiguration::fontChanged() const
+muse::async::Notification UiConfiguration::fontChanged() const
 {
     return m_fontChanged;
 }
@@ -530,15 +498,17 @@ std::string UiConfiguration::iconsFontFamily() const
 
 int UiConfiguration::iconsFontSize(IconSizeType type) const
 {
+    int bodyFontSize = fontSize(FontSizeType::BODY) + 4;
+
     switch (type) {
-    case IconSizeType::Regular: return 16;
-    case IconSizeType::Toolbar: return 20;
+    case IconSizeType::Regular: return bodyFontSize;
+    case IconSizeType::Toolbar: return bodyFontSize + 2;
     }
 
-    return 16;
+    return bodyFontSize;
 }
 
-Notification UiConfiguration::iconsFontChanged() const
+muse::async::Notification UiConfiguration::iconsFontChanged() const
 {
     return m_iconsFontChanged;
 }
@@ -553,14 +523,41 @@ int UiConfiguration::musicalFontSize() const
     return settings()->value(UI_MUSICAL_FONT_SIZE_KEY).toInt();
 }
 
-Notification UiConfiguration::musicalFontChanged() const
+muse::async::Notification UiConfiguration::musicalFontChanged() const
 {
     return m_musicalFontChanged;
 }
 
+std::string UiConfiguration::defaultFontFamily() const
+{
+#ifdef Q_OS_WIN
+    static const QString defaultWinFamily = "Segoe UI";
+
+    if (QFontDatabase::hasFamily(defaultWinFamily)) {
+        return defaultWinFamily.toStdString();
+    }
+#endif
+
+    return QFontDatabase::systemFont(QFontDatabase::GeneralFont).family().toStdString();
+}
+
+int UiConfiguration::defaultFontSize() const
+{
+    return 12;
+}
+
+void UiConfiguration::resetFonts()
+{
+    settings()->setSharedValue(UI_FONT_FAMILY_KEY, settings()->defaultValue(UI_FONT_FAMILY_KEY));
+    settings()->setSharedValue(UI_FONT_SIZE_KEY, settings()->defaultValue(UI_FONT_SIZE_KEY));
+    settings()->setSharedValue(UI_ICONS_FONT_FAMILY_KEY, settings()->defaultValue(UI_ICONS_FONT_FAMILY_KEY));
+    settings()->setSharedValue(UI_MUSICAL_FONT_FAMILY_KEY, settings()->defaultValue(UI_MUSICAL_FONT_FAMILY_KEY));
+    settings()->setSharedValue(UI_MUSICAL_FONT_SIZE_KEY, settings()->defaultValue(UI_MUSICAL_FONT_SIZE_KEY));
+}
+
 double UiConfiguration::guiScaling() const
 {
-    const QScreen* screen = mainWindow()->screen();
+    const QScreen* screen = mainWindow() ? mainWindow()->screen() : nullptr;
     return screen ? screen->devicePixelRatio() : 1;
 }
 
@@ -569,19 +566,52 @@ void UiConfiguration::setPhysicalDotsPerInch(std::optional<double> dpi)
     m_customDPI = dpi;
 }
 
-double UiConfiguration::physicalDotsPerInch() const
+double UiConfiguration::physicalDpi() const
 {
     if (m_customDPI) {
         return m_customDPI.value();
     }
 
-    const QScreen* screen = mainWindow()->screen();
-    return screen ? screen->physicalDotsPerInch() : 100;
+    constexpr double DEFAULT_DPI = 96;
+    const QScreen* screen = mainWindow() ? mainWindow()->screen() : nullptr;
+    if (!screen) {
+        return DEFAULT_DPI;
+    }
+
+    auto physicalSize = screen->physicalSize();
+    // Work around xrandr reporting a 1x1mm size if
+    // the screen doesn't have a valid physical size
+    if (physicalSize.height() <= 1 && physicalSize.width() <= 1) {
+        return DEFAULT_DPI;
+    }
+
+#ifdef Q_OS_WIN
+    //! NOTE: copied from MU3, `MuseScore::MuseScore()`
+    if (QOperatingSystemVersion::current() <= QOperatingSystemVersion(QOperatingSystemVersion::Windows, 7)) {
+        return screen->logicalDotsPerInch() * screen->devicePixelRatio();
+    }
+#endif
+    return screen->physicalDotsPerInch();
 }
 
-QByteArray UiConfiguration::pageState(const QString& pageName) const
+double UiConfiguration::logicalDpi() const
 {
-    return m_uiArrangement.state(pageName);
+    const QScreen* screen = mainWindow() ? mainWindow()->screen() : nullptr;
+    if (!screen) {
+        constexpr double DEFAULT_DPI = 96;
+        return DEFAULT_DPI;
+    }
+
+    return screen->logicalDotsPerInch();
+}
+
+ValNt<QByteArray> UiConfiguration::pageState(const QString& pageName) const
+{
+    ValNt<QByteArray> result;
+    result.val = m_uiArrangement.state(pageName);
+    result.notification = m_uiArrangement.stateChanged(pageName);
+
+    return result;
 }
 
 void UiConfiguration::setPageState(const QString& pageName, const QByteArray& state)
@@ -599,9 +629,14 @@ void UiConfiguration::setWindowGeometry(const QByteArray& geometry)
     m_uiArrangement.setState(WINDOW_GEOMETRY_KEY, geometry);
 }
 
-Notification UiConfiguration::windowGeometryChanged() const
+muse::async::Notification UiConfiguration::windowGeometryChanged() const
 {
     return m_windowGeometryChanged;
+}
+
+bool UiConfiguration::isGlobalMenuAvailable() const
+{
+    return platformTheme()->isGlobalMenuAvailable();
 }
 
 void UiConfiguration::applyPlatformStyle(QWindow* window)
@@ -622,14 +657,35 @@ void UiConfiguration::setIsVisible(const QString& key, bool val)
     m_uiArrangement.setValue(key, QString::number(val ? 1 : 0));
 }
 
-mu::async::Notification UiConfiguration::isVisibleChanged(const QString& key) const
+async::Notification UiConfiguration::isVisibleChanged(const QString& key) const
 {
     return m_uiArrangement.valueChanged(key);
 }
 
-ToolConfig UiConfiguration::toolConfig(const QString& toolName) const
+QString UiConfiguration::uiItemState(const QString& itemName) const
 {
-    return m_uiArrangement.toolConfig(toolName);
+    return m_uiArrangement.value(itemName);
+}
+
+void UiConfiguration::setUiItemState(const QString& itemName, const QString& value)
+{
+    m_uiArrangement.setValue(itemName, value);
+}
+
+Notification UiConfiguration::uiItemStateChanged(const QString& itemName) const
+{
+    return m_uiArrangement.valueChanged(itemName);
+}
+
+ToolConfig UiConfiguration::toolConfig(const QString& toolName, const ToolConfig& defaultConfig) const
+{
+    ToolConfig config = m_uiArrangement.toolConfig(toolName);
+    if (!config.isValid()) {
+        return defaultConfig;
+    }
+
+    updateToolConfig(toolName, config, defaultConfig);
+    return config;
 }
 
 void UiConfiguration::setToolConfig(const QString& toolName, const ToolConfig& config)
@@ -637,7 +693,115 @@ void UiConfiguration::setToolConfig(const QString& toolName, const ToolConfig& c
     m_uiArrangement.setToolConfig(toolName, config);
 }
 
-mu::async::Notification UiConfiguration::toolConfigChanged(const QString& toolName) const
+async::Notification UiConfiguration::toolConfigChanged(const QString& toolName) const
 {
     return m_uiArrangement.toolConfigChanged(toolName);
+}
+
+void UiConfiguration::updateToolConfig(const QString& toolName, ToolConfig& userConfig, const ToolConfig& defaultConfig) const
+{
+    bool hasChanged = false;
+
+    // Remove items that are not in the default config
+    {
+        QList<ToolConfig::Item> itemsToRemove;
+        for (const auto& item : userConfig.items) {
+            if (item.isSeparator()) {
+                continue;
+            }
+
+            if (std::find_if(defaultConfig.items.cbegin(), defaultConfig.items.cend(), [item](const auto& defaultItem) {
+                return item.action == defaultItem.action;
+            }) == defaultConfig.items.cend()) {
+                itemsToRemove << item;
+            }
+        }
+
+        for (const auto& itemToRemove : itemsToRemove) {
+            hasChanged = true;
+            userConfig.items.removeAll(itemToRemove);
+        }
+    }
+
+    // Insert items that are missing in the user config
+    {
+        for (const auto& defaultItem : defaultConfig.items) {
+            if (defaultItem.isSeparator()) {
+                continue;
+            }
+
+            if (std::find_if(userConfig.items.cbegin(), userConfig.items.cend(), [defaultItem](const auto& item) {
+                return defaultItem.action == item.action;
+            }) == userConfig.items.cend()) {
+                hasChanged = true;
+
+                // Try to find a good place to insert the item
+                int indexOfDefaultItem = defaultConfig.items.indexOf(defaultItem);
+
+                // If it was at the start of the default items...
+                if (indexOfDefaultItem == 0) {
+                    // insert it at the start of the user items
+                    userConfig.items.prepend(defaultItem);
+                    continue;
+                }
+
+                // If it was at the end of the default items...
+                if (indexOfDefaultItem == defaultConfig.items.size() - 1) {
+                    // insert it at the end of the user items
+                    userConfig.items.append(defaultItem);
+                    continue;
+                }
+
+                // Look at the item before it...
+                {
+                    const auto& itemBefore = defaultConfig.items[indexOfDefaultItem - 1];
+                    if (!itemBefore.isSeparator()) {
+                        auto it = std::find_if(userConfig.items.begin(), userConfig.items.end(), [itemBefore](const auto& item) {
+                            return item.action == itemBefore.action;
+                        });
+
+                        if (it != userConfig.items.end()) {
+                            userConfig.items.insert(++it, defaultItem);
+                            continue;
+                        }
+                    }
+                }
+
+                // Look at the item after it...
+                {
+                    const auto& itemAfter  = defaultConfig.items[indexOfDefaultItem + 1];
+                    if (!itemAfter.isSeparator()) {
+                        auto it = std::find_if(userConfig.items.begin(), userConfig.items.end(), [itemAfter](const auto& item) {
+                            return item.action == itemAfter.action;
+                        });
+
+                        userConfig.items.insert(it, defaultItem);
+                        continue;
+                    }
+                }
+
+                // Last resort: just insert at the end
+                userConfig.items.append(defaultItem);
+            }
+        }
+    }
+
+    if (hasChanged) {
+        // Save for later
+        auto self = const_cast<UiConfiguration*>(this);
+
+        Async::call(self, [self, toolName, userConfig]() {
+            self->setToolConfig(toolName, userConfig);
+        });
+    }
+}
+
+int UiConfiguration::flickableMaxVelocity() const
+{
+    return FLICKABLE_MAX_VELOCITY;
+}
+
+int UiConfiguration::tooltipDelay() const
+{
+    return TOOLTIP_DELAY;
 }

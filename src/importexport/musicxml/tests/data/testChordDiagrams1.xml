@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <work>
     <work-number>MuseScore testfile</work-number>
     <work-title>Chord diagrams 1</work-title>
@@ -314,28 +314,12 @@
           <frame-frets>4</frame-frets>
           <first-fret>12</first-fret>
           <frame-note>
-            <string>5</string>
-            <fret>12</fret>
-            <barre type="start"/>
-            </frame-note>
-          <frame-note>
-            <string>4</string>
-            <fret>14</fret>
-            <barre type="start"/>
-            </frame-note>
-          <frame-note>
-            <string>3</string>
-            <fret>14</fret>
-            </frame-note>
-          <frame-note>
             <string>2</string>
             <fret>14</fret>
-            <barre type="stop"/>
             </frame-note>
           <frame-note>
             <string>1</string>
             <fret>12</fret>
-            <barre type="stop"/>
             </frame-note>
           </frame>
         </harmony>

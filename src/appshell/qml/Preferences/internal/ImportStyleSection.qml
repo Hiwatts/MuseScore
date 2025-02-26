@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,19 +21,19 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Style used for import")
+    title: qsTrc("appshell/preferences", "Style used for import")
 
     navigation.direction: NavigationPanel.Both
 
     property string styleFileImportPath: ""
     property string fileChooseTitle: ""
-    property string filePathFilter: ""
+    property var filePathFilter: null
     property string fileDirectory: ""
 
     signal styleFileImportPathChangeRequested(string path)
@@ -41,14 +41,19 @@ BaseSection {
     QtObject {
         id: prv
 
-        property bool useStyleFile: root.styleFileImportPath !== ""
+        property bool useStyleFileExplicitlySet: root.styleFileImportPath !== ""
+        property bool useStyleFile: prv.useStyleFileExplicitlySet || root.styleFileImportPath !== ""
+    }
+
+    function reset() {
+        prv.useStyleFileExplicitlySet = false
     }
 
     RoundedRadioButton {
         id: builtInStyleButton
-        width: 193
+        width: root.columnWidth
 
-        text: qsTrc("appshell", "Built-in style")
+        text: qsTrc("appshell/preferences", "Built-in style")
         checked: !prv.useStyleFile
 
         navigation.name: "BuiltInStyleButton"
@@ -57,21 +62,22 @@ BaseSection {
         navigation.column: 0
 
         onToggled: {
-            prv.useStyleFile = false
+            prv.useStyleFileExplicitlySet = false
             root.styleFileImportPathChangeRequested("")
         }
     }
 
     Row {
         width: parent.width
+        spacing: root.columnSpacing
 
         RoundedRadioButton {
             id: useStyleFileButton
 
-            width: 193
+            width: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Use style file:")
+            text: qsTrc("appshell/preferences", "Use style file:")
             checked: prv.useStyleFile
 
             navigation.name: "UseStyleButton"
@@ -80,14 +86,14 @@ BaseSection {
             navigation.column: 0
 
             onToggled: {
-                prv.useStyleFile = true
+                prv.useStyleFileExplicitlySet = true
             }
         }
 
         FilePicker {
             id: styleFilePicker
 
-            width: 246
+            pathFieldWidth: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
             dialogTitle: root.fileChooseTitle
@@ -102,7 +108,7 @@ BaseSection {
             navigationRowOrderStart: 1
             navigationColumnOrderStart: 1
 
-            onPathEdited: {
+            onPathEdited: function(newPath) {
                 root.styleFileImportPathChangeRequested(newPath)
             }
         }

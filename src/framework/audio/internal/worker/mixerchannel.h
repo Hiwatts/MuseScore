@@ -19,31 +19,44 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_MIXERCHANNEL_H
-#define MU_AUDIO_MIXERCHANNEL_H
+#ifndef MUSE_AUDIO_MIXERCHANNEL_H
+#define MUSE_AUDIO_MIXERCHANNEL_H
 
-#include "modularity/ioc.h"
+#include "global/modularity/ioc.h"
+#include "global/async/asyncable.h"
+#include "global/async/notification.h"
 
-#include "async/asyncable.h"
-
-#include "ifxresolver.h"
-#include "ifxprocessor.h"
+#include "../../ifxresolver.h"
+#include "../../ifxprocessor.h"
+#include "../dsp/compressor.h"
 #include "track.h"
-#include "internal/dsp/compressor.h"
 
-namespace mu::audio {
-class MixerChannel : public ITrackAudioOutput, public async::Asyncable
+namespace muse::audio {
+class MixerChannel : public ITrackAudioOutput, public Injectable, public async::Asyncable
 {
-    INJECT(audio, fx::IFxResolver, fxResolver)
+    Inject<fx::IFxResolver> fxResolver = { this };
 
 public:
-    explicit MixerChannel(const TrackId trackId, IAudioSourcePtr source, const unsigned int sampleRate);
+    explicit MixerChannel(const TrackId trackId, IAudioSourcePtr source, const unsigned int sampleRate,
+                          const modularity::ContextPtr& iocCtx);
+    explicit MixerChannel(const TrackId trackId, const unsigned int sampleRate, unsigned int audioChannelsCount,
+                          const modularity::ContextPtr& iocCtx);
+
+    TrackId trackId() const;
+    IAudioSourcePtr source() const;
+
+    bool muted() const;
+    async::Notification mutedChanged() const;
+
+    bool isSilent() const;
+
+    void notifyNoAudioSignal();
 
     const AudioOutputParams& outputParams() const override;
     void applyOutputParams(const AudioOutputParams& requiredParams) override;
     async::Channel<AudioOutputParams> outputParamsChanged() const override;
 
-    async::Channel<audioch_t, AudioSignalVal> audioSignalChanges() const override;
+    AudioSignalChanges audioSignalChanges() const override;
 
     bool isActive() const override;
     void setIsActive(bool arg) override;
@@ -54,12 +67,12 @@ public:
     samples_t process(float* buffer, samples_t samplesPerChannel) override;
 
 private:
-    void completeOutput(float* buffer, unsigned int samplesCount) const;
-    void notifyAboutAudioSignalChanges(const audioch_t audioChannelNumber, const float linearRms) const;
+    void completeOutput(float* buffer, unsigned int samplesCount);
 
     TrackId m_trackId = -1;
 
     unsigned int m_sampleRate = 0;
+    unsigned int m_audioChannelsCount = 0;
     AudioOutputParams m_params;
 
     IAudioSourcePtr m_audioSource = nullptr;
@@ -67,6 +80,9 @@ private:
 
     dsp::CompressorPtr m_compressor = nullptr;
 
+    bool m_isSilent = true;
+
+    async::Notification m_mutedChanged;
     mutable async::Channel<AudioOutputParams> m_paramsChanges;
     mutable AudioSignalsNotifier m_audioSignalNotifier;
 };
@@ -74,4 +90,4 @@ private:
 using MixerChannelPtr = std::shared_ptr<MixerChannel>;
 }
 
-#endif // MU_AUDIO_MIXERCHANNEL_H
+#endif // MUSE_AUDIO_MIXERCHANNEL_H

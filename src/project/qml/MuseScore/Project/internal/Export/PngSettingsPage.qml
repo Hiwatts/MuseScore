@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,7 +22,7 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Project 1.0
 
 ExportSettingsPage {
@@ -30,7 +30,7 @@ ExportSettingsPage {
 
     ExportOptionItem {
         id: resolutionLabel
-        text: qsTrc("project", "Resolution:")
+        text: qsTrc("project/export", "Resolution:")
 
         IncrementalPropertyControl {
             Layout.preferredWidth: 80
@@ -45,7 +45,9 @@ ExportSettingsPage {
             maxValue: 5000
             step: 1
             decimals: 0
-            measureUnitsSymbol: qsTrc("project", "dpi")
+
+            //: Dots per inch
+            measureUnitsSymbol: qsTrc("global", "dpi")
 
             onValueEdited: function(newValue) {
                 root.model.pngResolution = newValue
@@ -55,7 +57,7 @@ ExportSettingsPage {
 
     CheckBox {
         width: parent.width
-        text: qsTrc("project", "Transparent background")
+        text: qsTrc("project/export", "Transparent background")
 
         navigation.name: "TransparentBackgroundCheckbox"
         navigation.panel: root.navigationPanel
@@ -69,7 +71,7 @@ ExportSettingsPage {
 
     StyledTextLabel {
         width: parent.width
-        text: qsTrc("project", "Each page of the selected parts will be exported as a separate PNG file.")
+        text: qsTrc("project/export", "Each page of the selected parts will be exported as a separate %1 file.").arg("PNG")
         horizontalAlignment: Text.AlignLeft
         wrapMode: Text.WordWrap
     }

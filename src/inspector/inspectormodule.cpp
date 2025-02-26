@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,13 +27,16 @@
 #include "models/abstractinspectormodel.h"
 #include "models/inspectorlistmodel.h"
 #include "models/inspectormodelcreator.h"
+#include "models/measures/measuressettingsmodel.h"
 #include "models/notation/notes/noteheads/noteheadgroupsmodel.h"
 #include "models/inspectorpopupcontroller.h"
 
 #include "view/widgets/fretcanvas.h"
+#include "view/widgets/bendgridcanvas.h"
 #include "view/widgets/gridcanvas.h"
 
-#include "types/stemtypes.h"
+#include "types/directiontypes.h"
+#include "types/slurtietypes.h"
 #include "types/noteheadtypes.h"
 #include "types/beamtypes.h"
 #include "types/hairpintypes.h"
@@ -50,14 +53,14 @@
 #include "types/articulationtypes.h"
 #include "types/ambitustypes.h"
 #include "types/chordsymboltypes.h"
-#include "types/scoreappearancetypes.h"
 #include "types/bendtypes.h"
 #include "types/tremolobartypes.h"
 #include "types/tremolotypes.h"
+#include "types/voicetypes.h"
 #include "types/linetypes.h"
 
 using namespace mu::inspector;
-using namespace mu::modularity;
+using namespace muse::modularity;
 
 static void inspector_init_qrc()
 {
@@ -85,9 +88,11 @@ void InspectorModule::registerUiTypes()
     qmlRegisterUncreatableType<AbstractInspectorModel>("MuseScore.Inspector", 1, 0, "Inspector", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<PropertyItem>("MuseScore.Inspector", 1, 0, "PropertyItem", "Not creatable from QML");
 
+    qmlRegisterUncreatableType<MeasuresSettingsModel>("MuseScore.Inspector", 1, 0, "MeasuresSettingsModel", "Not creatable from QML");
     qmlRegisterType<NoteheadGroupsModel>("MuseScore.Inspector", 1, 0, "NoteheadGroupsModel");
 
     qmlRegisterUncreatableType<DirectionTypes>("MuseScore.Inspector", 1, 0, "DirectionTypes", "Not creatable as it is an enum type");
+    qmlRegisterUncreatableType<SlurTieTypes>("MuseScore.Inspector", 1, 0, "SlurTieTypes", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<NoteHeadTypes>("MuseScore.Inspector", 1, 0, "NoteHead", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<BeamTypes>("MuseScore.Inspector", 1, 0, "Beam", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<HairpinTypes>("MuseScore.Inspector", 1, 0, "Hairpin", "Not creatable as it is an enum type");
@@ -106,12 +111,13 @@ void InspectorModule::registerUiTypes()
     qmlRegisterUncreatableType<AmbitusTypes>("MuseScore.Inspector", 1, 0, "AmbitusTypes", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<ChordSymbolTypes>("MuseScore.Inspector", 1, 0, "ChordSymbolTypes", "Not creatable as it is an enum type");
     qmlRegisterType<FretCanvas>("MuseScore.Inspector", 1, 0, "FretCanvas");
-    qmlRegisterUncreatableType<ScoreAppearanceTypes>("MuseScore.Inspector", 1, 0, "ScoreAppearanceTypes", "Not creatable...");
-    qmlRegisterType<GridCanvas>("MuseScore.Inspector", 1, 0, "GridCanvas");
+    qmlRegisterType<BendGridCanvas>("MuseScore.Inspector", 1, 0, "BendGridCanvas");
     qmlRegisterUncreatableType<BendTypes>("MuseScore.Inspector", 1, 0, "BendTypes", "Not creatable as it is an enum type");
+    qmlRegisterType<GridCanvas>("MuseScore.Inspector", 1, 0, "GridCanvas");
     qmlRegisterUncreatableType<TremoloBarTypes>("MuseScore.Inspector", 1, 0, "TremoloBarTypes", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<TremoloTypes>("MuseScore.Inspector", 1, 0, "TremoloTypes", "Not creatable as it is an enum type");
     qmlRegisterType<InspectorPopupController>("MuseScore.Inspector", 1, 0, "InspectorPopupController");
+    qmlRegisterUncreatableType<VoiceTypes>("MuseScore.Inspector", 1, 0, "VoiceTypes", "Not creatable as it is an enum type");
 
-    modularity::ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(inspector_QML_IMPORT);
+    ioc()->resolve<muse::ui::IUiEngine>(moduleName())->addSourceImportPath(inspector_QML_IMPORT);
 }

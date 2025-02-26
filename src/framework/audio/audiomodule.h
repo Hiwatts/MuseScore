@@ -19,13 +19,34 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_AUDIOMODULE_H
-#define MU_AUDIO_AUDIOMODULE_H
+#ifndef MUSE_AUDIO_AUDIOMODULE_H
+#define MUSE_AUDIO_AUDIOMODULE_H
+
+#include <memory>
 
 #include "modularity/imodulesetup.h"
-#include "async/asyncable.h"
+#include "global/async/asyncable.h"
 
-namespace mu::audio {
+#include "iaudiodriver.h"
+
+namespace muse::audio::fx {
+class FxResolver;
+}
+
+namespace muse::audio::synth  {
+class SynthResolver;
+}
+
+namespace muse::audio {
+class AudioConfiguration;
+class AudioEngine;
+class AudioThread;
+class AudioBuffer;
+class AudioOutputDeviceController;
+class Playback;
+class SoundFontRepository;
+class KnownAudioPluginsRegister;
+class RegisterAudioPluginsScenario;
 class AudioModule : public modularity::IModuleSetup, public async::Asyncable
 {
 public:
@@ -36,9 +57,30 @@ public:
     void registerExports() override;
     void registerResources() override;
     void registerUiTypes() override;
-    void onInit(const framework::IApplication::RunMode& mode) override;
+    void resolveImports() override;
+    void onInit(const IApplication::RunMode& mode) override;
     void onDeinit() override;
+    void onDestroy() override;
+
+private:
+    void setupAudioDriver(const IApplication::RunMode& mode);
+    void setupAudioWorker(const IAudioDriver::Spec& activeSpec);
+
+    std::shared_ptr<AudioConfiguration> m_configuration;
+    std::shared_ptr<AudioEngine> m_audioEngine;
+    std::shared_ptr<AudioThread> m_audioWorker;
+    std::shared_ptr<AudioBuffer> m_audioBuffer;
+    std::shared_ptr<AudioOutputDeviceController> m_audioOutputController;
+
+    std::shared_ptr<fx::FxResolver> m_fxResolver;
+    std::shared_ptr<synth::SynthResolver> m_synthResolver;
+
+    std::shared_ptr<Playback> m_playbackFacade;
+
+    std::shared_ptr<SoundFontRepository> m_soundFontRepository;
+
+    std::shared_ptr<IAudioDriver> m_audioDriver;
 };
 }
 
-#endif // MU_AUDIO_AUDIOMODULE_H
+#endif // MUSE_AUDIO_AUDIOMODULE_H

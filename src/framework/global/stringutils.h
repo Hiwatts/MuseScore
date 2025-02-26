@@ -19,22 +19,27 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_FRAMEWORK_STRINGUTILS_H
-#define MU_FRAMEWORK_STRINGUTILS_H
+#ifndef MUSE_GLOBAL_STRINGUTILS_H
+#define MUSE_GLOBAL_STRINGUTILS_H
 
+#include <locale>
 #include <string>
 #include <vector>
 #include <sstream>
 
-namespace mu::strings {
+#include "types/string.h"
+
+namespace muse::strings {
 bool replace(std::string& source, const std::string& what, const std::string& to);
 void split(const std::string& str, std::vector<std::string>& out, const std::string& delim);
+std::string join(const std::vector<std::string>& strs, const std::string& sep = ",");
 
 void ltrim(std::string& s);
 void rtrim(std::string& s);
 void trim(std::string& s);
 
 std::string toLower(const std::string& source);
+bool startsWith(const std::string& str, const std::string& start);
 bool endsWith(const std::string& str, const std::string& end);
 std::string leftJustified(const std::string& val, size_t width);
 
@@ -47,6 +52,11 @@ std::string toString(const T& t)
     oss << t;
     return oss.str();
 }
+
+bool lessThanCaseInsensitive(const std::string& lhs, const std::string& rhs);
+bool lessThanCaseInsensitive(const String& lhs, const String& rhs);
+
+size_t levenshteinDistance(const std::string& s1, const std::string& s2);
 }
 
-#endif // MU_FRAMEWORK_STRINGUTILS_H
+#endif // MUSE_GLOBAL_STRINGUTILS_H

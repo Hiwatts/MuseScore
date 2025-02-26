@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,13 +22,13 @@
 #include "canvaspreferencesmodel.h"
 
 #include "log.h"
-#include "translation.h"
+#include "types/translatablestring.h"
 
 using namespace mu::appshell;
 using namespace mu::notation;
 
 CanvasPreferencesModel::CanvasPreferencesModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
@@ -37,13 +37,32 @@ void CanvasPreferencesModel::load()
     setupConnections();
 }
 
+void CanvasPreferencesModel::setupConnections()
+{
+    notationConfiguration()->defaultZoomChanged().onNotify(this, [this]() {
+        emit defaultZoomChanged();
+    });
+    notationConfiguration()->mouseZoomPrecisionChanged().onNotify(this, [this]() {
+        emit mouseZoomPrecisionChanged();
+    });
+    notationConfiguration()->canvasOrientation().ch.onReceive(this, [this](muse::Orientation) {
+        emit scrollPagesOrientationChanged();
+    });
+    notationConfiguration()->isLimitCanvasScrollAreaChanged().onNotify(this, [this]() {
+        emit limitScrollAreaChanged();
+    });
+    notationConfiguration()->selectionProximityChanged().onReceive(this, [this](int selectionProximity) {
+        emit selectionProximityChanged(selectionProximity);
+    });
+}
+
 QVariantList CanvasPreferencesModel::zoomTypes() const
 {
     QVariantList types = {
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::Percentage) }, { "value", static_cast<int>(ZoomType::Percentage) } },
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::PageWidth) }, { "value", static_cast<int>(ZoomType::PageWidth) } },
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::WholePage) }, { "value", static_cast<int>(ZoomType::WholePage) } },
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::TwoPages) }, { "value", static_cast<int>(ZoomType::TwoPages) } }
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::Percentage).qTranslated() }, { "value", static_cast<int>(ZoomType::Percentage) } },
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::PageWidth).qTranslated() }, { "value", static_cast<int>(ZoomType::PageWidth) } },
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::WholePage).qTranslated() }, { "value", static_cast<int>(ZoomType::WholePage) } },
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::TwoPages).qTranslated() }, { "value", static_cast<int>(ZoomType::TwoPages) } }
     };
 
     return types;
@@ -73,6 +92,11 @@ int CanvasPreferencesModel::scrollPagesOrientation() const
 bool CanvasPreferencesModel::limitScrollArea() const
 {
     return notationConfiguration()->isLimitCanvasScrollArea();
+}
+
+int CanvasPreferencesModel::selectionProximity() const
+{
+    return notationConfiguration()->selectionProximity();
 }
 
 void CanvasPreferencesModel::setDefaultZoomType(int zoomType)
@@ -112,7 +136,7 @@ void CanvasPreferencesModel::setScrollPagesOrientation(int orientation)
         return;
     }
 
-    notationConfiguration()->setCanvasOrientation(static_cast<framework::Orientation>(orientation));
+    notationConfiguration()->setCanvasOrientation(static_cast<muse::Orientation>(orientation));
 }
 
 void CanvasPreferencesModel::setLimitScrollArea(bool limit)
@@ -125,11 +149,14 @@ void CanvasPreferencesModel::setLimitScrollArea(bool limit)
     emit limitScrollAreaChanged();
 }
 
-void CanvasPreferencesModel::setupConnections()
+void CanvasPreferencesModel::setSelectionProximity(int proximity)
 {
-    notationConfiguration()->canvasOrientation().ch.onReceive(this, [this](framework::Orientation) {
-        emit scrollPagesOrientationChanged();
-    });
+    if (selectionProximity() == proximity) {
+        return;
+    }
+
+    notationConfiguration()->setSelectionProximity(proximity);
+    emit selectionProximityChanged(proximity);
 }
 
 ZoomType CanvasPreferencesModel::defaultZoomType() const

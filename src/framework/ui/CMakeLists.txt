@@ -18,7 +18,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-set(MODULE ui)
+declare_module(muse_ui)
+set(MODULE_ALIAS muse::ui)
 
 set(MODULE_QRC ui.qrc)
 set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml)
@@ -28,13 +29,13 @@ if (OS_IS_MAC)
     set(PLATFORM_THEME_SRC
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/macos/macosplatformtheme.mm
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/macos/macosplatformtheme.h
-        ${CMAKE_CURRENT_LIST_DIR}/view/platform/macos/macosmainwindowprovider.mm
-        ${CMAKE_CURRENT_LIST_DIR}/view/platform/macos/macosmainwindowprovider.h
+        ${CMAKE_CURRENT_LIST_DIR}/view/platform/macos/macosmainwindowbridge.mm
+        ${CMAKE_CURRENT_LIST_DIR}/view/platform/macos/macosmainwindowbridge.h
     )
     # Don't mix C++ and Objective-C++ in Unity Build
     set_source_files_properties(
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/macos/macosplatformtheme.mm
-        ${CMAKE_CURRENT_LIST_DIR}/view/platform/macos/macosmainwindowprovider.mm
+        ${CMAKE_CURRENT_LIST_DIR}/view/platform/macos/macosmainwindowbridge.mm
         PROPERTIES
         SKIP_UNITY_BUILD_INCLUSION ON
         SKIP_PRECOMPILE_HEADERS ON
@@ -43,6 +44,11 @@ elseif(OS_IS_WIN)
     set(PLATFORM_THEME_SRC
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/windows/windowsplatformtheme.cpp
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/windows/windowsplatformtheme.h
+    )
+elseif(OS_IS_LIN)
+    set(PLATFORM_THEME_SRC
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/linux/linuxplatformtheme.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/linux/linuxplatformtheme.h
     )
 else()
     set(PLATFORM_THEME_SRC
@@ -60,17 +66,29 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/iuiconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/uierrors.h
     ${CMAKE_CURRENT_LIST_DIR}/uitypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/uiaction.h
     ${CMAKE_CURRENT_LIST_DIR}/imainwindow.h
     ${CMAKE_CURRENT_LIST_DIR}/iuiactionsregister.h
     ${CMAKE_CURRENT_LIST_DIR}/iuiactionsmodule.h
     ${CMAKE_CURRENT_LIST_DIR}/iuicontextresolver.h
     ${CMAKE_CURRENT_LIST_DIR}/inavigation.h
     ${CMAKE_CURRENT_LIST_DIR}/inavigationcontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/graphicsapiprovider.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/graphicsapiprovider.h
+
+    ${CMAKE_CURRENT_LIST_DIR}/api/themeapi.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/api/themeapi.h
+    ${CMAKE_CURRENT_LIST_DIR}/api/navigationapi.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/api/navigationapi.h
+    ${CMAKE_CURRENT_LIST_DIR}/api/keyboardapi.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/api/keyboardapi.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/interactiveuriregister.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/interactiveuriregister.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/uiengine.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/uiengine.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/mainwindow.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/mainwindow.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/uiconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/uiconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/themeconverter.cpp
@@ -90,8 +108,6 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/interactiveprovider.h
     ${CMAKE_CURRENT_LIST_DIR}/view/qmlapi.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/qmlapi.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/uitheme.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/uitheme.h
     ${CMAKE_CURRENT_LIST_DIR}/view/iconcodes.h
     ${CMAKE_CURRENT_LIST_DIR}/view/musicalsymbolcodes.h
     ${CMAKE_CURRENT_LIST_DIR}/view/qmltranslation.cpp
@@ -100,10 +116,6 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/qmllauncher.h
     ${CMAKE_CURRENT_LIST_DIR}/view/qmltooltip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/qmltooltip.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/widgetdialog.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/widgetdialog.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/abstractmenumodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/abstractmenumodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/abstractnavigation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/abstractnavigation.h
     ${CMAKE_CURRENT_LIST_DIR}/view/navigationsection.cpp
@@ -118,12 +130,22 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/navigationevent.h
     ${CMAKE_CURRENT_LIST_DIR}/view/qmlaccessible.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/qmlaccessible.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/widgetview.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/widgetview.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/mainwindowprovider.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/mainwindowprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/mainwindowbridge.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/mainwindowbridge.h
     ${CMAKE_CURRENT_LIST_DIR}/view/focuslistener.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/focuslistener.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgetnavigationfix.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgetnavigationfix.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgetstatestore.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgetstatestore.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/widgetutils.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/qmldataformatter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/qmldataformatter.h
+
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/errordetailsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/errordetailsmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/progressdialogmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/progressdialogmodel.h
 
     ${CMAKE_CURRENT_LIST_DIR}/dev/interactivetestsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/dev/interactivetestsmodel.h
@@ -135,13 +157,17 @@ set(MODULE_UI
     ${CMAKE_CURRENT_LIST_DIR}/dev/testdialog.ui
     )
 
-set(MODULE_LINK
-    accessibility
-    )
-
 if (OS_IS_MAC)
     find_library(AppKit NAMES AppKit)
     set(MODULE_LINK ${MODULE_LINK} ${AppKit})
 endif()
 
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
+set(MODULE_LINK ${MODULE_LINK}
+    muse::tours
+)
+
+setup_module()
+
+if (MUSE_MODULE_UI_TESTS)
+    add_subdirectory(tests)
+endif()

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,30 +22,42 @@
 
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Palette 1.0
 
 import "internal"
 
-Rectangle {
+Item {
     id: root
 
     property NavigationSection navigationSection: null
+    property int navigationOrderStart: 1
+
+    property alias contextMenuModel: contextMenuModel
 
     readonly property PaletteProvider paletteProvider: paletteRootModel.paletteProvider
 
     implicitHeight: 4 * palettesPanelHeader.implicitHeight
     implicitWidth: paletteTree.implicitWidth
 
-    enabled: paletteRootModel.paletteEnabled
-
     function applyCurrentPaletteElement() {
         paletteTree.applyCurrentElement();
     }
 
-    color: ui.theme.backgroundPrimaryColor
+    PalettesPanelContextMenuModel {
+        id: contextMenuModel
+
+        onExpandCollapseAllRequested: function(expand) {
+            paletteTree.expandCollapseAll(expand)
+        }
+    }
+
+    Component.onCompleted: {
+        contextMenuModel.load()
+    }
 
     PaletteRootModel {
         id: paletteRootModel
@@ -53,73 +65,90 @@ Rectangle {
         onPaletteSearchRequested: {
             palettesPanelHeader.startSearch()
         }
+        onApplyCurrentPaletteElementRequested: {
+            root.applyCurrentPaletteElement()
+        }
     }
 
-    PalettesPanelHeader {
-        id: palettesPanelHeader
+    ColumnLayout {
+        id: contentColumn
 
-        paletteProvider: root.paletteProvider
+        readonly property int sideMargin: 12
 
-        popupMaxHeight: root.height - palettesPanelHeader.height
+        anchors.fill: parent
+        anchors.leftMargin: sideMargin
+        anchors.rightMargin: sideMargin
 
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.leftMargin: 12
-        anchors.right: parent.right
-        anchors.rightMargin: 12
+        spacing: sideMargin
 
-        navigation.section: root.navigationSection
-        navigation.enabled: root.visible
-        navigation.order: 2
+        PalettesPanelHeader {
+            id: palettesPanelHeader
 
-        onAddCustomPaletteRequested: paletteTree.insertCustomPalette(0, paletteName);
-    }
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignTop
 
-    StyledTextLabel {
-        id: searchHint
+            paletteProvider: root.paletteProvider
 
-        anchors.top: palettesPanelHeader.bottom
-        anchors.topMargin: 26
-        anchors.horizontalCenter: parent.horizontalCenter
+            popupMaxHeight: contentColumn.height - palettesPanelHeader.height
+            popupAnchorItem: root
 
-        text: qsTrc("palette", "Start typing to search all palettes")
+            navigation.section: root.navigationSection
+            navigation.order: root.navigationOrderStart
 
-        visible: palettesPanelHeader.isSearchOpened && !Boolean(palettesPanelHeader.searchText)
-    }
-
-    PaletteTree {
-        id: paletteTree
-        clip: true
-        paletteProvider: root.paletteProvider
-        backgroundColor: root.color
-
-        navigation.section: root.navigationSection
-        navigation.enabled: root.visible
-        navigation.order: 5
-
-        filter: palettesPanelHeader.searchText
-        enableAnimations: !palettesPanelHeader.isSearchFieldFocused
-        searchOpened: palettesPanelHeader.isSearchOpened
-
-        anchors {
-            top: palettesPanelHeader.bottom
-            topMargin: 3
-            bottom: parent.bottom
-            left: parent.left
-            right: parent.right
+            onAddCustomPaletteRequested: function(paletteName) {
+                paletteTree.insertCustomPalette(0, paletteName)
+            }
         }
 
-        visible: !searchHint.visible
-    }
+        StyledTextLabel {
+            id: searchHint
 
-    Rectangle {
-        // Shadow overlay for Tours. The usual overlay doesn't cover palettes
-        // as they reside in a window container above the main MuseScore window.
-        visible: paletteRootModel.needShowShadowOverlay
-        anchors.fill: parent
-        z: 1000
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: 8
+            Layout.rightMargin: 8
 
-        color: ui.theme.strokeColor
-        opacity: 0.5
+            text: qsTrc("palette", "Start typing to search all palettes")
+            verticalAlignment: Qt.AlignTop
+            wrapMode: Text.WordWrap
+
+            visible: palettesPanelHeader.isSearchOpened && !Boolean(palettesPanelHeader.searchText)
+        }
+
+        StyledTextLabel {
+            id: notFoundHint
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: 8
+            Layout.rightMargin: 8
+
+            text: qsTrc("global", "No results found")
+            verticalAlignment: Qt.AlignTop
+            wrapMode: Text.WordWrap
+
+            visible: !searchHint.visible && !paletteTree.isResultFound
+        }
+
+        PaletteTree {
+            id: paletteTree
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: -contentColumn.sideMargin
+            Layout.rightMargin: -contentColumn.sideMargin
+
+            clip: true
+            paletteProvider: root.paletteProvider
+
+            navigation.section: root.navigationSection
+            navigation.order: palettesPanelHeader.navigation.order + 1
+
+            filter: palettesPanelHeader.searchText
+            enableAnimations: !palettesPanelHeader.isSearchFieldFocused
+            searchOpened: palettesPanelHeader.isSearchOpened
+
+            visible: !searchHint.visible
+        }
     }
 }

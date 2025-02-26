@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,26 +20,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Auto save")
+    title: qsTrc("appshell/preferences", "Auto save")
 
     navigation.direction: NavigationPanel.Horizontal
 
-    property alias isAutoSave: autoSaveCheckBox.checked
-    property alias autoSavePeriod: autoSavePeriodControl.currentValue
+    property alias isAutoSaveEnabled: autoSaveCheckBox.checked
+    property alias autoSaveInterval: autoSaveIntervalControl.currentValue
 
-    signal autoSaveChanged(bool autoSave)
-    signal periodChanged(int period)
+    signal autoSaveEnabledChanged(bool enabled)
+    signal intervalChanged(int minutes)
 
     Row {
-        spacing: 0
+        spacing: 12
 
         CheckBox {
             id: autoSaveCheckBox
@@ -47,38 +46,38 @@ BaseSection {
             width: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Auto save every:")
+            text: qsTrc("appshell/preferences", "Auto save every:")
 
             navigation.name: "AutoSaveCheckBox"
             navigation.panel: root.navigation
             navigation.column: 1
 
             onClicked: {
-                root.autoSaveChanged(!checked)
+                root.autoSaveEnabledChanged(!checked)
             }
         }
 
         IncrementalPropertyControl {
-            id: autoSavePeriodControl
+            id: autoSaveIntervalControl
 
             width: 96
             anchors.verticalCenter: parent.verticalCenter
 
-            enabled: root.isAutoSave
+            enabled: root.isAutoSaveEnabled
 
             minValue: 1
             maxValue: 100
             step: 1
             decimals: 0
 
-            measureUnitsSymbol: qsTrc("appshell", "min")
+            measureUnitsSymbol: " " + qsTrc("global", "min", /*disambiguation*/ "abbreviation of minutes")
 
             navigation.name: "AutoSavePeriodControl"
             navigation.panel: root.navigation
             navigation.column: 2
 
-            onValueEdited: {
-                root.periodChanged(newValue)
+            onValueEdited: function(newValue) {
+                root.intervalChanged(newValue)
             }
         }
     }

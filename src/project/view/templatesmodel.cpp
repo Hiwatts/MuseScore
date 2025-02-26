@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,6 +25,14 @@
 
 using namespace mu::project;
 using namespace mu::notation;
+using namespace muse;
+
+namespace mu::project {
+inline bool operator==(const Template& templ1, const Template& templ2)
+{
+    return templ1.meta.filePath == templ2.meta.filePath;
+}
+}
 
 TemplatesModel::TemplatesModel(QObject* parent)
     : QObject(parent)
@@ -33,25 +41,36 @@ TemplatesModel::TemplatesModel(QObject* parent)
 
 void TemplatesModel::load()
 {
+    TRACEFUNC;
+
     RetVal<Templates> templates = repository()->templates();
     if (!templates.ret) {
         LOGE() << templates.ret.toString();
     }
 
     for (const Template& templ : templates.val) {
-        if (!templ.title.isEmpty()) {
+        if (!templ.meta.title.isEmpty()) {
             m_allTemplates << templ;
         }
     }
 
+    loadAllCategories();
+}
+
+void TemplatesModel::loadAllCategories()
+{
+    TRACEFUNC;
+
+    QStringList visibleCategories;
+
     for (const Template& templ: m_allTemplates) {
-        if (!m_visibleCategoriesTitles.contains(templ.categoryTitle)) {
-            m_visibleCategoriesTitles << templ.categoryTitle;
+        if (!visibleCategories.contains(templ.categoryTitle)) {
+            visibleCategories << templ.categoryTitle;
         }
     }
 
-    updateTemplatesByCategory();
-    emit categoriesChanged();
+    setVisibleCategories(visibleCategories);
+    updateTemplatesByCurrentCategory();
 }
 
 QStringList TemplatesModel::categoriesTitles() const
@@ -59,13 +78,19 @@ QStringList TemplatesModel::categoriesTitles() const
     return m_visibleCategoriesTitles;
 }
 
+int TemplatesModel::currentCategoryIndex() const
+{
+    return m_visibleCategoriesTitles.indexOf(m_currentCategory);
+}
+
+int TemplatesModel::currentTemplateIndex() const
+{
+    return m_visibleTemplates.indexOf(m_currentTemplate);
+}
+
 QString TemplatesModel::currentTemplatePath() const
 {
-    if (m_visibleTemplates.isEmpty()) {
-        return QString();
-    }
-
-    return m_visibleTemplates[m_currentTemplateIndex].filePath.toQString();
+    return m_currentTemplate.meta.filePath.toQString();
 }
 
 QStringList TemplatesModel::templatesTitles() const
@@ -73,51 +98,101 @@ QStringList TemplatesModel::templatesTitles() const
     QStringList titles;
 
     for (const Template& templ: m_visibleTemplates) {
-        titles << templ.title;
+        QString titleToAdd = templ.isCustom ? templ.meta.fileName(false).toQString() : templ.meta.title;
+        titles << titleToAdd;
     }
 
     return titles;
 }
 
-void TemplatesModel::setCurrentCategory(int index)
+void TemplatesModel::setCurrentCategoryIndex(int index)
 {
-    if (m_currentCategoryIndex == index) {
-        return;
-    }
-
-    m_currentCategoryIndex = index;
-    updateTemplatesByCategory();
+    setCurrentCategory(m_visibleCategoriesTitles.value(index));
+    updateTemplatesByCurrentCategory();
 }
 
-void TemplatesModel::updateTemplatesByCategory()
+void TemplatesModel::setVisibleTemplates(const Templates& templates)
 {
-    if (categoriesTitles().isEmpty()) {
+    if (m_visibleTemplates == templates) {
         return;
     }
 
-    m_visibleTemplates.clear();
-    m_currentTemplateIndex = 0;
+    m_visibleTemplates = templates;
+    emit templatesChanged();
 
-    QString currentCategoryTitle = categoriesTitles()[m_currentCategoryIndex];
+    setCurrentTemplate(templates.value(0));
+}
+
+void TemplatesModel::setCurrentTemplate(const Template& templ)
+{
+    if (m_currentTemplate == templ) {
+        return;
+    }
+
+    m_currentTemplate = templ;
+    emit currentTemplateChanged();
+}
+
+void TemplatesModel::setVisibleCategories(const QStringList& titles)
+{
+    if (m_visibleCategoriesTitles == titles) {
+        return;
+    }
+
+    QString currentCategory = titles.value(0);
+    if (m_saveCurrentCategory) {
+        m_saveCurrentCategory = false;
+        currentCategory = m_currentCategory;
+    }
+
+    m_visibleCategoriesTitles = titles;
+    emit categoriesChanged();
+
+    setCurrentCategory(currentCategory);
+}
+
+void TemplatesModel::setCurrentCategory(const QString& category)
+{
+    if (m_currentCategory == category) {
+        return;
+    }
+
+    m_currentCategory = category;
+    emit currentCategoryChanged();
+}
+
+void TemplatesModel::updateTemplatesByCurrentCategory()
+{
+    TRACEFUNC;
+
+    QStringList titles = categoriesTitles();
+    if (titles.isEmpty()) {
+        return;
+    }
+
+    Templates newVisibleTemplates;
 
     for (const Template& templ: m_allTemplates) {
-        if (templ.categoryTitle == currentCategoryTitle) {
-            m_visibleTemplates << templ;
+        if (templ.categoryTitle == m_currentCategory) {
+            newVisibleTemplates << templ;
         }
     }
 
-    emit templatesChanged();
-    emit currentTemplateChanged();
+    setVisibleTemplates(newVisibleTemplates);
 }
 
-void TemplatesModel::setCurrentTemplate(int index)
+void TemplatesModel::setCurrentTemplateIndex(int index)
 {
-    if (m_currentTemplateIndex == index) {
-        return;
-    }
+    setCurrentTemplate(m_visibleTemplates.value(index));
 
-    m_currentTemplateIndex = index;
-    emit currentTemplateChanged();
+    if (isSearching()) {
+        setCurrentCategory(m_currentTemplate.categoryTitle);
+    }
+}
+
+void TemplatesModel::saveCurrentCategory()
+{
+    m_saveCurrentCategory = true;
 }
 
 void TemplatesModel::setSearchText(const QString& text)
@@ -132,31 +207,42 @@ void TemplatesModel::setSearchText(const QString& text)
 
 void TemplatesModel::updateTemplatesAndCategoriesBySearch()
 {
-    m_visibleTemplates.clear();
-    m_visibleCategoriesTitles.clear();
+    TRACEFUNC;
 
-    m_currentCategoryIndex = 0;
-    m_currentTemplateIndex = 0;
+    if (!isSearching()) {
+        loadAllCategories();
+        return;
+    }
+
+    QStringList newVisibleCategories;
+    Templates newVisibleTemplates;
 
     for (const Template& templ: m_allTemplates) {
-        if (titleAccepted(templ.title) || titleAccepted(templ.categoryTitle)) {
-            m_visibleTemplates << templ;
-            if (!m_visibleCategoriesTitles.contains(templ.categoryTitle)) {
-                m_visibleCategoriesTitles << templ.categoryTitle;
+        if (titleAccepted(templ.meta.title) || titleAccepted(templ.categoryTitle)) {
+            newVisibleTemplates << templ;
+
+            if (!newVisibleCategories.contains(templ.categoryTitle)) {
+                newVisibleCategories << templ.categoryTitle;
             }
         }
     }
 
-    emit categoriesChanged();
-    emit templatesChanged();
-    emit currentTemplateChanged();
+    setVisibleCategories(newVisibleCategories);
+    setVisibleTemplates(newVisibleTemplates);
+
+    setCurrentCategory(m_currentTemplate.categoryTitle);
 }
 
 bool TemplatesModel::titleAccepted(const QString& title) const
 {
-    if (m_searchText.isEmpty()) {
-        return true;
+    if (isSearching()) {
+        return title.contains(m_searchText, Qt::CaseInsensitive);
     }
 
-    return title.contains(m_searchText, Qt::CaseInsensitive);
+    return true;
+}
+
+bool TemplatesModel::isSearching() const
+{
+    return !m_searchText.isEmpty();
 }

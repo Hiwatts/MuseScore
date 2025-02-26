@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<museScore version="4.00">
+<museScore version="4.40">
   <Score>
-    <LayerTag id="0" tag="default"></LayerTag>
-    <currentLayer>0</currentLayer>
     <Division>480</Division>
     <Style>
-      <frameSystemDistance>13</frameSystemDistance>
-      <measureSpacing>1.14</measureSpacing>
+      <frameSystemDistance>7</frameSystemDistance>
       <voltaPosAbove x="0" y="-2"/>
-      <Spatium>1.764</Spatium>
+      <defaultsVersion>114</defaultsVersion>
+      <spatium>1.764</spatium>
       </Style>
     <showInvisible>1</showInvisible>
     <showUnprintable>1</showUnprintable>
@@ -20,21 +18,20 @@
     <metaTag name="lyricist"></metaTag>
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle"></metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           </StaffType>
-        <bracket type="-1" span="1" col="0"/>
+        <bracket type="-1" span="1" col="0" visible="1"/>
         </Staff>
       <trackName>Flute</trackName>
-      <Instrument>
-        <longName><font size="11.9992"/><font face="Times New Roman"/>Flute</longName>
-        <shortName><font size="11.9992"/><font face="Times New Roman"/>Fl.</shortName>
+      <Instrument id="flute">
+        <longName><font size="12"/>Flute</longName>
+        <shortName><font size="12"/>Fl.</shortName>
         <trackName>Flute</trackName>
         <minPitchP>59</minPitchP>
         <maxPitchP>98</maxPitchP>
@@ -75,7 +72,11 @@
           <Clef>
             <concertClefType>G</concertClefType>
             <transposingClefType>G</transposingClefType>
+            <isHeader>1</isHeader>
             </Clef>
+          <KeySig>
+            <concertKey>0</concertKey>
+            </KeySig>
           <TimeSig>
             <sigN>4</sigN>
             <sigD>4</sigD>
@@ -95,6 +96,7 @@
           <Harmony>
             <root>16</root>
             <extension>64</extension>
+            <name>7</name>
             </Harmony>
           <Rest>
             <durationType>measure</durationType>
@@ -107,6 +109,7 @@
           <Harmony>
             <root>11</root>
             <extension>16</extension>
+            <name>m</name>
             </Harmony>
           <Rest>
             <durationType>measure</durationType>
@@ -119,6 +122,7 @@
           <Harmony>
             <root>20</root>
             <extension>6</extension>
+            <name>Maj7</name>
             </Harmony>
           <Rest>
             <durationType>measure</durationType>
@@ -133,6 +137,7 @@
           <Harmony>
             <root>15</root>
             <extension>33</extension>
+            <name>dim</name>
             </Harmony>
           <Rest>
             <durationType>measure</durationType>
@@ -147,6 +152,7 @@
           <Harmony>
             <root>17</root>
             <extension>76</extension>
+            <name>7b9</name>
             </Harmony>
           <Rest>
             <durationType>measure</durationType>
@@ -160,7 +166,8 @@
         <voice>
           <Harmony>
             <root>19</root>
-            <name>o</name>
+            <extension>33</extension>
+            <name>dim</name>
             </Harmony>
           <Rest>
             <durationType>measure</durationType>

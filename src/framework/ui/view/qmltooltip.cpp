@@ -21,78 +21,130 @@
  */
 #include "qmltooltip.h"
 
-#include <QWidget>
-#include <QToolTip>
 #include <QGuiApplication>
-#include <QStyleHints>
-#include <QCursor>
-#include <QQuickWindow>
 
-#include "log.h"
+using namespace muse::ui;
 
-using namespace mu::ui;
-
-QmlToolTip::QmlToolTip(QObject* parent)
-    : QObject(parent)
+QmlToolTip::QmlToolTip(QObject* parent, const modularity::ContextPtr& iocCtx)
+    : QObject(parent), Injectable(iocCtx)
 {
-    m_timer.setSingleShot(true);
-    connect(&m_timer, &QTimer::timeout, this, &QmlToolTip::doShow);
+    connect(&m_openTimer, &QTimer::timeout, this, &QmlToolTip::doShow);
+
+    m_closeTimer.setSingleShot(true);
+    connect(&m_closeTimer, &QTimer::timeout, this, &QmlToolTip::doHide);
+
+    qApp->installEventFilter(this);
 }
 
 void QmlToolTip::show(QQuickItem* item, const QString& title, const QString& description, const QString& shortcut)
 {
     if (item == m_item) {
+        m_closeTimer.stop();
         return;
     }
 
-    if (m_item) {
-        disconnect(m_item, &QObject::destroyed, this, &QmlToolTip::doHide);
-    }
-
-    m_item = item;
     m_title = title;
     m_description = description;
     m_shortcut = shortcut;
 
-    if (m_item) {
-        connect(m_item, &QObject::destroyed, this, &QmlToolTip::doHide);
+    bool toolTipNotOpened = m_item == nullptr;
+    bool openTimerStarted = m_openTimer.isActive();
 
-        const int interval = item ? qApp->styleHints()->mousePressAndHoldInterval() : 100;
-        m_timer.start(interval);
+    m_item = item;
+    m_shouldBeClosed = false;
+
+    if (m_item) {
+        connect(m_item, &QObject::destroyed, this, &QmlToolTip::onItemDestruction);
+    }
+
+    if (toolTipNotOpened || openTimerStarted) {
+        m_openTimer.start(uiConfiguration()->tooltipDelay());
     } else {
-        doHide();
+        doShow();
     }
 }
 
-void QmlToolTip::hide(QQuickItem* item)
+void QmlToolTip::hide(QQuickItem* item, bool force)
 {
     if (m_item != item) {
         return;
     }
 
-    doHide();
+    m_shouldBeClosed = true;
+
+    if (force) {
+        doHide();
+        return;
+    }
+
+    m_closeTimer.start(uiConfiguration()->tooltipDelay());
+}
+
+void QmlToolTip::init()
+{
+    interactiveProvider()->currentUriAboutToBeChanged().onNotify(this, [this]() {
+        m_shouldBeClosed = true;
+        doHide();
+    });
 }
 
 void QmlToolTip::doShow()
 {
+    m_openTimer.stop();
+    m_closeTimer.stop();
+
     if (!m_item) {
+        return;
+    }
+
+    if (m_shouldBeClosed) {
+        clear();
         return;
     }
 
     emit showToolTip(m_item, m_title, m_description, m_shortcut);
 }
 
+void QmlToolTip::onItemDestruction()
+{
+    m_shouldBeClosed = true;
+    doHide();
+}
+
 void QmlToolTip::doHide()
 {
-    if (m_item) {
-        disconnect(m_item, &QObject::destroyed, this, &QmlToolTip::doHide);
+    if (!m_shouldBeClosed) {
+        return;
     }
 
-    m_timer.stop();
+    m_openTimer.stop();
+    m_closeTimer.stop();
+
+    clear();
+
+    emit hideToolTip();
+}
+
+bool QmlToolTip::eventFilter(QObject*, QEvent* event)
+{
+    if (event->type() == QEvent::Wheel) {
+        m_shouldBeClosed = true;
+        doHide();
+    }
+
+    return false;
+}
+
+void QmlToolTip::clear()
+{
+    if (m_item) {
+        disconnect(m_item, &QObject::destroyed, this, &QmlToolTip::onItemDestruction);
+    }
+
     m_item = nullptr;
     m_title = QString();
     m_description = QString();
     m_shortcut = QString();
 
-    emit hideToolTip();
+    m_shouldBeClosed = false;
 }

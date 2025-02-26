@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,10 +32,9 @@
 
 #include "log.h"
 
+using namespace muse;
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
-
-static std::shared_ptr<ImagesExportConfiguration> s_configuration = std::make_shared<ImagesExportConfiguration>();
 
 std::string ImagesExportModule::moduleName() const
 {
@@ -44,20 +43,26 @@ std::string ImagesExportModule::moduleName() const
 
 void ImagesExportModule::registerExports()
 {
-    modularity::ioc()->registerExport<IImagesExportConfiguration>(moduleName(), s_configuration);
+    m_configuration = std::make_shared<ImagesExportConfiguration>();
+
+    ioc()->registerExport<IImagesExportConfiguration>(moduleName(), m_configuration);
 }
 
 void ImagesExportModule::resolveImports()
 {
-    auto writers = modularity::ioc()->resolve<INotationWritersRegister>(moduleName());
+    auto writers = ioc()->resolve<INotationWritersRegister>(moduleName());
     if (writers) {
-        writers->reg({ "pdf" }, std::make_shared<PdfWriter>());
-        writers->reg({ "svg" }, std::make_shared<SvgWriter>());
-        writers->reg({ "png" }, std::make_shared<PngWriter>());
+        writers->reg({ "pdf" }, std::make_shared<PdfWriter>(iocContext()));
+        writers->reg({ "svg" }, std::make_shared<SvgWriter>(iocContext()));
+        writers->reg({ "png" }, std::make_shared<PngWriter>(iocContext()));
     }
 }
 
-void ImagesExportModule::onInit(const framework::IApplication::RunMode&)
+void ImagesExportModule::onInit(const IApplication::RunMode& mode)
 {
-    s_configuration->init();
+    if (mode == IApplication::RunMode::AudioPluginRegistration) {
+        return;
+    }
+
+    m_configuration->init();
 }

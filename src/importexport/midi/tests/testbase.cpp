@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,69 +22,66 @@
 
 #include "testbase.h"
 
-#include <QtTest/QtTest>
+#include <QProcess>
 #include <QTextStream>
 
-#include "config.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/instrtemplate.h"
-#include "libmscore/musescoreCore.h"
+#include "io/file.h"
 
+#include "engraving/dom/masterscore.h"
+#include "engraving/engravingerrors.h"
 #include "engraving/compat/mscxcompat.h"
 #include "engraving/compat/scoreaccess.h"
 #include "engraving/compat/writescorehook.h"
+#include "engraving/infrastructure/localfileinfoprovider.h"
+#include "engraving/rw/rwregister.h"
 
+#include "log.h"
+
+using namespace mu;
+using namespace muse::io;
 using namespace mu::engraving;
 
-namespace Ms {
-}
-
-namespace Ms {
-MTest::MTest()
-{
-    MScore::testMode = true;
-}
-
+namespace mu::engraving {
 MasterScore* MTest::readScore(const QString& name)
 {
-    QString path = root + "/" + name;
-    MasterScore* score = compat::ScoreAccess::createMasterScoreWithBaseStyle();
-    QFileInfo fi(path);
-    score->setName(fi.completeBaseName());
-    QString csl  = fi.suffix().toLower();
+    muse::io::path_t path = root + "/" + name;
+    MasterScore* score = compat::ScoreAccess::createMasterScoreWithBaseStyle(nullptr);
+    score->setFileInfoProvider(std::make_shared<LocalFileInfoProvider>(path));
+    std::string suffix = muse::io::suffix(path);
 
     ScoreLoad sl;
-    Score::FileError rv;
-    if (csl == "mscz" || csl == "mscx") {
-        rv = compat::loadMsczOrMscx(score, path, false);
+    muse::Ret ret;
+    if (suffix == "mscz" || suffix == "mscx") {
+        ret = compat::loadMsczOrMscx(score, path, false);
     } else {
-        rv = Score::FileError::FILE_UNKNOWN_TYPE;
+        ret = make_ret(Err::FileUnknownType, path);
     }
 
-    if (rv != Score::FileError::FILE_NO_ERROR) {
-        QWARN(qPrintable(QString("readScore: cannot load <%1> type <%2>\n").arg(path).arg(csl)));
+    if (!ret) {
+        LOGE() << ret.text();
         delete score;
-        score = 0;
+        score = nullptr;
     } else {
         for (Score* s : score->scoreList()) {
             s->doLayout();
         }
     }
+
     return score;
 }
 
 bool MTest::saveScore(Score* score, const QString& name) const
 {
-    QFile file(name);
+    File file(name);
     if (file.exists()) {
         file.remove();
     }
 
-    if (!file.open(QIODevice::ReadWrite)) {
+    if (!file.open(IODevice::ReadWrite)) {
         return false;
     }
-    compat::WriteScoreHook hook;
-    return score->writeScore(&file, false, false, hook);
+
+    return rw::RWRegister::writer(score->iocContext())->writeScore(score, &file, false);
 }
 
 bool MTest::compareFilesFromPaths(const QString& f1, const QString& f2)
@@ -96,13 +93,12 @@ bool MTest::compareFilesFromPaths(const QString& f1, const QString& f2)
     args.append(f2);
     args.append(f1);
     QProcess p;
-    qDebug() << "Running " << cmd << " with arg1: " << QFileInfo(f2).fileName() << " and arg2: "
-             << QFileInfo(f1).fileName();
+    LOGD() << "Running " << cmd << " with arg1: " << f2 << " and arg2: " << f1;
     p.start(cmd, args);
     if (!p.waitForFinished() || p.exitCode()) {
         QByteArray ba = p.readAll();
-        //qDebug("%s", qPrintable(ba));
-        //qDebug("   <diff -u %s %s failed", qPrintable(compareWith),
+        //LOGD("%s", qPrintable(ba));
+        //LOGD("   <diff -u %s %s failed", qPrintable(compareWith),
         //   qPrintable(QString(root + "/" + saveName)));
         QTextStream outputText(stdout);
         outputText << QString(ba);
@@ -125,15 +121,8 @@ bool MTest::saveCompareScore(Score* score, const QString& saveName, const QStrin
     return compareFiles(saveName, compareWith);
 }
 
-void MTest::initMTest(const QString& rootDir)
+void MTest::setRootDir(const QString& rootDir)
 {
-    MScore::noGui = true;
-
-    mscore = new MScore;
-    new MuseScoreCore;
-    mscore->init();
-
     root = rootDir;
-    loadInstrumentTemplates(":/data/instruments.xml");
 }
 }

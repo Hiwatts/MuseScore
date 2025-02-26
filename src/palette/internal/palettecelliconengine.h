@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,13 +28,17 @@
 
 #include "modularity/ioc.h"
 #include "ipaletteconfiguration.h"
-#include "ui/iuiconfiguration.h"
+#include "engraving/rendering/isinglerenderer.h"
+
+namespace muse::draw {
+class Painter;
+}
 
 namespace mu::palette {
 class PaletteCellIconEngine : public QIconEngine
 {
-    INJECT_STATIC(palette, IPaletteConfiguration, configuration)
-    INJECT_STATIC(palette, ui::IUiConfiguration, uiConfiguration)
+    INJECT_STATIC(IPaletteConfiguration, configuration)
+    INJECT_STATIC(engraving::rendering::ISingleRenderer, engravingRender)
 
 public:
     explicit PaletteCellIconEngine(PaletteCellConstPtr cell, qreal extraMag = 1.0);
@@ -43,14 +47,9 @@ public:
 
     void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode, QIcon::State state) override;
 
-    static void paintPaletteElement(void* data, Ms::EngravingItem* element);
-
 private:
-    void paintCell(draw::Painter& painter, const RectF& rect, bool selected, bool current) const;
-    void paintBackground(draw::Painter& painter, const RectF& rect, bool selected, bool current) const;
-    void paintActionIcon(draw::Painter& painter, const RectF& rect, Ms::EngravingItem* element) const;
-    qreal paintStaff(draw::Painter& painter, const RectF& rect, qreal spatium) const;
-    void paintScoreElement(draw::Painter& painter, Ms::EngravingItem* element, qreal spatium, bool alignToStaff) const;
+    void paintCell(muse::draw::Painter& painter, const muse::RectF& rect, bool selected, bool current, qreal dpi) const;
+    void paintBackground(muse::draw::Painter& painter, const muse::RectF& rect, bool selected, bool current) const;
 
     PaletteCellConstPtr m_cell;
     qreal m_extraMag = 1.0;

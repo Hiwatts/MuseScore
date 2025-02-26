@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,32 +22,36 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
+import Muse.Dock 1.0
 import MuseScore.AppShell 1.0
-import MuseScore.Dock 1.0
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 import "./HomePage"
 import "./NotationPage"
 import "./PublishPage"
 import "./DevTools"
-import "./dockwindow"
 
 DockWindow {
     id: root
 
     objectName: "WindowContent"
 
-    property var provider: InteractiveProvider {
+    onPageLoaded: {
+        interactiveProvider.onPageOpened()
+    }
+
+    InteractiveProvider {
+        id: interactiveProvider
         topParent: root
 
-        onRequestedDockPage: {
-            root.loadPage(uri)
+        onRequestedDockPage: function(uri, params) {
+            root.loadPage(uri, params)
         }
     }
 
-    property NavigationSection topToolKeyNavSec: NavigationSection {
-        id: keynavSec
+    NavigationSection {
+        id: topToolbarKeyNavSec
         name: "TopTool"
         order: 1
     }
@@ -59,13 +63,14 @@ DockWindow {
             objectName: "mainToolBar"
             title: qsTrc("appshell", "Main toolbar")
 
-            width: root.width / 2
-            minimumWidth: 304
+            floatable: false
+            closable: false
 
-            movable: false
+            navigationSection: topToolbarKeyNavSec
 
-            contentComponent: MainToolBar {
-                navigation.section: root.topToolKeyNavSec
+            MainToolBar {
+                id: toolBar
+                navigation.section: mainToolBar.navigationSection
                 navigation.order: 1
 
                 currentUri: root.currentPageUri
@@ -76,29 +81,28 @@ DockWindow {
                     }
                 }
 
-                onSelected: {
+                onSelected: function(uri) {
                     api.launcher.open(uri)
+                }
+
+                Component.onCompleted: {
+                    toolBar.focusOnFirst()
                 }
             }
         }
     ]
 
-    mainToolBarDockingHolder: DockToolBarHolder {
-        objectName: root.objectName + "_mainToolBarDockingHolderTop"
-        location: DockBase.Top
-
-        Rectangle { color: ui.theme.backgroundPrimaryColor }
-    }
-
     pages: [
-        HomePage {},
+        HomePage {
+            window: root.window
+        },
 
         NotationPage {
-            topToolKeyNavSec: root.topToolKeyNavSec
+            topToolbarKeyNavSec: topToolbarKeyNavSec
         },
 
         PublishPage {
-            topToolKeyNavSec: root.topToolKeyNavSec
+            topToolbarKeyNavSec: topToolbarKeyNavSec
         },
 
         DevToolsPage {}

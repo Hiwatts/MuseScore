@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,24 +25,21 @@
 #include "project/inotationwriter.h"
 
 namespace mu::iex::imagesexport {
-class AbstractImageWriter : public project::INotationWriter
+class AbstractImageWriter : public project::INotationWriter, public muse::Injectable
 {
 public:
-    AbstractImageWriter() = default;
-    virtual ~AbstractImageWriter() = default;
+    AbstractImageWriter(const muse::modularity::ContextPtr& iocCtx)
+        : muse::Injectable(iocCtx) {}
 
     std::vector<UnitType> supportedUnitTypes() const override;
     bool supportsUnitType(UnitType unitType) const override;
 
-    Ret write(notation::INotationPtr notation, io::Device& destinationDevice, const Options& options = Options()) override;
-    Ret writeList(const notation::INotationPtrList& notations, io::Device& destinationDevice, const Options& options = Options()) override;
-
-    void abort() override;
-    framework::ProgressChannel progress() const override;
+    muse::Ret write(notation::INotationPtr notation, muse::io::IODevice& dstDevice, const Options& options = Options()) override;
+    muse::Ret writeList(const notation::INotationPtrList& notations, muse::io::IODevice& dstDevice,
+                        const Options& options = Options()) override;
 
 protected:
     UnitType unitTypeFromOptions(const Options& options) const;
-    framework::ProgressChannel m_progress;
 };
 }
 

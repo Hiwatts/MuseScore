@@ -24,25 +24,18 @@
 
 #include "log.h"
 
-using namespace mu::vst;
-using namespace mu::audio;
-using namespace mu::audio::synth;
+using namespace muse::vst;
+using namespace muse::audio;
+using namespace muse::audio::synth;
 
-ISynthesizerPtr VstiResolver::resolveSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const
+ISynthesizerPtr VstiResolver::resolveSynth(const muse::audio::TrackId trackId, const muse::audio::AudioInputParams& params) const
 {
-    SynthPair& pair = m_synthMap[trackId];
+    return createSynth(trackId, params);
+}
 
-    if (pair.first == params.resourceMeta.id) {
-        return pair.second;
-    }
-
-    if (pair.second) {
-        pluginsRegister()->unregisterInstrPlugin(trackId, pair.first);
-    }
-
-    pair.second = createSynth(trackId, params);
-
-    return pair.second;
+bool VstiResolver::hasCompatibleResources(const muse::audio::PlaybackSetupData& /*setup*/) const
+{
+    return true;
 }
 
 void VstiResolver::refresh()
@@ -50,20 +43,13 @@ void VstiResolver::refresh()
     pluginModulesRepo()->refresh();
 }
 
-VstSynthPtr VstiResolver::createSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const
+VstSynthPtr VstiResolver::createSynth(const muse::audio::TrackId trackId, const muse::audio::AudioInputParams& params) const
 {
-    PluginModulePtr modulePtr = pluginModulesRepo()->pluginModule(params.resourceMeta.id);
-
-    IF_ASSERT_FAILED(modulePtr) {
+    if (!pluginModulesRepo()->exists(params.resourceMeta.id)) {
         return nullptr;
     }
 
-    VstPluginPtr pluginPtr = std::make_shared<VstPlugin>(modulePtr);
-    pluginsRegister()->registerInstrPlugin(trackId, params.resourceMeta.id, pluginPtr);
-
-    pluginPtr->load();
-
-    std::shared_ptr<VstSynthesiser> synth = std::make_shared<VstSynthesiser>(std::move(pluginPtr), params);
+    auto synth = std::make_shared<VstSynthesiser>(trackId, params, iocContext());
     synth->init();
 
     return synth;
@@ -72,4 +58,14 @@ VstSynthPtr VstiResolver::createSynth(const audio::TrackId trackId, const audio:
 AudioResourceMetaList VstiResolver::resolveResources() const
 {
     return pluginModulesRepo()->instrumentModulesMeta();
+}
+
+SoundPresetList VstiResolver::resolveSoundPresets(const muse::audio::AudioResourceMeta&) const
+{
+    return SoundPresetList();
+}
+
+void VstiResolver::clearSources()
+{
+    instancesRegister()->unregisterAllInstrPlugin();
 }

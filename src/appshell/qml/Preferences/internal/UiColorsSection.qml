@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,37 +20,39 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Preferences 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "UI colors")
+    title: qsTrc("appshell/preferences", "UI colors")
     navigation.direction: NavigationPanel.Both
 
     signal colorChangeRequested(var newColor, var propertyType)
 
     GridLayout {
         id: grid
+        width: parent.width
 
-        columnSpacing: parent.width / 8
-        rowSpacing: 20
+        columnSpacing: root.columnSpacing
+        rowSpacing: root.rowSpacing
         columns: 2
 
         Repeater {
-
             model: [
-                { textRole: "Accent color:", colorRole: ui.theme.accentColor, typeRole: AppearancePreferencesModel.AccentColor},
-                { textRole: "Text and icons:", colorRole: ui.theme.fontPrimaryColor, typeRole: AppearancePreferencesModel.TextAndIconsColor},
-                { textRole: "Disabled text:", colorRole: "#000000", typeRole: AppearancePreferencesModel.DisabledColor},
-                { textRole: "Border color:", colorRole: ui.theme.strokeColor, typeRole: AppearancePreferencesModel.BorderColor}
+                { textRole: qsTrc("appshell/preferences", "Accent color:"), colorRole: ui.theme.accentColor, typeRole: AppearancePreferencesModel.AccentColor},
+                { textRole: qsTrc("appshell/preferences", "Text and icons:"), colorRole: ui.theme.fontPrimaryColor, typeRole: AppearancePreferencesModel.TextAndIconsColor},
+                { textRole: qsTrc("appshell/preferences", "Disabled text:"), colorRole: "#000000", typeRole: AppearancePreferencesModel.DisabledColor},
+                { textRole: qsTrc("appshell/preferences", "Border color:"), colorRole: ui.theme.strokeColor, typeRole: AppearancePreferencesModel.BorderColor}
             ]
 
             delegate: Row {
+                Layout.preferredWidth: (grid.width - grid.columnSpacing) / 2
+                spacing: root.columnSpacing
 
                 StyledTextLabel {
                     id: titleLabel
@@ -70,7 +72,7 @@ BaseSection {
                     navigation.column: index % grid.columns
                     navigation.accessible.name: titleLabel.text
 
-                    onNewColorSelected: {
+                    onNewColorSelected: function(newColor) {
                         root.colorChangeRequested(newColor, modelData.typeRole)
                     }
                 }

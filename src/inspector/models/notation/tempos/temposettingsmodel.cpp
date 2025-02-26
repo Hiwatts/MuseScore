@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,48 +27,66 @@
 
 using namespace mu::inspector;
 
-TempoSettingsModel::TempoSettingsModel(QObject* parent, IElementRepositoryService* repository)
+TempoSettingsModel::TempoSettingsModel(QObject* parent, IElementRepositoryService* repository, InspectorModelType modelType)
     : AbstractInspectorModel(parent, repository)
 {
-    setModelType(InspectorModelType::TYPE_TEMPO);
-    setTitle(qtrc("inspector", "Tempo"));
-    setIcon(ui::IconCode::Code::METRONOME);
+    Q_ASSERT(modelType == InspectorModelType::TYPE_TEMPO
+             || modelType == InspectorModelType::TYPE_A_TEMPO
+             || modelType == InspectorModelType::TYPE_TEMPO_PRIMO
+             );
+
+    setModelType(modelType);
+
+    switch (modelType) {
+    case InspectorModelType::TYPE_TEMPO:
+        setTitle(muse::qtrc("inspector", "Tempo"));
+        break;
+    case InspectorModelType::TYPE_A_TEMPO:
+        setTitle(muse::qtrc("inspector", "A tempo"));
+        break;
+    case InspectorModelType::TYPE_TEMPO_PRIMO:
+        setTitle(muse::qtrc("inspector", "Tempo primo"));
+        break;
+    default:
+        break;
+    }
+
+    setIcon(muse::ui::IconCode::Code::METRONOME);
     createProperties();
 }
 
 void TempoSettingsModel::createProperties()
 {
-    m_isDefaultTempoForced = buildPropertyItem(Ms::Pid::TEMPO_FOLLOW_TEXT, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_isFollowText
+        = buildPropertyItem(mu::engraving::Pid::TEMPO_FOLLOW_TEXT, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         emit requestReloadPropertyItems();
     });
 
-    m_tempo = buildPropertyItem(Ms::Pid::TEMPO);
+    m_tempo = buildPropertyItem(mu::engraving::Pid::TEMPO);
 }
 
 void TempoSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::TEMPO_TEXT);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::TEMPO_TEXT);
 }
 
 void TempoSettingsModel::loadProperties()
 {
-    loadPropertyItem(m_isDefaultTempoForced);
-    loadPropertyItem(m_tempo, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
+    loadPropertyItem(m_isFollowText);
+    loadPropertyItem(m_tempo, formatDoubleFunc);
 }
 
 void TempoSettingsModel::resetProperties()
 {
-    m_isDefaultTempoForced->resetToDefault();
+    m_isFollowText->resetToDefault();
     m_tempo->resetToDefault();
 }
 
-PropertyItem* TempoSettingsModel::isDefaultTempoForced() const
+PropertyItem* TempoSettingsModel::isFollowText() const
 {
-    return m_isDefaultTempoForced;
+    return m_isFollowText;
 }
 
 PropertyItem* TempoSettingsModel::tempo() const

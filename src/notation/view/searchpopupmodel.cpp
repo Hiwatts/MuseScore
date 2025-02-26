@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -34,9 +34,10 @@ void SearchPopupModel::load()
 
 void SearchPopupModel::search(const QString& text)
 {
-    Ms::EngravingItem* element = notation()->elements()->search(text.toStdString());
+    mu::engraving::EngravingItem* element = notation()->elements()->search(text.toStdString());
     if (element) {
         notation()->interaction()->select({ element }, SelectType::SINGLE);
+        notation()->interaction()->showItem(element);
     } else {
         notation()->interaction()->clearSelection();
     }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,9 +29,10 @@
  */
 
 #include <QRegularExpression>
-#include <QDebug>
 
 #include "lexer.h"
+
+#include "log.h"
 
 namespace Bww {
 /**
@@ -41,9 +42,9 @@ namespace Bww {
 Lexer::Lexer(QIODevice* inDevice)
     : in(inDevice),
     lineNumber(-1),
-    value(NONE)
+    value(QChar(NONE))
 {
-    qDebug() << "Lexer::Lexer() begin";
+    LOGD() << "Lexer::Lexer() begin";
 
     // Initialize the grace note translation table
 
@@ -332,9 +333,16 @@ Lexer::Lexer(QIODevice* inDevice)
     graceMap["tf"]  = "HA F";
     graceMap["thg"] = "HA HG";
 
+    // piobraich
+    graceMap["endari"] = "E LA F LA";
+    graceMap["embari"] = "E LG F LG";
+    graceMap["dare"]   = "F E HG E";
+    graceMap["crunl"]  = "LG D LG E LA F LA";
+    graceMap["crunlb"] = "LG B LG E LA F LA";
+
     getSym();
 
-    qDebug() << "Lexer::Lexer() end";
+    LOGD() << "Lexer::Lexer() end";
 }
 
 /**
@@ -343,7 +351,7 @@ Lexer::Lexer(QIODevice* inDevice)
 
 void Lexer::getSym()
 {
-    qDebug() << "Lexer::getSym()";
+    LOGD() << "Lexer::getSym()";
 
     // if unparsed words remaining, use these
     if (list.size() > 0) {
@@ -358,14 +366,14 @@ void Lexer::getSym()
         ++lineNumber;
         if (line.isNull()) {
             // end of file
-            qDebug() << "-> end of file";
+            LOGD() << "-> end of file";
             type = NONE;
             value = "";
             return;
         }
     }while (line == "");
 
-    qDebug() << "getSym: read line" << line;
+    LOGD() << "getSym: read line" << line;
     QRegularExpression rHeaderIgnore("^Bagpipe Reader|^MIDINoteMappings|^FrequencyMappings"
                                      "|^InstrumentMappings|^GracenoteDurations|^FontSizes"
                                      "|^TuneFormat");
@@ -373,7 +381,7 @@ void Lexer::getSym()
     if (rHeaderIgnore.match(line).capturedStart() == 0) {
         type = COMMENT;
         value = "";
-        qDebug()
+        LOGD()
             << "-> header ignore,"
             << "type:" << symbolToString(type)
             << "value:" << value
@@ -383,7 +391,7 @@ void Lexer::getSym()
     } else if (rTuneTempo.match(line).capturedStart() == 0) {
         type = TEMPO;
         value = line;
-        qDebug()
+        LOGD()
             << "-> tempo,"
             << "type:" << symbolToString(type)
             << "value:" << value
@@ -393,7 +401,7 @@ void Lexer::getSym()
     } else if (line.at(0) == '"') {
         type = STRING;
         value = line;
-        qDebug()
+        LOGD()
             << "-> quoted string,"
             << "type:" << symbolToString(type)
             << "value:" << value
@@ -402,7 +410,7 @@ void Lexer::getSym()
     } else {
         // split line into space-separated words
         list = line.trimmed().split(QRegularExpression("\\s+"));
-        qDebug()
+        LOGD()
             << "-> words"
             << list
         ;
@@ -436,7 +444,7 @@ QString Lexer::symValue() const
 
 void Lexer::categorizeWord(QString word)
 {
-    qDebug() << "Lexer::categorizeWord(" << word << ")";
+    LOGD() << "Lexer::categorizeWord(" << word << ")";
 
     // default values
     type = NONE;
@@ -477,7 +485,7 @@ void Lexer::categorizeWord(QString word)
         type = UNKNOWN;
     }
 
-    qDebug()
+    LOGD()
         << " type: " << qPrintable(symbolToString(type))
         << " value: '" << qPrintable(value) << "'"
     ;

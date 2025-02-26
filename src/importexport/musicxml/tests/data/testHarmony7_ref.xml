@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <identification>
     <encoding>
       <software>MuseScore 0.7.0</software>
@@ -54,6 +54,7 @@
           <line>5</line>
           </clef>
         <staff-details number="2">
+          <staff-type>alternate</staff-type>
           <staff-lines>6</staff-lines>
           <staff-tuning line="1">
             <tuning-step>E</tuning-step>

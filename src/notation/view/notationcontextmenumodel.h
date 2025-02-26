@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,28 +22,52 @@
 #ifndef MU_NOTATION_NOTATIONCONTEXTMENUMODEL_H
 #define MU_NOTATION_NOTATIONCONTEXTMENUMODEL_H
 
-#include "ui/view/abstractmenumodel.h"
+#include "modularity/ioc.h"
+#include "context/iglobalcontext.h"
+
+#include "uicomponents/view/abstractmenumodel.h"
 #include "notation/notationtypes.h"
 
 namespace mu::notation {
-class NotationContextMenuModel : public ui::AbstractMenuModel
+class NotationContextMenuModel : public muse::uicomponents::AbstractMenuModel
 {
     Q_OBJECT
+
+    INJECT(context::IGlobalContext, globalContext)
 
 public:
     Q_INVOKABLE void loadItems(int elementType);
 
 private:
-    ui::MenuItemList itemsByElementType(ElementType type) const;
+    muse::uicomponents::MenuItemList makeItemsByElementType(ElementType type);
 
-    ui::MenuItemList pageItems() const;
-    ui::MenuItemList defaultCopyPasteItems() const;
-    ui::MenuItemList measureItems() const;
-    ui::MenuItemList staffTextItems() const;
-    ui::MenuItemList systemTextItems() const;
-    ui::MenuItemList timeSignatureItems() const;
-    ui::MenuItemList selectItems() const;
-    ui::MenuItemList elementItems() const;
+    muse::uicomponents::MenuItemList makePageItems();
+    muse::uicomponents::MenuItemList makeDefaultCopyPasteItems();
+    muse::uicomponents::MenuItemList makeMeasureItems();
+    muse::uicomponents::MenuItemList makeStaffTextItems();
+    muse::uicomponents::MenuItemList makeSystemTextItems();
+    muse::uicomponents::MenuItemList makeTimeSignatureItems();
+    muse::uicomponents::MenuItemList makeInstrumentNameItems();
+    muse::uicomponents::MenuItemList makeHarmonyItems();
+    muse::uicomponents::MenuItemList makeSelectItems();
+    muse::uicomponents::MenuItemList makeElementItems();
+    muse::uicomponents::MenuItemList makeInsertMeasuresItems();
+    muse::uicomponents::MenuItemList makeMoveMeasureItems();
+    muse::uicomponents::MenuItemList makeChangeInstrumentItems();
+    muse::uicomponents::MenuItemList makeVerticalBoxItems();
+    muse::uicomponents::MenuItemList makeHorizontalBoxItems();
+    muse::uicomponents::MenuItemList makeHairpinItems();
+    muse::uicomponents::MenuItemList makeGradualTempoChangeItems();
+
+    bool isSingleSelection() const;
+    bool canSelectSimilarInRange() const;
+    bool canSelectSimilar() const;
+    bool isDrumsetStaff() const;
+
+    INotationInteractionPtr interaction() const;
+    INotationSelectionPtr selection() const;
+
+    const INotationInteraction::HitElementContext& hitElementContext() const;
 };
 }
 

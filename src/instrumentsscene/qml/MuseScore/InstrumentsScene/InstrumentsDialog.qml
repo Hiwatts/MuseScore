@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 StyledDialogView {
@@ -36,11 +36,33 @@ StyledDialogView {
     contentWidth: root.canSelectMultipleInstruments ? 900 : 600
     margins: 12
 
-    title: canSelectMultipleInstruments ? qsTrc("instruments", "Instruments") :
+    title: canSelectMultipleInstruments ? qsTrc("instruments", "Add or remove instruments") :
                                           qsTrc("instruments", "Select instrument")
+
+    onNavigationActivateRequested: {
+        instrumentsPage.focusOnFirst()
+    }
+
+    function submit() {
+        var result = {}
+        result["instruments"] = instrumentsPage.instruments()
+        result["scoreOrder"] = instrumentsPage.currentOrder()
+
+        root.ret = { errcode: 0, value: result }
+        root.hide()
+    }
+
+    Component.onCompleted: {
+        theInstrumentsOnScoreModel.load()
+    }
+
+    InstrumentsOnScoreListModel {
+        id: theInstrumentsOnScoreModel
+    }
 
     ColumnLayout {
         anchors.fill: parent
+        spacing: 20
 
         ChooseInstrumentsPage {
             id: instrumentsPage
@@ -50,31 +72,58 @@ StyledDialogView {
 
             canSelectMultipleInstruments: root.canSelectMultipleInstruments
             currentInstrumentId: root.currentInstrumentId
-        }
 
-        Row {
-            Layout.alignment: Qt.AlignTrailing
-            spacing: 8
+            navigationSection: root.navigationSection
 
-            FlatButton {
-                text: qsTrc("global", "Cancel")
-
-                onClicked: {
-                    root.reject()
-                }
+            onSubmitRequested: {
+                root.submit()
             }
 
-            FlatButton {
-                text: qsTrc("global", "OK")
-                enabled: instrumentsPage.hasSelectedInstruments
+            instrumentsOnScoreModel: theInstrumentsOnScoreModel
+        }
 
-                onClicked: {
-                    var result = {}
-                    result["instruments"] = instrumentsPage.instruments()
-                    result["scoreOrder"] = instrumentsPage.currentOrder()
+        RowLayout {
+            spacing: 12
 
-                    root.ret = { errcode: 0, value: result }
-                    root.hide()
+            StyledTextLabel {
+                id: descriptionLabel
+                text: instrumentsPage.description
+
+                Layout.fillWidth: true
+                Layout.maximumHeight: buttonBox.height
+
+                font: ui.theme.bodyFont
+                opacity: 0.7
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.Wrap
+            }
+
+            ButtonBox {
+                id: buttonBox
+
+                Layout.preferredWidth: implicitWidth
+
+                buttons: [ ButtonBoxModel.Cancel ]
+
+                navigationPanel.section: root.navigationSection
+                navigationPanel.order: 100
+
+                FlatButton {
+                    text: qsTrc("global", "OK")
+                    buttonRole: ButtonBoxModel.AcceptRole
+                    buttonId: ButtonBoxModel.Ok
+                    enabled: instrumentsPage.hasSelectedInstruments
+                    accentButton: true
+
+                    onClicked: {
+                        root.submit()
+                    }
+                }
+
+                onStandardButtonClicked: function(buttonId) {
+                    if (buttonId === ButtonBoxModel.Cancel) {
+                        root.reject()
+                    }
                 }
             }
         }

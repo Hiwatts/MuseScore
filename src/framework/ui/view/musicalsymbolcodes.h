@@ -20,12 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UI_MUSICALSYMBOLCODE_H
-#define MU_UI_MUSICALSYMBOLCODE_H
+#ifndef MUSE_UI_MUSICALSYMBOLCODE_H
+#define MUSE_UI_MUSICALSYMBOLCODE_H
 
 #include <QObject>
 
-namespace mu::ui {
+namespace muse::ui {
 /**
  * @brief The MusicalSymbolCodes class simplifies access to the icons from the musical font
  *
@@ -69,6 +69,7 @@ public:
         NOTEHEAD_LARGE_ARROW = 0xE0F0,
 
         NOTEHEAD_SLASH = 0xE101,
+        NOTEHEAD_LARGE_DIAMOND = 0xE104,
         NOTEHEAD_SOL = 0xE1B1,
         NOTEHEAD_LA = 0xE1B3,
         NOTEHEAD_FA = 0xE1B5,
@@ -77,6 +78,9 @@ public:
         NOTEHEAD_RE = 0xE1BD,
         NOTEHEAD_TI = 0xE1BF,
 
+        NOTEHEAD_HEAVY_CROSS = 0xE0FA,
+        NOTEHEAD_HEAVY_CROSS_HAT = 0xE0F9,
+
         SEMIBREVE = 0xE1D2,
         MINIM = 0xE1D3,
         CROTCHET = 0xE1D5,
@@ -84,6 +88,16 @@ public:
         SEMIQUAVER = 0xE1D9,
         DEMISEMIQUAVER = 0xE1DB,
         DOT = 0xE1E7,
+
+        MENSURAL_PROLATION_1 = 0xE910,
+        MENSURAL_PROLATION_2 = 0xE911,
+        MENSURAL_PROLATION_3 = 0xE912,
+        MENSURAL_PROLATION_4 = 0xE913,
+        MENSURAL_PROLATION_5 = 0xE914,
+        MENSURAL_PROLATION_7 = 0xE916,
+        MENSURAL_PROLATION_8 = 0xE917,
+        MENSURAL_PROLATION_10 = 0xE919,
+        MENSURAL_PROLATION_11 = 0xE91A,
 
         NOTEHEAD_BREVIS_ALT = 0xF43F,
 
@@ -105,4 +119,4 @@ inline QString musicalSymbolToString(MusicalSymbolCodes::Code symbolCode, bool w
 }
 }
 
-#endif // MU_UI_MUSICALSYMBOLCODE_H
+#endif // MUSE_UI_MUSICALSYMBOLCODE_H

@@ -22,10 +22,10 @@
 
 #include "filepickermodel.h"
 
-using namespace mu::uicomponents;
+using namespace muse::uicomponents;
 
 FilePickerModel::FilePickerModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
@@ -39,21 +39,49 @@ QString FilePickerModel::dir() const
     return m_dir;
 }
 
-QString FilePickerModel::filter() const
+QStringList FilePickerModel::filter() const
 {
     return m_filter;
 }
 
 QString FilePickerModel::selectFile()
 {
-    io::path file = interactive()->selectOpeningFile(m_title, m_dir, m_filter);
+    std::vector<std::string> filter;
+    for (const QString& nameFilter : m_filter) {
+        filter.push_back(nameFilter.toStdString());
+    }
+
+    io::path_t file = interactive()->selectOpeningFile(m_title, m_dir, filter);
+
+    if (!file.empty()) {
+        m_dir = io::dirpath(file).toQString();
+    }
+
     return file.toQString();
 }
 
 QString FilePickerModel::selectDirectory()
 {
-    io::path directory = interactive()->selectDirectory(m_title, m_dir);
+    io::path_t directory = interactive()->selectDirectory(m_title, m_dir);
+
+    if (!directory.empty()) {
+        m_dir = directory.toQString();
+    }
+
     return directory.toQString();
+}
+
+QString FilePickerModel::selectMultipleDirectories(const QString& selectedDirectoriesStr)
+{
+    io::paths_t selectedDirectories = io::pathsFromString(selectedDirectoriesStr.toStdString());
+    io::paths_t directories = interactive()->selectMultipleDirectories(m_title, m_dir, selectedDirectories);
+
+    QStringList result;
+    for (const io::path_t& dir: directories) {
+        result << dir.toQString();
+    }
+
+    return result.join(";");
 }
 
 void FilePickerModel::setTitle(const QString& title)
@@ -76,7 +104,7 @@ void FilePickerModel::setDir(const QString& dir)
     emit dirChanged(dir);
 }
 
-void FilePickerModel::setFilter(const QString& filter)
+void FilePickerModel::setFilter(const QStringList& filter)
 {
     if (filter == m_filter) {
         return;

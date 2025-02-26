@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,22 +29,23 @@
 #include "actions/iactionsdispatcher.h"
 
 namespace mu::inspector {
-class TextSettingsModel : public AbstractInspectorModel, public mu::async::Asyncable
+class TextSettingsModel : public AbstractInspectorModel
 {
     Q_OBJECT
 
-    INJECT(inspector, actions::IActionsDispatcher, dispatcher)
+    INJECT(muse::actions::IActionsDispatcher, dispatcher)
 
     Q_PROPERTY(PropertyItem * fontFamily READ fontFamily CONSTANT)
     Q_PROPERTY(PropertyItem * fontStyle READ fontStyle CONSTANT)
     Q_PROPERTY(PropertyItem * fontSize READ fontSize CONSTANT)
+    Q_PROPERTY(PropertyItem * textLineSpacing READ textLineSpacing CONSTANT)
     Q_PROPERTY(PropertyItem * horizontalAlignment READ horizontalAlignment CONSTANT)
     Q_PROPERTY(PropertyItem * verticalAlignment READ verticalAlignment CONSTANT)
 
     Q_PROPERTY(PropertyItem * isSizeSpatiumDependent READ isSizeSpatiumDependent CONSTANT)
     Q_PROPERTY(PropertyItem * frameType READ frameType CONSTANT)
     Q_PROPERTY(PropertyItem * frameBorderColor READ frameBorderColor CONSTANT)
-    Q_PROPERTY(PropertyItem * frameHighlightColor READ frameHighlightColor CONSTANT)
+    Q_PROPERTY(PropertyItem * frameFillColor READ frameFillColor CONSTANT)
     Q_PROPERTY(PropertyItem * frameThickness READ frameThickness CONSTANT)
     Q_PROPERTY(PropertyItem * frameMargin READ frameMargin CONSTANT)
     Q_PROPERTY(PropertyItem * frameCornerRadius READ frameCornerRadius CONSTANT)
@@ -53,9 +54,13 @@ class TextSettingsModel : public AbstractInspectorModel, public mu::async::Async
     Q_PROPERTY(PropertyItem * textPlacement READ textPlacement CONSTANT)
     Q_PROPERTY(PropertyItem * textScriptAlignment READ textScriptAlignment CONSTANT)
 
+    Q_PROPERTY(QVariantList textStyles READ textStyles NOTIFY textStylesChanged)
+
     Q_PROPERTY(bool areStaffTextPropertiesAvailable READ areStaffTextPropertiesAvailable NOTIFY areStaffTextPropertiesAvailableChanged)
     Q_PROPERTY(
         bool isSpecialCharactersInsertionAvailable READ isSpecialCharactersInsertionAvailable NOTIFY isSpecialCharactersInsertionAvailableChanged)
+    Q_PROPERTY(bool isDynamicSpecificSettings READ isDynamicSpecificSettings NOTIFY isDynamicSpecificSettingsChanged)
+    Q_PROPERTY(bool isHorizontalAlignmentAvailable READ isHorizontalAlignmentAvailable NOTIFY isHorizontalAlignmentAvailableChanged)
 
 public:
     explicit TextSettingsModel(QObject* parent, IElementRepositoryService* repository);
@@ -68,16 +73,20 @@ public:
     void loadProperties() override;
     void resetProperties() override;
 
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
+
     PropertyItem* fontFamily() const;
     PropertyItem* fontStyle() const;
     PropertyItem* fontSize() const;
+    PropertyItem* textLineSpacing() const;
     PropertyItem* horizontalAlignment() const;
     PropertyItem* verticalAlignment() const;
 
     PropertyItem* isSizeSpatiumDependent() const;
     PropertyItem* frameType() const;
     PropertyItem* frameBorderColor() const;
-    PropertyItem* frameHighlightColor() const;
+    PropertyItem* frameFillColor() const;
     PropertyItem* frameThickness() const;
     PropertyItem* frameMargin() const;
     PropertyItem* frameCornerRadius() const;
@@ -86,35 +95,49 @@ public:
     PropertyItem* textPlacement() const;
     PropertyItem* textScriptAlignment() const;
 
-    bool areStaffTextPropertiesAvailable() const;
+    QVariantList textStyles();
 
+    bool areStaffTextPropertiesAvailable() const;
     bool isSpecialCharactersInsertionAvailable() const;
+    bool isDynamicSpecificSettings() const;
+    bool isHorizontalAlignmentAvailable() const;
 
 public slots:
     void setAreStaffTextPropertiesAvailable(bool areStaffTextPropertiesAvailable);
     void setIsSpecialCharactersInsertionAvailable(bool isSpecialCharactersInsertionAvailable);
+    void setIsDynamicSpecificSettings(bool isOnlyDynamics);
+    void setIsHorizontalAlignmentAvailable(bool isHorizontalAlignmentAvailable);
 
 signals:
+    void textStylesChanged();
+
     void areStaffTextPropertiesAvailableChanged(bool areStaffTextPropertiesAvailable);
     void isSpecialCharactersInsertionAvailableChanged(bool isSpecialCharactersInsertionAvailable);
+    void isDynamicSpecificSettingsChanged(bool isDynamicSpecificSettings);
+    void isHorizontalAlignmentAvailableChanged(bool isHorizontalAlignmentAvailable);
 
 private:
     bool isTextEditingStarted() const;
-    async::Notification isTextEditingChanged() const;
+    muse::async::Notification isTextEditingChanged() const;
 
     void updateFramePropertiesAvailability();
     void updateStaffPropertiesAvailability();
+    void updateIsDynamicSpecificSettings();
+    void updateIsHorizontalAlignmentAvailable();
+
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
 
     PropertyItem* m_fontFamily = nullptr;
     PropertyItem* m_fontStyle = nullptr;
     PropertyItem* m_fontSize = nullptr;
+    PropertyItem* m_textLineSpacing = nullptr;
     PropertyItem* m_horizontalAlignment = nullptr;
     PropertyItem* m_verticalAlignment = nullptr;
 
     PropertyItem* m_isSizeSpatiumDependent = nullptr;
     PropertyItem* m_frameType = nullptr;
     PropertyItem* m_frameBorderColor = nullptr;
-    PropertyItem* m_frameHighlightColor = nullptr;
+    PropertyItem* m_frameFillColor = nullptr;
     PropertyItem* m_frameThickness = nullptr;
     PropertyItem* m_frameMargin = nullptr;
     PropertyItem* m_frameCornerRadius = nullptr;
@@ -123,8 +146,12 @@ private:
     PropertyItem* m_textPlacement = nullptr;
     PropertyItem* m_textScriptAlignment = nullptr;
 
+    QVariantList m_textStyles;
+
     bool m_areStaffTextPropertiesAvailable = false;
     bool m_isSpecialCharactersInsertionAvailable = false;
+    bool m_isDynamicSpecificSettings = false;
+    bool m_isHorizontalAlignmentAvailable = true;
 };
 }
 

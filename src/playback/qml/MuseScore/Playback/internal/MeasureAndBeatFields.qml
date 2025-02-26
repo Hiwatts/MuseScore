@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,12 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.12
+import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
-RowLayout {
+Item {
     id: root
 
     property alias measureNumber: measureNumberField.value
@@ -34,54 +34,69 @@ RowLayout {
     property alias beatNumber: beatNumberField.value
     property alias maxBeatNumber: beatNumberField.maxValue
 
-    property var font: ui.theme.tabFont
+    property font font: ui.theme.largeBodyFont
 
     signal measureNumberEdited(var newValue)
     signal beatNumberEdited(var newValue)
 
-    spacing: 4
+    implicitWidth: contentRow.implicitWidth
+    implicitHeight: contentRow.implicitHeight
 
-    Item {
-        Layout.preferredWidth: 20
+    RowLayout {
+        id: contentRow
 
-        NumberInputField {
-            id: measureNumberField
+        anchors.centerIn: parent
 
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+        spacing: 3
 
-            minValue: 1
-            addLeadingZeros: false
+        Item {
+            //! NOTE: explicit width prevents the content from jumping around
+            // when a score is being played
+            // See: https://github.com/musescore/MuseScore/issues/9633
+            Layout.preferredWidth: 26
 
-            font: root.font
+            NumberInputField {
+                id: measureNumberField
 
-            onValueEdited: {
-                root.measureNumberEdited(newValue)
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+
+                minValue: 1
+                addLeadingZeros: false
+
+                font: root.font
+
+                onValueEdited: function(newValue) {
+                    root.measureNumberEdited(newValue)
+                }
             }
         }
-    }
 
-    StyledTextLabel {
-        text: "."
-        font: root.font
-    }
-
-    Item {
-        Layout.preferredWidth: 10
-
-        NumberInputField {
-            id: beatNumberField
-
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-
-            minValue: 1
-            addLeadingZeros: false
-
+        StyledTextLabel {
+            text: "."
             font: root.font
+        }
 
-            onValueEdited: {
-                root.beatNumberEdited(newValue)
+        Item {
+            //! NOTE: explicit width prevents the content from jumping around
+            // when a score is being played
+            // See: https://github.com/musescore/MuseScore/issues/9633
+            Layout.preferredWidth: 20
+
+            NumberInputField {
+                id: beatNumberField
+
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+
+                minValue: 1
+                addLeadingZeros: false
+
+                font: root.font
+
+                onValueEdited: function(newValue) {
+                    root.beatNumberEdited(newValue)
+                }
             }
         }
     }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,25 +22,24 @@
 #include "aboutmodel.h"
 
 #include "translation.h"
-#include "version.h"
-#include "config.h"
 
+#include <QApplication>
 #include <QClipboard>
 #include <QUrl>
-#include <QApplication>
 
 using namespace mu::appshell;
 
 AboutModel::AboutModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
 QString AboutModel::museScoreVersion() const
 {
-    return (mu::framework::Version::unstable() ? qtrc("appshell",
-                                                      "Unstable Prerelease for %1") : "%1").arg(QString::fromStdString(configuration()->
-                                                                                                                       museScoreVersion()));
+    QString version = QString::fromStdString(configuration()->museScoreVersion());
+    return application()->unstable()
+           ? muse::qtrc("appshell/about", "Unstable prerelease for %1").arg(version)
+           : version;
 }
 
 QString AboutModel::museScoreRevision() const
@@ -51,46 +50,63 @@ QString AboutModel::museScoreRevision() const
 QVariantMap AboutModel::museScoreUrl() const
 {
     QUrl museScoreUrl(QString::fromStdString(configuration()->museScoreUrl()));
-    return makeUrl(museScoreUrl.toString(), museScoreUrl.host());
+    return makeUrl(museScoreUrl, false);
 }
 
 QVariantMap AboutModel::museScoreForumUrl() const
 {
-    QUrl museScoreUrl(QString::fromStdString(configuration()->museScoreForumUrl()));
-    return makeUrl(museScoreUrl.toString(), qtrc("appshell", "help"));
+    QUrl museScoreForumUrl(QString::fromStdString(configuration()->museScoreForumUrl()));
+    return makeUrl(museScoreForumUrl);
 }
 
 QVariantMap AboutModel::museScoreContributionUrl() const
 {
-    QUrl museScoreUrl(QString::fromStdString(configuration()->museScoreContributionUrl()));
-    return makeUrl(museScoreUrl.toString(), qtrc("appshell", "contribute"));
+    QUrl museScoreContributionUrl(QString::fromStdString(configuration()->museScoreContributionUrl()));
+    return makeUrl(museScoreContributionUrl);
+}
+
+QVariantMap AboutModel::museScorePrivacyPolicyUrl() const
+{
+    QUrl museScorePrivacyPolicyUrl(QString::fromStdString(updateConfiguration()->museScorePrivacyPolicyUrl()));
+    return makeUrl(museScorePrivacyPolicyUrl);
 }
 
 QVariantMap AboutModel::musicXMLLicenseUrl() const
 {
     QUrl musicXMLLicenseUrl(QString::fromStdString(configuration()->musicXMLLicenseUrl()));
-    return makeUrl(musicXMLLicenseUrl.toString(), musicXMLLicenseUrl.host() + musicXMLLicenseUrl.path());
+    return makeUrl(musicXMLLicenseUrl);
 }
 
 QVariantMap AboutModel::musicXMLLicenseDeedUrl() const
 {
     QUrl musicXMLLicenseDeedUrl(QString::fromStdString(configuration()->musicXMLLicenseDeedUrl()));
-    return makeUrl(musicXMLLicenseDeedUrl.toString(), musicXMLLicenseDeedUrl.host() + musicXMLLicenseDeedUrl.path());
+    return makeUrl(musicXMLLicenseDeedUrl);
 }
 
 void AboutModel::copyRevisionToClipboard() const
 {
-    QApplication::clipboard()->setText(QString(
-                                           "OS: %1, Arch.: %2, MuseScore version (%3-bit): %4-%5, revision: github-musescore-musescore-%6")
-                                       .arg(QSysInfo::prettyProductName()).arg(QSysInfo::currentCpuArchitecture()).arg(QSysInfo::WordSize)
-                                       .arg(VERSION).arg(BUILD_NUMBER).arg(MUSESCORE_REVISION));
+    QApplication::clipboard()->setText(
+        QString("OS: %1, Arch.: %2, MuseScore Studio version (%3-bit): %4-%5, revision: github-musescore-musescore-%6")
+        .arg(QSysInfo::prettyProductName()
+             + ((QSysInfo::productType() == "windows" && (QSysInfo::productVersion() == "10" || QSysInfo::productVersion() == "11"))
+                ? " or later" : ""))
+        .arg(QSysInfo::currentCpuArchitecture())
+        .arg(QSysInfo::WordSize)
+        .arg(application()->version().toString())
+        .arg(application()->build())
+        .arg(application()->revision()));
 }
 
-QVariantMap AboutModel::makeUrl(const QString& url, const QString& displayName) const
+void AboutModel::toggleDevMode()
+{
+    globalConfiguration()->setDevModeEnabled(!globalConfiguration()->devModeEnabled());
+}
+
+QVariantMap AboutModel::makeUrl(const QUrl& url, bool showPath) const
 {
     QVariantMap urlMap;
-    urlMap["url"] = url;
-    urlMap["displayName"] = displayName;
+    urlMap["url"] = url.toString();
+    urlMap["displayName"] = showPath ? url.host() + url.path() : url.host();
 
     return urlMap;
 }

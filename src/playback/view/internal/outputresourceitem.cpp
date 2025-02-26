@@ -4,16 +4,20 @@
 
 #include "log.h"
 #include "translation.h"
+#include "stringutils.h"
 
 using namespace mu::playback;
-using namespace mu::audio;
+using namespace muse;
+using namespace muse::audio;
 
 static const QString& NO_FX_MENU_ITEM_ID()
 {
-    static std::string id = mu::trc("playback", "No effect");
+    static std::string id = muse::trc("playback", "No effect");
     static QString resultStr = QString::fromStdString(id);
     return resultStr;
 }
+
+static const QString GET_MORE_EFFECTS("getMoreEffects");
 
 OutputResourceItem::OutputResourceItem(QObject* parent, const audio::AudioFxParams& params)
     : AbstractAudioResourceItem(parent),
@@ -43,7 +47,9 @@ void OutputResourceItem::requestAvailableResources()
                                 NO_FX_MENU_ITEM_ID(),
                                 m_currentFxParams.resourceMeta.id.empty());
 
-        result << buildSeparator();
+        if (!m_fxByVendorMap.empty()) {
+            result << buildSeparator();
+        }
 
         for (const auto& pair : m_fxByVendorMap) {
             const QString& vendor = QString::fromStdString(pair.first);
@@ -63,6 +69,9 @@ void OutputResourceItem::requestAvailableResources()
                                     subItems);
         }
 
+        result << buildSeparator();
+        result << buildExternalLinkMenuItem(GET_MORE_EFFECTS, muse::qtrc("playback", "Get more effects"));
+
         emit availableResourceListResolved(result);
     })
     .onReject(this, [](const int errCode, const std::string& errText) {
@@ -77,11 +86,16 @@ void OutputResourceItem::handleMenuItem(const QString& menuItemId)
     if (menuItemId == NO_FX_MENU_ITEM_ID()) {
         updateCurrentFxParams(AudioResourceMeta());
         return;
+    } else if (menuItemId == GET_MORE_EFFECTS) {
+        const QString url = QString::fromStdString(globalConfiguration()->museHubWebUrl());
+        const QString urlParams("plugins?utm_source=mss-mixer-fx&utm_medium=mh-fx&utm_campaign=mss-mixer-fx-mainpage");
+        interactive()->openUrl(url + urlParams);
+        return;
     }
 
     const AudioResourceId& newSelectedResourceId = menuItemId.toStdString();
 
-    for (auto& pair : m_fxByVendorMap) {
+    for (const auto& pair : m_fxByVendorMap) {
         for (const AudioResourceMeta& fxResourceMeta : pair.second) {
             if (newSelectedResourceId != fxResourceMeta.id) {
                 continue;
@@ -97,6 +111,32 @@ const AudioFxParams& OutputResourceItem::params() const
     return m_currentFxParams;
 }
 
+void OutputResourceItem::setParams(const audio::AudioFxParams& params)
+{
+    if (m_currentFxParams == params) {
+        return;
+    }
+
+    bool activeChanged = m_currentFxParams.active != params.active;
+    bool resourceChanged = m_currentFxParams.resourceMeta.id != params.resourceMeta.id;
+    bool blankChanged = m_currentFxParams.isValid() != params.isValid();
+
+    m_currentFxParams = params;
+    emit fxParamsChanged();
+
+    if (activeChanged) {
+        emit isActiveChanged();
+    }
+
+    if (resourceChanged) {
+        emit titleChanged();
+    }
+
+    if (blankChanged) {
+        emit isBlankChanged();
+    }
+}
+
 QString OutputResourceItem::title() const
 {
     return QString::fromStdString(m_currentFxParams.resourceMeta.id);
@@ -105,6 +145,11 @@ QString OutputResourceItem::title() const
 bool OutputResourceItem::isActive() const
 {
     return m_currentFxParams.active;
+}
+
+QString OutputResourceItem::id() const
+{
+    return QString::number(m_currentFxParams.chainOrder);
 }
 
 void OutputResourceItem::setIsActive(bool newIsActive)
@@ -125,15 +170,12 @@ void OutputResourceItem::updateCurrentFxParams(const AudioResourceMeta& newMeta)
         return;
     }
 
-    m_currentFxParams.resourceMeta = newMeta;
-    m_currentFxParams.active = newMeta.isValid();
+    audio::AudioFxParams newParams = m_currentFxParams;
+    newParams.resourceMeta = newMeta;
+    newParams.active = newMeta.isValid();
 
-    emit isActiveChanged();
-    emit titleChanged();
-    emit fxParamsChanged();
-    emit isBlankChanged();
-
-    requestToLaunchNativeEditorView();
+    setParams(newParams);
+    updateNativeEditorView();
 }
 
 void OutputResourceItem::updateAvailableFxVendorsMap(const audio::AudioResourceMetaList& availableFxResources)
@@ -143,6 +185,10 @@ void OutputResourceItem::updateAvailableFxVendorsMap(const audio::AudioResourceM
     for (const auto& meta : availableFxResources) {
         AudioResourceMetaList& fxResourceList = m_fxByVendorMap[meta.vendor];
         fxResourceList.push_back(meta);
+    }
+
+    for (auto& [vendor, fxResourceList] : m_fxByVendorMap) {
+        sortResourcesList(fxResourceList);
     }
 }
 

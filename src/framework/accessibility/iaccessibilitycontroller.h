@@ -20,24 +20,31 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_ACCESSIBILITY_IACCESSIBILITYCONTROLLER_H
-#define MU_ACCESSIBILITY_IACCESSIBILITYCONTROLLER_H
+#ifndef MUSE_ACCESSIBILITY_IACCESSIBILITYCONTROLLER_H
+#define MUSE_ACCESSIBILITY_IACCESSIBILITYCONTROLLER_H
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 #include "iaccessible.h"
 
-namespace mu::accessibility {
+namespace muse::accessibility {
 class IAccessibilityController : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IAccessibilityController)
 public:
     virtual ~IAccessibilityController() = default;
 
-    virtual const IAccessible* accessibleRoot() const = 0;
-
     virtual void reg(IAccessible* item) = 0;
     virtual void unreg(IAccessible* item) = 0;
+
+    virtual const IAccessible* accessibleRoot() const = 0;
+
+    virtual const IAccessible* lastFocused() const = 0;
+
+    virtual bool needToVoicePanelInfo() const = 0;
+    virtual QString currentPanelAccessibleName() const = 0;
+
+    virtual void setIgnoreQtAccessibilityEvents(bool ignore) = 0;
 };
 }
 
-#endif // MU_ACCESSIBILITY_IACCESSIBILITYCONTROLLER_H
+#endif // MUSE_ACCESSIBILITY_IACCESSIBILITYCONTROLLER_H

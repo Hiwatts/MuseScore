@@ -22,9 +22,12 @@
 
 #include "themeconverter.h"
 
+#include "translation.h"
+
 #include "log.h"
 
-using namespace mu::ui;
+using namespace muse;
+using namespace muse::ui;
 
 static const QString CODEKEY_KEY("codeKey");
 static const QString TITLE_KEY("title");
@@ -34,16 +37,24 @@ static const std::vector<std::pair<ThemeStyleKey, QString > > s_keys = {
 
     { BACKGROUND_PRIMARY_COLOR, "backgroundPrimaryColor" },
     { BACKGROUND_SECONDARY_COLOR, "backgroundSecondaryColor" },
+    { BACKGROUND_TERTIARY_COLOR, "backgroundTertiaryColor" },
+    { BACKGROUND_QUARTERNARY_COLOR, "backgroundQuarternaryColor" },
     { POPUP_BACKGROUND_COLOR, "popupBackgroundColor" },
+    { PROJECT_TAB_COLOR, "projectTabColor" },
     { TEXT_FIELD_COLOR, "textFieldColor" },
     { ACCENT_COLOR, "accentColor" },
     { STROKE_COLOR, "strokeColor" },
+    { STROKE_SECONDARY_COLOR, "strokeSecondaryColor" },
     { BUTTON_COLOR, "buttonColor" },
     { BORDER_WIDTH, "borderWidth" },
     { FONT_PRIMARY_COLOR, "fontPrimaryColor" },
     { FONT_SECONDARY_COLOR, "fontSecondaryColor" },
     { LINK_COLOR, "linkColor" },
     { FOCUS_COLOR, "focusColor" },
+    { WHITE_COLOR, "whiteColor" },
+    { BLACK_COLOR, "blackColor" },
+    { PLAY_COLOR, "playColor" },
+    { RECORD_COLOR, "recordColor" },
 
     { BORDER_WIDTH, "borderWidth" },
     { NAVIGATION_CONTROL_BORDER_WIDTH, "navigationControlBorderWidth" },
@@ -57,6 +68,25 @@ static const std::vector<std::pair<ThemeStyleKey, QString > > s_keys = {
 
     { ITEM_OPACITY_DISABLED, "itemOpacityDisabled" },
 };
+
+static QString titleForTheme(const ThemeInfo& theme)
+{
+    if (theme.codeKey == LIGHT_THEME_CODE) {
+        //: The name of the light ui theme
+        return muse::qtrc("ui", "Light");
+    } else if (theme.codeKey == DARK_THEME_CODE) {
+        //: The name of the dark ui theme
+        return muse::qtrc("ui", "Dark");
+    } else if (theme.codeKey == HIGH_CONTRAST_WHITE_THEME_CODE) {
+        //: The name of the high contrast light ui theme
+        return muse::qtrc("ui", "White");
+    } else if (theme.codeKey == HIGH_CONTRAST_BLACK_THEME_CODE) {
+        //: The name of the high contrast dark ui theme
+        return muse::qtrc("ui", "Black");
+    }
+
+    return QString::fromStdString(theme.title);
+}
 
 static const QString& themeStyleKeyToString(ThemeStyleKey key)
 {
@@ -92,7 +122,7 @@ QVariantMap ThemeConverter::toMap(const ThemeInfo& theme)
     QVariantMap obj;
 
     obj[CODEKEY_KEY] = QString::fromStdString(theme.codeKey);
-    obj[TITLE_KEY] = QString::fromStdString(theme.title);
+    obj[TITLE_KEY] = titleForTheme(theme);
 
     for (ThemeStyleKey key : theme.values.keys()) {
         obj[themeStyleKeyToString(key)] = theme.values[key];

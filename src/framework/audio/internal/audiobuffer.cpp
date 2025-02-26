@@ -21,105 +21,233 @@
  */
 #include "audiobuffer.h"
 
-#include <cstring>
+#include <iostream>
 
 #include "log.h"
 
-using namespace mu::audio;
+using namespace muse::audio;
 
-void AudioBuffer::init(const audioch_t audioChannelsCount, const samples_t samplesPerChannel)
+static constexpr size_t DEFAULT_SIZE_PER_CHANNEL = 1024 * 8;
+static constexpr size_t DEFAULT_SIZE = DEFAULT_SIZE_PER_CHANNEL * 2;
+
+static const std::vector<float> SILENT_FRAMES(DEFAULT_SIZE, 0.f);
+
+//#define DEBUG_AUDIO
+#ifdef DEBUG_AUDIO
+#define LOG_AUDIO LOGD
+#else
+#define LOG_AUDIO LOGN
+#endif
+
+inline size_t reservedFrames(const size_t writeIdx, const size_t readIdx)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    size_t result = 0;
+    if (readIdx <= writeIdx) {
+        result = writeIdx - readIdx;
+    } else {
+        result = writeIdx + DEFAULT_SIZE - readIdx;
+    }
 
-    m_samplesPerChannel = samplesPerChannel;
+    return result;
+}
+
+struct BaseBufferProfiler {
+    size_t reservedFramesMax = 0;
+    size_t reservedFramesMin = 0;
+    double elapsedMax = 0.0;
+    double elapsedSum = 0.0;
+    double elapsedMin = 0.0;
+    uint64_t callCount = 0;
+    uint64_t maxCallCount = 0;
+    std::string tag;
+
+    BaseBufferProfiler(std::string&& profileTag, uint64_t profilerMaxCalls)
+        : maxCallCount(profilerMaxCalls), tag(std::move(profileTag)) {}
+
+    ~BaseBufferProfiler()
+    {
+        if (!stopped()) {
+            return;
+        }
+
+        std::cout << "\n BUFFER PROFILE:    " << tag;
+        std::cout << "\n reservedFramesMax: " << reservedFramesMax;
+        std::cout << "\n reservedFramesMin: " << reservedFramesMin;
+        std::cout << "\n elapsedMax:        " << elapsedMax;
+        std::cout << "\n elapsedMin:        " << elapsedMin;
+        std::cout << "\n elapsedAvg:        " << elapsedSum / callCount;
+        std::cout << "\n total call count:  " << callCount;
+        std::cout << "\n ===================\n";
+    }
+
+    void add(size_t reservedFrames, double elapsed)
+    {
+        if (maxCallCount != 0 && callCount > maxCallCount) {
+            return;
+        }
+
+        callCount++;
+
+        if (callCount == 1) {
+            reservedFramesMin = reservedFrames;
+            elapsedMin = elapsed;
+        } else {
+            reservedFramesMin = std::min(reservedFrames, reservedFramesMin);
+            elapsedMin = std::min(elapsed, elapsedMin);
+        }
+
+        reservedFramesMax = std::max(reservedFrames, reservedFramesMax);
+        elapsedMax = std::max(elapsed, elapsedMax);
+        elapsedSum += elapsed;
+    }
+
+    bool stopped() const
+    {
+        return callCount >= maxCallCount && maxCallCount != 0;
+    }
+
+    void stop()
+    {
+        if (stopped()) {
+            return;
+        }
+
+        maxCallCount = callCount - 1;
+        LOGD() << "\n PROFILE STOP";
+    }
+};
+
+static BaseBufferProfiler READ_PROFILE("READ_PROFILE", 3000);
+static BaseBufferProfiler WRITE_PROFILE("WRITE_PROFILE", 0);
+
+void AudioBuffer::init(const audioch_t audioChannelsCount)
+{
     m_audioChannelsCount = audioChannelsCount;
+    m_samplesPerChannel = DEFAULT_SIZE_PER_CHANNEL;
+    m_minSamplesToReserve = DEFAULT_SIZE_PER_CHANNEL / 2;
+    m_renderStep = m_minSamplesToReserve;
 
     m_data.resize(m_samplesPerChannel * m_audioChannelsCount, 0.f);
 }
 
-void AudioBuffer::setSource(std::shared_ptr<IAudioSource> source)
+void AudioBuffer::setSource(IAudioSourcePtr source)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_source == source) {
+        return;
+    }
+
+    if (m_source) {
+        reset();
+    }
+
     m_source = source;
 }
 
+void AudioBuffer::setMinSamplesPerChannelToReserve(const samples_t samplesPerChannel)
+{
+    IF_ASSERT_FAILED(samplesPerChannel > 0 && samplesPerChannel < DEFAULT_SIZE_PER_CHANNEL) {
+        return;
+    }
+
+    m_minSamplesToReserve = samplesPerChannel * m_audioChannelsCount;
+}
+
+void AudioBuffer::setRenderStep(const samples_t renderStep)
+{
+    IF_ASSERT_FAILED(renderStep > 0 && renderStep < DEFAULT_SIZE_PER_CHANNEL) {
+        return;
+    }
+
+    m_renderStep = renderStep;
+}
+
 void AudioBuffer::forward()
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    fillup();
-}
-
-void AudioBuffer::pop(float* dest, size_t sampleCount)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    size_t from = m_readIndex;
-    auto memStep = sizeof(float);
-    size_t to = m_readIndex + sampleCount * m_audioChannelsCount;
-    if (to > m_data.size()) {
-        to = m_data.size();
-    }
-    auto count = to - from;
-    std::memcpy(dest, m_data.data() + from, count * memStep);
-    m_readIndex += count;
-
-    size_t left = sampleCount * m_audioChannelsCount - count;
-    if (left > 0) {
-        std::memcpy(dest + count, m_data.data(), left * memStep);
-        m_readIndex = left;
-    }
-
-    if (m_readIndex >= m_data.size()) {
-        m_readIndex -= m_data.size();
-    }
-}
-
-void AudioBuffer::setMinSampleLag(size_t lag)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    IF_ASSERT_FAILED(lag < m_data.size()) {
-        lag = m_data.size();
-    }
-    m_minSampleLag = lag;
-}
-
-void AudioBuffer::fillup()
 {
     if (!m_source) {
         return;
     }
 
-    while (sampleLag() < m_minSampleLag + FILL_OVER) {
-        m_source->process(m_data.data() + m_writeIndex, FILL_SAMPLES);
-        updateWriteIndex(FILL_SAMPLES);
+    const auto currentWriteIdx = m_writeIndex.load(std::memory_order_relaxed);
+    const auto currentReadIdx = m_readIndex.load(std::memory_order_acquire);
+    size_t nextWriteIdx = currentWriteIdx;
+
+    while (reservedFrames(nextWriteIdx, currentReadIdx) < m_minSamplesToReserve) {
+        samples_t renderStep = m_renderStep;
+        samples_t samplesToRender = renderStep * m_audioChannelsCount;
+
+        if (nextWriteIdx + samplesToRender > DEFAULT_SIZE) {
+            renderStep = (DEFAULT_SIZE - nextWriteIdx) / m_audioChannelsCount;
+            samplesToRender = renderStep * m_audioChannelsCount;
+            IF_ASSERT_FAILED(renderStep > 0) {
+                break;
+            }
+        }
+
+        m_source->process(m_data.data() + nextWriteIdx, renderStep);
+
+        nextWriteIdx += samplesToRender;
+        if (nextWriteIdx >= DEFAULT_SIZE) {
+            nextWriteIdx = 0;
+        }
     }
+
+    m_writeIndex.store(nextWriteIdx, std::memory_order_release);
 }
 
-void AudioBuffer::updateWriteIndex(const unsigned int samplesPerChannel)
+void AudioBuffer::pop(float* dest, size_t sampleCount)
 {
-    size_t from = m_writeIndex;
-
-    auto to = m_writeIndex + samplesPerChannel * m_audioChannelsCount;
-    if (to > m_data.size()) {
-        to = m_data.size() - 1;
+    const auto currentReadIdx = m_readIndex.load(std::memory_order_relaxed);
+    const auto currentWriteIdx = m_writeIndex.load(std::memory_order_acquire);
+    if (currentReadIdx == currentWriteIdx) { // empty queue
+        std::memcpy(dest, SILENT_FRAMES.data(), sampleCount * sizeof(float) * m_audioChannelsCount);
+        return;
     }
+
+#ifdef DEBUG_AUDIO
+    if (reservedFrames(currentWriteIdx, currentReadIdx) < (sampleCount * m_audioChannelsCount)) {
+        static size_t missingFramesTotal = 0;
+        missingFramesTotal += (sampleCount * m_audioChannelsCount);
+        LOG_AUDIO() << "\n FRAMES MISSED " << sampleCount * m_audioChannelsCount << ", reserve: " <<
+            reservedFrames(currentWriteIdx, currentReadIdx) << ", total: " << missingFramesTotal;
+    }
+#endif
+
+    size_t newReadIdx = currentReadIdx;
+    const size_t totalSampleCount = sampleCount * m_audioChannelsCount;
+
+    size_t from = newReadIdx;
+    auto memStep = sizeof(float);
+    size_t to = from + totalSampleCount;
+    if (to > DEFAULT_SIZE) {
+        to = DEFAULT_SIZE;
+    }
+
     auto count = to - from;
-    m_writeIndex += count;
+    std::memcpy(dest, m_data.data() + from, count * memStep);
+    newReadIdx += count;
 
-    if (m_writeIndex >= m_data.size()) {
-        m_writeIndex -= m_data.size();
+    size_t left = totalSampleCount - count;
+    if (left > 0) {
+        std::memcpy(dest + count, m_data.data(), left * memStep);
+        newReadIdx = left;
     }
+
+    if (newReadIdx >= DEFAULT_SIZE) {
+        newReadIdx -= DEFAULT_SIZE;
+    }
+
+    m_readIndex.store(newReadIdx, std::memory_order_release);
 }
 
-unsigned int AudioBuffer::sampleLag() const
+void AudioBuffer::reset()
 {
-    size_t lag = 0;
-    if (m_readIndex <= m_writeIndex) {
-        lag = m_writeIndex - m_readIndex;
-    } else {
-        lag = m_writeIndex + m_data.size() - m_readIndex;
-    }
+    m_readIndex.store(0, std::memory_order_release);
+    m_writeIndex.store(0, std::memory_order_release);
 
-    return static_cast<unsigned int>(lag / m_audioChannelsCount);
+    m_data = SILENT_FRAMES;
+}
+
+audioch_t AudioBuffer::audioChannelCount() const
+{
+    return m_audioChannelsCount;
 }

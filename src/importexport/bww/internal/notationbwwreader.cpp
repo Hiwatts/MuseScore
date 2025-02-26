@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,17 +21,18 @@
  */
 #include "notationbwwreader.h"
 
-#include "libmscore/masterscore.h"
-#include "notation/notationerrors.h"
-
-namespace Ms {
-extern Score::FileError importBww(MasterScore*, const QString& name);
-}
+#include "engraving/dom/score.h"
+#include "engraving/engravingerrors.h"
 
 using namespace mu::iex::bww;
+using namespace mu::engraving;
 
-mu::Ret NotationBwwReader::read(Ms::MasterScore* score, const io::path& path, const Options&)
+namespace mu::iex::bww {
+extern Err importBww(MasterScore*, const QString& name);
+}
+
+muse::Ret NotationBwwReader::read(MasterScore* score, const muse::io::path_t& path, const Options&)
 {
-    Ms::Score::FileError err = Ms::importBww(score, path.toQString());
-    return mu::notation::scoreFileErrorToRet(err, path);
+    Err err = importBww(score, path.toQString());
+    return make_ret(err, path);
 }

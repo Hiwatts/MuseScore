@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,17 +22,17 @@
 #ifndef IMPORTMIDI_FRACTION_H
 #define IMPORTMIDI_FRACTION_H
 
-#include "libmscore/fraction.h"
+#include "engraving/types/fraction.h"
 
-namespace Ms {
+namespace mu::iex::midi {
 class ReducedFraction
 {
 public:
     ReducedFraction();
     ReducedFraction(int z, int n);
-    explicit ReducedFraction(const Fraction&);
+    explicit ReducedFraction(const engraving::Fraction&);
 
-    Fraction fraction() const { return Fraction(numerator_, denominator_); }
+    engraving::Fraction fraction() const { return engraving::Fraction(numerator_, denominator_); }
     int numerator() const { return numerator_; }
     int denominator() const { return denominator_; }
 
@@ -74,6 +74,6 @@ private:
 };
 
 ReducedFraction toMuseScoreTicks(int tick, int oldDivision, bool isDivisionInTps);
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_FRACTION_H

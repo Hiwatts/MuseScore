@@ -19,14 +19,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_NAVIGATIONSECTIONMOCK_H
-#define MU_UI_NAVIGATIONSECTIONMOCK_H
+#ifndef MUSE_UI_NAVIGATIONSECTIONMOCK_H
+#define MUSE_UI_NAVIGATIONSECTIONMOCK_H
 
 #include <gmock/gmock.h>
 
 #include "framework/ui/inavigation.h"
 
-namespace mu::ui {
+namespace muse::ui {
 class NavigationSectionMock : public INavigationSection
 {
 public:
@@ -46,9 +46,13 @@ public:
 
     MOCK_METHOD(void, onEvent, (EventPtr), (override));
 
+    MOCK_METHOD(QWindow*, window, (), (const, override));
+
     MOCK_METHOD(const std::set<INavigationPanel*>&, panels, (), (const, override));
     MOCK_METHOD(async::Notification, panelsListChanged, (), (const, override));
-    MOCK_METHOD(SectionPanelControlChannel, activeRequested, (), (const, override));
+
+    MOCK_METHOD(void, setOnActiveRequested, (const OnActiveRequested& func), (override));
+    MOCK_METHOD(void, requestActive, (INavigationPanel*, INavigationControl*, bool, INavigation::ActivationType), (override));
 };
 
 class NavigationPanelMock : public INavigationPanel
@@ -69,11 +73,14 @@ public:
 
     MOCK_METHOD(void, onEvent, (EventPtr), (override));
 
+    MOCK_METHOD(QWindow*, window, (), (const, override));
+
     MOCK_METHOD(INavigationSection*, section, (), (const, override));
     MOCK_METHOD(Direction, direction, (), (const, override));
     MOCK_METHOD(const std::set<INavigationControl*>&, controls, (), (const, override));
     MOCK_METHOD(async::Notification, controlsListChanged, (), (const, override));
-    MOCK_METHOD(PanelControlChannel, activeRequested, (), (const, override));
+
+    MOCK_METHOD(void, requestActive, (INavigationControl*, bool, INavigation::ActivationType), (override));
 };
 
 class NavigationControlMock : public INavigationControl
@@ -94,11 +101,13 @@ public:
 
     MOCK_METHOD(void, onEvent, (EventPtr), (override));
 
+    MOCK_METHOD(QWindow*, window, (), (const, override));
+
     MOCK_METHOD(INavigationPanel*, panel, (), (const, override));
 
     MOCK_METHOD(void, trigger, (), (override));
-    MOCK_METHOD(async::Channel<INavigationControl*>, activeRequested, (), (const, override));
+    MOCK_METHOD(void, requestActive, (bool), (override));
 };
 }
 
-#endif // MU_UI_NAVIGATIONSECTIONMOCK_H
+#endif // MUSE_UI_NAVIGATIONSECTIONMOCK_H

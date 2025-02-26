@@ -19,14 +19,33 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_FRAMEWORK_TRANSLATION_H
-#define MU_FRAMEWORK_TRANSLATION_H
+#ifndef MUSE_GLOBAL_TRANSLATION_H
+#define MUSE_GLOBAL_TRANSLATION_H
 
+#include <string>
+
+#ifndef NO_QT_SUPPORT
 #include <QString>
+#endif
 
-namespace mu {
+#include "types/string.h"
+
+namespace muse {
 std::string trc(const char* context, const char* key, const char* disambiguation = nullptr, int n = -1);
+
+String mtrc(const char* context, const char* key, const char* disambiguation = nullptr, int n = -1);
+String mtrc(const char* context, const String& key, const char* disambiguation = nullptr, int n = -1);
+String mtrc(const char* context, const String& key, const String& disambiguation, int n = -1);
+
+#ifndef NO_QT_SUPPORT
 QString qtrc(const char* context, const char* key, const char* disambiguation = nullptr, int n = -1);
+QString qtrc(const char* context, const String& key, const char* disambiguation = nullptr, int n = -1);
+QString qtrc(const char* context, const String& key, const String& disambiguation, int n = -1);
+#endif
+
+#ifdef NO_QT_SUPPORT
+#define QT_TRANSLATE_NOOP(ctx, msg) msg
+#endif
 }
 
-#endif // MU_FRAMEWORK_TRANSLATION_H
+#endif // MUSE_GLOBAL_TRANSLATION_H

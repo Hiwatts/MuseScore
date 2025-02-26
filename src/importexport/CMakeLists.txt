@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# MuseScore-CLA-applies
+# MuseScore-Studio-CLA-applies
 #
-# MuseScore
+# MuseScore Studio
 # Music Composition & Notation
 #
-# Copyright (C) 2021 MuseScore BVBA and others
+# Copyright (C) 2021 MuseScore Limited
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -18,15 +18,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-add_subdirectory(bb)
-add_subdirectory(braille)
-add_subdirectory(bww)
-add_subdirectory(capella)
-add_subdirectory(guitarpro)
-add_subdirectory(midi)
-add_subdirectory(musedata)
-add_subdirectory(musicxml)
-add_subdirectory(ove)
-add_subdirectory(audioexport)
-add_subdirectory(imagesexport)
+if (MUE_BUILD_IMPORTEXPORT_MODULE)
+    add_subdirectory(bb)
+
+    add_subdirectory(bww)
+    add_subdirectory(capella)
+    add_subdirectory(midi)
+    add_subdirectory(musedata)
+    add_subdirectory(musicxml)
+    add_subdirectory(ove)
+    add_subdirectory(audioexport)
+    add_subdirectory(imagesexport)
+    add_subdirectory(guitarpro)
+    add_subdirectory(mei)
+
+    if (MUE_BUILD_VIDEOEXPORT_MODULE)
+        add_subdirectory(videoexport)
+    endif()
+else()
+    if (MUE_BUILD_IMAGESEXPORT_MODULE)
+        add_subdirectory(imagesexport)
+    endif()
+endif()
+
+
+
 

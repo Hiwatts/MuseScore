@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,7 +24,7 @@
 
 #include <QAbstractListModel>
 
-#include "libmscore/engravingitem.h"
+#include "engraving/dom/engravingitem.h"
 
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
@@ -33,11 +33,11 @@
 
 namespace mu::inspector {
 class IElementRepositoryService;
-class InspectorListModel : public QAbstractListModel, public mu::async::Asyncable
+class InspectorListModel : public QAbstractListModel, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(inspector, context::IGlobalContext, context)
+    INJECT(context::IGlobalContext, context)
 
 public:
     explicit InspectorListModel(QObject* parent = nullptr);
@@ -47,37 +47,42 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
-signals:
-    void elementsModified();
-    void modelChanged();
+    Q_INVOKABLE void setInspectorVisible(bool visible);
 
 private:
     enum RoleNames {
-        InspectorDataRole = Qt::UserRole + 1,
-        InspectorTitleRole
+        InspectorSectionModelRole = Qt::UserRole + 1
     };
 
-    void setElementList(const QList<Ms::EngravingItem*>& selectedElementList);
+    void listenSelectionChanged();
+    void updateElementList();
 
-    void buildModelsForEmptySelection(const ElementKeySet& selectedElementKeySet);
-    void buildModelsForSelectedElements(const ElementKeySet& selectedElementKeySet);
+    void setElementList(const QList<mu::engraving::EngravingItem*>& selectedElementList,
+                        notation::SelectionState selectionState = notation::SelectionState::NONE);
 
-    void createModelsBySectionType(const QList<AbstractInspectorModel::InspectorSectionType>& sectionTypeList,
-                                   const ElementKeySet& selectedElementKeySet = {});
-    void removeUnusedModels(const ElementKeySet& newElementKeySet,
-                            const QList<AbstractInspectorModel::InspectorSectionType>& exclusions = QList<AbstractInspectorModel::InspectorSectionType>());
+    void buildModelsForEmptySelection();
+    void buildModelsForSelectedElements(const ElementKeySet& selectedElementKeySet, bool isRangeSelection,
+                                        const QList<engraving::EngravingItem*>& selectedElementList);
+
+    void createModelsBySectionType(const InspectorSectionTypeSet& sectionTypes, const ElementKeySet& selectedElementKeySet = {});
+    void removeUnusedModels(const ElementKeySet& newElementKeySet, bool isRangeSelection,
+                            const QList<mu::engraving::EngravingItem*>& selectedElementList,
+                            const InspectorSectionTypeSet& exclusions = {});
+
+    bool isModelAllowed(const AbstractInspectorModel* model, const InspectorModelTypeSet& allowedModelTypes,
+                        const InspectorSectionTypeSet& allowedSectionTypes) const;
 
     void sortModels();
 
-    bool isModelAlreadyExists(const AbstractInspectorModel::InspectorSectionType modelType) const;
+    AbstractInspectorModel* modelBySectionType(InspectorSectionType sectionType) const;
 
-    void subscribeOnSelectionChanges();
+    void notifyModelsAboutNotationChanged();
 
-    QHash<int, QByteArray> m_roleNames;
     QList<AbstractInspectorModel*> m_modelList;
 
     IElementRepositoryService* m_repository = nullptr;
-    notation::INotationPtr m_notation;
+
+    bool m_inspectorVisible = true;
 };
 }
 

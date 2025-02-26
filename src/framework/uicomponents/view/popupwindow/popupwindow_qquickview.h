@@ -19,51 +19,73 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UICOMPONENTS_POPUPWINDOW_QQUICKVIEW_H
-#define MU_UICOMPONENTS_POPUPWINDOW_QQUICKVIEW_H
+#ifndef MUSE_UICOMPONENTS_POPUPWINDOW_QQUICKVIEW_H
+#define MUSE_UICOMPONENTS_POPUPWINDOW_QQUICKVIEW_H
 
 #include <QObject>
 #include <QQuickView>
-#include "ipopupwindow.h"
+
+#include "async/asyncable.h"
 
 #include "modularity/ioc.h"
+#include "ui/iinteractiveprovider.h"
 #include "ui/imainwindow.h"
+#include "ui/iuiconfiguration.h"
 
-namespace mu::uicomponents {
-class PopupWindow_QQuickView : public QObject, public IPopupWindow
+#include "ipopupwindow.h"
+
+namespace muse::uicomponents {
+class PopupWindow_QQuickView : public IPopupWindow, public muse::Injectable, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(uicomponents, ui::IMainWindow, mainWindow)
+    muse::Inject<ui::IInteractiveProvider> interactiveProvider = { this };
+    muse::Inject<ui::IMainWindow> mainWindow = { this };
+    muse::Inject<ui::IUiConfiguration> uiConfiguration  = { this };
 
 public:
-    explicit PopupWindow_QQuickView(QObject* parent = nullptr);
+    explicit PopupWindow_QQuickView(const muse::modularity::ContextPtr& iocCtx, QObject* parent = nullptr);
     ~PopupWindow_QQuickView();
 
-    void init(QQmlEngine* engine, std::shared_ptr<ui::IUiConfiguration> uiConfiguration, bool isDialogMode) override;
+    void init(QQmlEngine* engine, bool isDialogMode, bool isFrameless) override;
 
-    void setContent(QQuickItem* item) override;
+    void setContent(QQmlComponent* component, QQuickItem* item) override;
 
-    void show(QPoint p) override;
-    void setPosition(QPoint p) override;
-    void hide() override;
+    void show(QScreen* screen, QRect geometry, bool activateFocus) override;
+    void close() override;
+    void raise() override;
+    void setPosition(QPoint position) override;
 
     QWindow* qWindow() const override;
     bool isVisible() const override;
     QRect geometry() const override;
 
+    QWindow* parentWindow() const override;
+    void setParentWindow(QWindow* window) override;
+
+    bool resizable() const override;
+    void setResizable(bool resizable) override;
+
     void setPosition(const QPoint& position) const override;
 
+    bool hasActiveFocus() const override;
     void forceActiveFocus() override;
 
     void setOnHidden(const std::function<void()>& callback) override;
+    void setTakeFocusOnClick(bool takeFocusOnClick) override;
 
 private:
-
     bool eventFilter(QObject* watched, QEvent* event) override;
 
+    void updateSize(const QSize& newSize);
+
     QQuickView* m_view = nullptr;
+    bool m_resizable = false;
     std::function<void()> m_onHidden;
+    bool m_activeFocusOnParentOnClose = false;
+    bool m_takeFocusOnClick = true;
+
+    QWindow* m_parentWindow = nullptr;
 };
 }
-#endif // POPUPWINDOW_QQUICKVIEW_H
+#endif // MUSE_UICOMPONENTS_POPUPWINDOW_QQUICKVIEW_H

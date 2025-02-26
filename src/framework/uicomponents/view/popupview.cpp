@@ -24,35 +24,46 @@
 
 #include <functional>
 #include <QQuickView>
-#include <QQuickWidget>
 #include <QQmlEngine>
 #include <QUrl>
 #include <QQmlContext>
 #include <QApplication>
-#include <QMainWindow>
 #include <QTimer>
 #include <QScreen>
 
+#include "ui/inavigation.h"
+
 #include "popupwindow/popupwindow_qquickview.h"
 
+#if defined(Q_OS_MAC)
+#include "internal/platform/macos/macospopupviewclosecontroller.h"
+#elif defined(Q_OS_WIN)
+#include "internal/platform/win/winpopupviewclosecontroller.h"
+#endif
+
 #include "log.h"
-#include "config.h"
 
-using namespace mu::uicomponents;
-
-static const QString POPUP_VIEW_CONTENT_OBJECT_NAME("_PopupViewContent");
+using namespace muse::uicomponents;
 
 PopupView::PopupView(QQuickItem* parent)
-    : QObject(parent)
+    : QObject(parent), Injectable(muse::iocCtxForQmlObject(this))
 {
     setObjectName("PopupView");
     setErrCode(Ret::Code::Ok);
 
     setPadding(12);
     setShowArrow(true);
+}
 
-    qApp->installEventFilter(this);
-    connect(qApp, &QApplication::applicationStateChanged, this, &PopupView::onApplicationStateChanged);
+PopupView::~PopupView()
+{
+    if (m_window) {
+        m_window->setOnHidden(std::function<void()>());
+    }
+
+    if (m_closeController) {
+        delete m_closeController;
+    }
 }
 
 QQuickItem* PopupView::parentItem() const
@@ -71,7 +82,30 @@ void PopupView::setParentItem(QQuickItem* parent)
     }
 
     QObject::setParent(parent);
+
+    if (m_closeController) {
+        m_closeController->setParentItem(parent);
+    }
+
     emit parentItemChanged();
+}
+
+void PopupView::setEngine(QQmlEngine* engine)
+{
+    if (m_engine == engine) {
+        return;
+    }
+
+    m_engine = engine;
+}
+
+void PopupView::setComponent(QQmlComponent* component)
+{
+    if (m_component == component) {
+        return;
+    }
+
+    m_component = component;
 }
 
 void PopupView::forceActiveFocus()
@@ -91,38 +125,77 @@ void PopupView::classBegin()
 {
 }
 
-void PopupView::componentComplete()
+void PopupView::init()
 {
-    QQmlEngine* engine = qmlEngine(this);
+    QQmlEngine* engine = this->engine();
     IF_ASSERT_FAILED(engine) {
         return;
     }
 
-    m_window = new PopupWindow_QQuickView();
-    m_window->init(engine, uiConfiguration(), isDialog());
+    m_window = new PopupWindow_QQuickView(muse::iocCtxForQmlEngine(engine), this);
+    m_window->init(engine, isDialog(), frameless());
     m_window->setOnHidden([this]() { onHidden(); });
-    m_window->setContent(m_contentItem);
+    m_window->setContent(m_component, m_contentItem);
+    m_window->setTakeFocusOnClick(m_takeFocusOnClick);
 
-    connect(parentItem(), &QQuickItem::visibleChanged, this, [this]() {
-        if (!parentItem() || !parentItem()->isVisible()) {
-            close();
+    // TODO: Can't use new `connect` syntax because the IPopupWindow::aboutToClose
+    // has a parameter of type QQuickCloseEvent, which is not public, so we
+    // can't include any header for it and it will always be an incomplete
+    // type, which is not allowed for the new `connect` syntax.
+    //connect(m_window, &IPopupWindow::aboutToClose, this, &PopupView::aboutToClose);
+    connect(m_window, SIGNAL(aboutToClose(QQuickCloseEvent*)), this, SIGNAL(aboutToClose(QQuickCloseEvent*)));
+
+    connect(this, &PopupView::isContentReadyChanged, this, [this]() {
+        if (isContentReady() && m_shouldOpenOnReady) {
+            doOpen();
         }
     });
 
-    if (!isDialog()) {
-        m_contentItem->setObjectName(POPUP_VIEW_CONTENT_OBJECT_NAME);
-    }
+    navigationController()->navigationChanged().onNotify(this, [this]() {
+        ui::INavigationPanel* navigationPanel = navigationController()->activePanel();
+        if (!navigationPanel) {
+            return;
+        }
+
+        if (navigationPanel->window() == m_window->qWindow() && !m_window->hasActiveFocus()) {
+            m_window->forceActiveFocus();
+        }
+    });
+
+    emit windowChanged();
+}
+
+void PopupView::initCloseController()
+{
+#if defined(Q_OS_MAC)
+    m_closeController = new MacOSPopupViewCloseController(muse::iocCtxForQmlEngine(this->engine()));
+#elif defined(Q_OS_WIN)
+    m_closeController = new WinPopupViewCloseController(muse::iocCtxForQmlEngine(this->engine()));
+#else
+    m_closeController = new PopupViewCloseController(muse::iocCtxForQmlEngine(this->engine()));
+#endif
+
+    m_closeController->init();
+
+    m_closeController->setParentItem(parentItem());
+    m_closeController->setWindow(window());
+    m_closeController->setPopupHasFocus(!(m_openPolicies & OpenPolicy::NoActivateFocus));
+    m_closeController->setIsCloseOnPressOutsideParent(m_closePolicies & ClosePolicy::CloseOnPressOutsideParent);
+
+    m_closeController->closeNotification().onNotify(this, [this]() {
+        close(true);
+    });
+}
+
+void PopupView::componentComplete()
+{
+    init();
 }
 
 bool PopupView::eventFilter(QObject* watched, QEvent* event)
 {
-    if (QEvent::MouseButtonPress == event->type()) {
-        mousePressEvent(static_cast<QMouseEvent*>(event));
-    } else if (QEvent::MouseButtonRelease == event->type()) {
-        mouseReleaseEvent(static_cast<QMouseEvent*>(event));
-    } else if (QEvent::Close == event->type() && watched == mainWindow()->qWindow()) {
-        close();
-    } else if (QEvent::UpdateRequest == event->type()) {
+    if (QEvent::UpdateRequest == event->type()
+        || (event->type() == QEvent::Move && watched == mainWindow()->qWindow())) {
         repositionWindowIfNeed();
     }
 
@@ -134,13 +207,24 @@ QWindow* PopupView::qWindow() const
     return m_window ? m_window->qWindow() : nullptr;
 }
 
-void PopupView::beforeShow()
+void PopupView::open()
+{
+    if ((m_openPolicies & OpenPolicy::OpenOnContentReady) && !m_isContentReady) {
+        m_shouldOpenOnReady = true;
+        return;
+    }
+
+    doOpen();
+}
+
+void PopupView::beforeOpen()
 {
 }
 
-void PopupView::open()
+void PopupView::doOpen()
 {
     if (isOpened()) {
+        repositionWindowIfNeed();
         return;
     }
 
@@ -148,10 +232,11 @@ void PopupView::open()
         return;
     }
 
-    beforeShow();
+    beforeOpen();
+
+    updateGeometry();
 
     if (!isDialog()) {
-        updatePosition();
         updateContentPosition();
     }
 
@@ -160,29 +245,45 @@ void PopupView::open()
         IF_ASSERT_FAILED(qWindow) {
             return;
         }
+
         qWindow->setTitle(m_title);
-        qWindow->setModality(m_modal ? Qt::ApplicationModal : Qt::NonModal);
-#ifdef UI_DISABLE_MODALITY
+
+        if (m_alwaysOnTop) {
+#ifdef Q_OS_MAC
+            auto updateStayOnTopHint = [this]() {
+                bool stay = qApp->applicationState() == Qt::ApplicationActive;
+                m_window->qWindow()->setFlag(Qt::WindowStaysOnTopHint, stay);
+            };
+            updateStayOnTopHint();
+            connect(qApp, &QApplication::applicationStateChanged, this, updateStayOnTopHint);
+#endif
+        } else {
+            qWindow->setModality(m_modal ? Qt::ApplicationModal : Qt::NonModal);
+        }
+
+        qWindow->setFlag(Qt::FramelessWindowHint, m_frameless);
+#ifdef MUSE_MODULE_UI_DISABLE_MODALITY
         qWindow->setModality(Qt::NonModal);
 #endif
-
-        QRect winRect = m_window->geometry();
-        qWindow->setMinimumSize(winRect.size());
-        if (!m_resizable) {
-            qWindow->setMaximumSize(winRect.size());
-        }
+        m_window->setResizable(m_resizable);
     }
 
-    m_window->show(m_globalPos.toPoint());
+    resolveNavigationParentControl();
+
+    QScreen* screen = resolveScreen();
+    m_window->show(screen, viewGeometry(), !(m_openPolicies & OpenPolicy::NoActivateFocus));
 
     m_globalPos = QPointF(); // invalidate
 
-    if (!m_navigationParentControl) {
-        ui::INavigationControl* ctrl = navigationController()->activeControl();
-        //! NOTE At the moment we have only qml navigation controls
-        QObject* qmlCtrl = dynamic_cast<QObject*>(ctrl);
-        setNavigationParentControl(qmlCtrl);
+    if (!isDialog()) {
+        if (!m_closeController) {
+            initCloseController();
+        }
+
+        m_closeController->setActive(true);
     }
+
+    qApp->installEventFilter(this);
 
     emit isOpenedChanged();
     emit opened();
@@ -191,10 +292,10 @@ void PopupView::open()
 void PopupView::onHidden()
 {
     emit isOpenedChanged();
-    emit closed();
+    emit closed(m_forceClosed);
 }
 
-void PopupView::close()
+void PopupView::close(bool force)
 {
     if (!isOpened()) {
         return;
@@ -204,7 +305,16 @@ void PopupView::close()
         return;
     }
 
-    m_window->hide();
+    if (m_closeController) {
+        m_closeController->setActive(false);
+    }
+
+    qApp->removeEventFilter(this);
+
+    m_forceClosed = force;
+    m_window->close();
+
+    activateNavigationParentControl();
 }
 
 void PopupView::toggleOpened()
@@ -216,22 +326,47 @@ void PopupView::toggleOpened()
     }
 }
 
+void PopupView::setParentWindow(QWindow* window)
+{
+    m_window->setParentWindow(window);
+}
+
 bool PopupView::isOpened() const
 {
     return m_window ? m_window->isVisible() : false;
 }
 
-PopupView::ClosePolicy PopupView::closePolicy() const
+PopupView::OpenPolicies PopupView::openPolicies() const
 {
-    return m_closePolicy;
+    return m_openPolicies;
 }
 
-QObject* PopupView::navigationParentControl() const
+PopupView::ClosePolicies PopupView::closePolicies() const
+{
+    return m_closePolicies;
+}
+
+PopupView::Placement PopupView::placement() const
+{
+    return m_placement;
+}
+
+bool PopupView::activateParentOnClose() const
+{
+    return m_activateParentOnClose;
+}
+
+bool PopupView::takeFocusOnClick() const
+{
+    return m_takeFocusOnClick;
+}
+
+muse::ui::INavigationControl* PopupView::navigationParentControl() const
 {
     return m_navigationParentControl;
 }
 
-void PopupView::setNavigationParentControl(QObject* navigationParentControl)
+void PopupView::setNavigationParentControl(ui::INavigationControl* navigationParentControl)
 {
     if (m_navigationParentControl == navigationParentControl) {
         return;
@@ -254,6 +389,41 @@ void PopupView::setContentItem(QQuickItem* content)
 QQuickItem* PopupView::contentItem() const
 {
     return m_contentItem;
+}
+
+int PopupView::contentWidth() const
+{
+    return m_contentWidth;
+}
+
+void PopupView::setContentWidth(int contentWidth)
+{
+    if (m_contentWidth == contentWidth) {
+        return;
+    }
+
+    m_contentWidth = contentWidth;
+    emit contentWidthChanged();
+}
+
+int PopupView::contentHeight() const
+{
+    return m_contentHeight;
+}
+
+void PopupView::setContentHeight(int contentHeight)
+{
+    if (m_contentHeight == contentHeight) {
+        return;
+    }
+
+    m_contentHeight = contentHeight;
+    emit contentHeightChanged();
+}
+
+QWindow* PopupView::window() const
+{
+    return qWindow();
 }
 
 qreal PopupView::localX() const
@@ -295,93 +465,70 @@ void PopupView::setLocalY(qreal y)
     repositionWindowIfNeed();
 }
 
+void PopupView::setOpenPolicies(PopupView::OpenPolicies openPolicies)
+{
+    if (m_openPolicies == openPolicies) {
+        return;
+    }
+
+    m_openPolicies = openPolicies;
+
+    if (m_closeController) {
+        m_closeController->setPopupHasFocus(!(m_openPolicies & OpenPolicy::NoActivateFocus));
+    }
+
+    emit openPoliciesChanged(m_openPolicies);
+}
+
 void PopupView::repositionWindowIfNeed()
 {
     if (isOpened() && !isDialog()) {
         m_globalPos = QPointF();
-        updatePosition();
+        updateGeometry();
         updateContentPosition();
         m_window->setPosition(m_globalPos.toPoint());
         m_globalPos = QPoint();
     }
 }
 
-void PopupView::setClosePolicy(ClosePolicy closePolicy)
+void PopupView::setClosePolicies(ClosePolicies closePolicies)
 {
-    if (m_closePolicy == closePolicy) {
+    if (m_closePolicies == closePolicies) {
         return;
     }
 
-    m_closePolicy = closePolicy;
-    emit closePolicyChanged(closePolicy);
+    m_closePolicies = closePolicies;
+
+    if (m_closeController) {
+        m_closeController->setIsCloseOnPressOutsideParent(closePolicies & ClosePolicy::CloseOnPressOutsideParent);
+    }
+
+    emit closePoliciesChanged(closePolicies);
 }
 
-void PopupView::onApplicationStateChanged(Qt::ApplicationState state)
+void PopupView::setPlacement(Placement placement)
 {
-    if (m_closePolicy == NoAutoClose) {
+    if (m_placement == placement) {
         return;
     }
 
-    if (state != Qt::ApplicationActive) {
-        close();
-    }
+    m_placement = placement;
+    emit placementChanged(placement);
 }
 
-void PopupView::mousePressEvent(QMouseEvent* event)
+void PopupView::setObjectId(QString objectId)
 {
-    if (!isOpened()) {
+    if (m_objectId == objectId) {
         return;
     }
 
-    if (m_closePolicy == ClosePolicy::CloseOnPressOutsideParent) {
-        if (!isMouseWithinBoundaries(event->globalPos())) {
-            close();
-        }
-    }
+    m_objectId = objectId;
+    emit objectIdChanged(m_objectId);
 }
 
-void PopupView::mouseReleaseEvent(QMouseEvent* event)
+QString PopupView::objectId() const
 {
-    if (!isOpened()) {
-        return;
-    }
-
-    if (m_closePolicy == ClosePolicy::CloseOnReleaseOutsideParent) {
-        if (!isMouseWithinBoundaries(event->globalPos())) {
-            close();
-        }
-    }
-}
-
-bool PopupView::isMouseWithinBoundaries(const QPoint& mousePos) const
-{
-    QRect viewRect = m_window->geometry();
-    bool contains = viewRect.contains(mousePos);
-    if (!contains) {
-        //! NOTE We also check the parent because often clicking on the parent should toggle the popup,
-        //! but if we don't check a parent here, the popup will be closed and reopened.
-        QQuickItem* prn = parentItem();
-        QPointF localPos = prn->mapFromGlobal(mousePos);
-        QRectF parentRect = QRectF(0, 0, prn->width(), prn->height());
-        contains = parentRect.contains(localPos);
-    }
-
-    return contains;
-}
-
-void PopupView::setObjectID(QString objectID)
-{
-    if (m_objectID == objectID) {
-        return;
-    }
-
-    m_objectID = objectID;
-    emit objectIDChanged(m_objectID);
-}
-
-QString PopupView::objectID() const
-{
-    return m_objectID;
+    return m_objectId;
 }
 
 QString PopupView::title() const
@@ -418,19 +565,52 @@ void PopupView::setModal(bool modal)
     emit modalChanged(m_modal);
 }
 
-void PopupView::setResizable(bool resizable)
+bool PopupView::frameless() const
 {
-    if (m_resizable == resizable) {
+    return m_frameless;
+}
+
+void PopupView::setFrameless(bool frameless)
+{
+    if (m_frameless == frameless) {
         return;
     }
 
-    m_resizable = resizable;
-    emit resizableChanged(m_resizable);
+    m_frameless = frameless;
+    emit framelessChanged(m_frameless);
 }
 
 bool PopupView::resizable() const
 {
-    return m_resizable;
+    return m_window ? m_window->resizable() : m_resizable;
+}
+
+void PopupView::setResizable(bool resizable)
+{
+    if (this->resizable() == resizable) {
+        return;
+    }
+
+    m_resizable = resizable;
+    if (m_window) {
+        m_window->setResizable(m_resizable);
+    }
+    emit resizableChanged(m_resizable);
+}
+
+bool PopupView::alwaysOnTop() const
+{
+    return m_alwaysOnTop;
+}
+
+void PopupView::setAlwaysOnTop(bool alwaysOnTop)
+{
+    if (m_alwaysOnTop == alwaysOnTop) {
+        return;
+    }
+
+    m_alwaysOnTop = alwaysOnTop;
+    emit alwaysOnTopChanged();
 }
 
 void PopupView::setRet(QVariantMap ret)
@@ -463,16 +643,6 @@ void PopupView::setArrowX(int arrowX)
     emit arrowXChanged(m_arrowX);
 }
 
-void PopupView::setCascadeAlign(Qt::AlignmentFlag cascadeAlign)
-{
-    if (m_cascadeAlign == cascadeAlign) {
-        return;
-    }
-
-    m_cascadeAlign = cascadeAlign;
-    emit cascadeAlignChanged(m_cascadeAlign);
-}
-
 void PopupView::setPadding(int padding)
 {
     if (m_padding == padding) {
@@ -503,6 +673,25 @@ void PopupView::setAnchorItem(QQuickItem* anchorItem)
     emit anchorItemChanged(m_anchorItem);
 }
 
+void PopupView::setActivateParentOnClose(bool activateParentOnClose)
+{
+    if (m_activateParentOnClose == activateParentOnClose) {
+        return;
+    }
+
+    m_activateParentOnClose = activateParentOnClose;
+    emit activateParentOnCloseChanged(m_activateParentOnClose);
+}
+
+void PopupView::setTakeFocusOnClick(bool takeFocusOnClick)
+{
+    if (m_takeFocusOnClick == takeFocusOnClick) {
+        return;
+    }
+    m_takeFocusOnClick = takeFocusOnClick;
+    emit takeFocusOnClickChanged(takeFocusOnClick);
+}
+
 QVariantMap PopupView::ret() const
 {
     return m_ret;
@@ -516,11 +705,6 @@ bool PopupView::opensUpward() const
 int PopupView::arrowX() const
 {
     return m_arrowX;
-}
-
-Qt::AlignmentFlag PopupView::cascadeAlign() const
-{
-    return m_cascadeAlign;
 }
 
 int PopupView::padding() const
@@ -545,17 +729,26 @@ void PopupView::setErrCode(Ret::Code code)
     setRet(ret);
 }
 
-QRect PopupView::currentScreenGeometry() const
+QScreen* PopupView::resolveScreen() const
 {
-    QScreen* currentScreen = QGuiApplication::screenAt(m_globalPos.toPoint());
-    if (!currentScreen) {
-        currentScreen = QGuiApplication::primaryScreen();
+    const QQuickItem* parent = parentItem();
+    const QWindow* parentWindow = parent ? parent->window() : nullptr;
+    QScreen* screen = parentWindow ? parentWindow->screen() : nullptr;
+
+    if (!screen) {
+        screen = QGuiApplication::primaryScreen();
     }
 
-    return currentScreen->availableGeometry();
+    return screen;
 }
 
-void PopupView::updatePosition()
+QRect PopupView::currentScreenGeometry() const
+{
+    QScreen* screen = resolveScreen();
+    return mainWindow()->isFullScreen() ? screen->geometry() : screen->availableGeometry();
+}
+
+void PopupView::updateGeometry()
 {
     const QQuickItem* parent = parentItem();
     IF_ASSERT_FAILED(parent) {
@@ -568,60 +761,43 @@ void PopupView::updatePosition()
         m_globalPos = parentTopLeft + m_localPos;
     }
 
-    const QWindow* window = mainWindow()->qWindow();
-    if (!window) {
-        return;
-    }
-
     QRectF anchorRect = anchorGeometry();
-    QRectF popupRect(m_globalPos, contentItem()->size());
+    QRectF viewRect = viewGeometry();
 
-    setOpensUpward(false);
-    setCascadeAlign(Qt::AlignmentFlag::AlignRight);
-
-    auto movePos = [this, &popupRect](qreal x, qreal y) {
+    auto movePos = [this, &viewRect](qreal x, qreal y) {
         m_globalPos.setX(x);
         m_globalPos.setY(y);
 
-        popupRect.moveTopLeft(m_globalPos);
+        viewRect.moveTopLeft(m_globalPos);
     };
 
-    const QQuickItem* parentPopupContentItem = this->parentPopupContentItem();
-    bool isCascade = parentPopupContentItem != nullptr;
+    bool canFitAbove = viewRect.height() < parentTopLeft.y();
+    bool canFitBelow = viewRect.bottom() < anchorRect.bottom();
 
-    if (popupRect.left() < anchorRect.left()) {
+    if (placement() == Placement::PreferAbove && canFitAbove) {
+        movePos(m_globalPos.x(), parentTopLeft.y() - viewRect.height());
+        setOpensUpward(true);
+    } else if (placement() == Placement::PreferBelow && canFitBelow) {
+        movePos(m_globalPos.x(), parentTopLeft.y() + parent->height());
+    } else if (!canFitBelow) {
+        if (canFitAbove) {
+            // move to the top of the parent
+            movePos(m_globalPos.x(), parentTopLeft.y() - viewRect.height());
+            setOpensUpward(true);
+        } else {
+            // move to the right of the parent and move to top to an area that doesn't fit
+            movePos(parentTopLeft.x() + parent->width(), m_globalPos.y() - (viewRect.bottom() - anchorRect.bottom()) + padding());
+        }
+    }
+
+    if (viewRect.left() < anchorRect.left()) {
         // move to the right to an area that doesn't fit
-        movePos(m_globalPos.x() + anchorRect.left() - popupRect.left(), m_globalPos.y());
+        movePos(m_globalPos.x() + anchorRect.left() - viewRect.left(), m_globalPos.y());
     }
 
-    qreal popupShiftByY = parent->height() + popupRect.height();
-    if (popupRect.bottom() > anchorRect.bottom()) {
-        if (isCascade) {
-            // move to the top to an area that doesn't fit
-            movePos(m_globalPos.x(), m_globalPos.y() - (popupRect.bottom() - anchorRect.bottom()));
-        } else {
-            qreal newY = m_globalPos.y() - popupShiftByY;
-            if (anchorRect.top() < newY) {
-                // move to the top of the parent
-                movePos(m_globalPos.x(), newY);
-                setOpensUpward(true);
-            } else {
-                // move to the right of the parent and move to top to an area that doesn't fit
-                movePos(parentTopLeft.x() + parent->width(), m_globalPos.y() - (popupRect.bottom() - anchorRect.bottom()));
-            }
-        }
-    }
-
-    Qt::AlignmentFlag parentCascadeAlign = this->parentCascadeAlign(parentPopupContentItem);
-    if (popupRect.right() > anchorRect.right() || parentCascadeAlign != Qt::AlignmentFlag::AlignRight) {
-        if (isCascade) {
-            // move to the right of the parent
-            movePos(parentTopLeft.x() - popupRect.width() + padding() * 2, m_globalPos.y());
-            setCascadeAlign(Qt::AlignmentFlag::AlignLeft);
-        } else {
-            // move to the left to an area that doesn't fit
-            movePos(m_globalPos.x() - (popupRect.right() - anchorRect.right()), m_globalPos.y());
-        }
+    if (viewRect.right() > anchorRect.right()) {
+        // move to the left to an area that doesn't fit
+        movePos(m_globalPos.x() - (viewRect.right() - anchorRect.right()), m_globalPos.y());
     }
 
     if (!showArrow()) {
@@ -639,37 +815,21 @@ void PopupView::updateContentPosition()
 
         QPointF parentTopLeft = parent->mapToGlobal(QPoint(0, 0));
 
-        setArrowX(parentTopLeft.x() + (parent->width() / 2) - m_globalPos.x());
-    } else {
-        if (opensUpward()) {
-            contentItem()->setY(padding());
+        QRect viewGeometry = this->viewGeometry();
+        QPointF viewTopLeft = QPointF(viewGeometry.x(), viewGeometry.y());
+        QPointF viewTopRight = QPointF(viewGeometry.x() + viewGeometry.width(), viewGeometry.y());
+
+        if (parentTopLeft.x() < viewTopLeft.x() || parentTopLeft.x() > viewTopRight.x()) {
+            setArrowX(viewGeometry.width() / 2);
         } else {
-            contentItem()->setY(-padding());
+            setArrowX(parentTopLeft.x() + (parent->width() / 2) - m_globalPos.x());
         }
     }
 }
 
-QQuickItem* PopupView::parentPopupContentItem() const
+QRect PopupView::viewGeometry() const
 {
-    QQuickItem* parent = parentItem();
-    while (parent) {
-        if (parent->objectName() == POPUP_VIEW_CONTENT_OBJECT_NAME) {
-            return parent;
-        }
-
-        parent = parent->parentItem();
-    }
-
-    return nullptr;
-}
-
-Qt::AlignmentFlag PopupView::parentCascadeAlign(const QQuickItem* parent) const
-{
-    if (!parent) {
-        return Qt::AlignmentFlag::AlignRight;
-    }
-
-    return static_cast<Qt::AlignmentFlag>(parent->property("cascadeAlign").toInt());
+    return QRect(m_globalPos.toPoint(), contentItem()->size().toSize());
 }
 
 QRectF PopupView::anchorGeometry() const
@@ -681,4 +841,52 @@ QRectF PopupView::anchorGeometry() const
     }
 
     return geometry;
+}
+
+void PopupView::resolveNavigationParentControl()
+{
+    ui::INavigationControl* ctrl = navigationController()->activeControl();
+    setNavigationParentControl(ctrl);
+
+    //! NOTE At the moment we have only qml navigation controls
+    QObject* qmlCtrl = dynamic_cast<QObject*>(ctrl);
+
+    if (qmlCtrl) {
+        connect(qmlCtrl, &QObject::destroyed, this, [this]() {
+            setNavigationParentControl(nullptr);
+        });
+
+        setParentWindow(ctrl->window());
+    }
+}
+
+void PopupView::activateNavigationParentControl()
+{
+    if (m_activateParentOnClose && m_navigationParentControl) {
+        m_navigationParentControl->requestActive();
+    }
+}
+
+QQmlEngine* PopupView::engine() const
+{
+    if (m_engine) {
+        return m_engine;
+    }
+
+    return qmlEngine(this);
+}
+
+bool PopupView::isContentReady() const
+{
+    return m_isContentReady;
+}
+
+void PopupView::setIsContentReady(bool ready)
+{
+    if (m_isContentReady == ready) {
+        return;
+    }
+
+    m_isContentReady = ready;
+    emit isContentReadyChanged();
 }

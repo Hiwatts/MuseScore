@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,31 +22,36 @@
 #ifndef MU_PLAYBACK_PLAYBACKTOOLBARMODEL_H
 #define MU_PLAYBACK_PLAYBACKTOOLBARMODEL_H
 
-#include "ui/view/abstractmenumodel.h"
+#include "uicomponents/view/abstractmenumodel.h"
 
 #include "modularity/ioc.h"
 #include "iplaybackcontroller.h"
+#include "notation/inotationconfiguration.h"
+#include "context/iglobalcontext.h"
 
 namespace mu::playback {
-class PlaybackToolBarModel : public ui::AbstractMenuModel
+class PlaybackToolBarModel : public muse::uicomponents::AbstractMenuModel
 {
     Q_OBJECT
-
-    INJECT(playback, IPlaybackController, playbackController)
 
     Q_PROPERTY(bool isToolbarFloating READ isToolbarFloating WRITE setIsToolbarFloating NOTIFY isToolbarFloatingChanged)
     Q_PROPERTY(bool isPlayAllowed READ isPlayAllowed NOTIFY isPlayAllowedChanged)
 
     Q_PROPERTY(QDateTime maxPlayTime READ maxPlayTime NOTIFY maxPlayTimeChanged)
-    Q_PROPERTY(QDateTime playTime READ playTime WRITE setPlayTime NOTIFY playTimeChanged)
-    Q_PROPERTY(qreal playPosition READ playPosition WRITE setPlayPosition NOTIFY playTimeChanged)
 
-    Q_PROPERTY(int measureNumber READ measureNumber WRITE setMeasureNumber NOTIFY playTimeChanged)
-    Q_PROPERTY(int maxMeasureNumber READ maxMeasureNumber NOTIFY playTimeChanged)
-    Q_PROPERTY(int beatNumber READ beatNumber WRITE setBeatNumber NOTIFY playTimeChanged)
-    Q_PROPERTY(int maxBeatNumber READ maxBeatNumber NOTIFY playTimeChanged)
+    Q_PROPERTY(QDateTime playTime READ playTime WRITE setPlayTime NOTIFY playPositionChanged)
+    Q_PROPERTY(qreal playPosition READ playPosition WRITE setPlayPosition NOTIFY playPositionChanged)
+    Q_PROPERTY(int measureNumber READ measureNumber WRITE setMeasureNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int maxMeasureNumber READ maxMeasureNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int beatNumber READ beatNumber WRITE setBeatNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int maxBeatNumber READ maxBeatNumber NOTIFY playPositionChanged)
 
-    Q_PROPERTY(QVariant tempo READ tempo NOTIFY playTimeChanged)
+    Q_PROPERTY(QVariant tempo READ tempo NOTIFY tempoChanged)
+    Q_PROPERTY(qreal tempoMultiplier READ tempoMultiplier WRITE setTempoMultiplier NOTIFY tempoChanged)
+
+    muse::Inject<IPlaybackController> playbackController;
+    muse::Inject<context::IGlobalContext> globalContext;
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
 
 public:
     explicit PlaybackToolBarModel(QObject* parent = nullptr);
@@ -64,6 +69,7 @@ public:
     int maxBeatNumber() const;
 
     QVariant tempo() const;
+    qreal tempoMultiplier() const;
 
     Q_INVOKABLE void load() override;
 
@@ -73,31 +79,33 @@ public slots:
     void setPlayTime(const QDateTime& time);
     void setMeasureNumber(int measureNumber);
     void setBeatNumber(int beatNumber);
+    void setTempoMultiplier(qreal multiplier);
 
 signals:
     void isToolbarFloatingChanged(bool floating);
     void isPlayAllowedChanged();
     void maxPlayTimeChanged();
-    void playTimeChanged();
+    void playPositionChanged();
+    void tempoChanged();
 
 private:
     void setupConnections();
+    muse::uicomponents::MenuItem* makeInputPitchMenu();
 
     void updateActions();
-    void onActionsStateChanges(const actions::ActionCodeList& codes) override;
+    void onActionsStateChanges(const muse::actions::ActionCodeList& codes) override;
 
-    bool isAdditionalAction(const actions::ActionCode& actionCode) const;
-
-    ui::MenuItem makeActionWithDescriptionAsTitle(const actions::ActionCode& actionCode) const;
+    bool isAdditionalAction(const muse::actions::ActionCode& actionCode) const;
 
     QTime totalPlayTime() const;
-    uint64_t totalPlayTimeMilliseconds() const;
     notation::MeasureBeat measureBeat() const;
 
-    void updatePlayTime();
+    muse::ui::UiAction playAction() const;
+
+    void updatePlayPosition(muse::audio::secs_t secs);
     void doSetPlayTime(const QTime& time);
 
-    void rewind(uint64_t milliseconds);
+    void rewind(muse::audio::secs_t secs);
     void rewindToBeat(const notation::MeasureBeat& beat);
 
     bool m_isToolbarFloating = false;

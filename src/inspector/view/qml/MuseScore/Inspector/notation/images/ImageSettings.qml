@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,8 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../common"
@@ -58,7 +58,7 @@ Column {
             propertyItem: root.model ? root.model.height : null
 
             icon: IconCode.VERTICAL
-            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("inspector", "sp") : qsTrc("inspector", "mm")
+            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("global", "sp") : qsTrc("global", "mm")
 
             navigationPanel: root.navigationPanel
             navigationRowStart: root.navigationRowStart + 1
@@ -68,10 +68,11 @@ Column {
             id: lockButton
 
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: heightControl.verticalCenter
 
             height: 20
             width: 20
+
+            y: heightControl.spinBox.y + (heightControl.spinBox.height - height) / 2
 
             icon: checked ? IconCode.LOCK_CLOSED : IconCode.LOCK_OPEN
 
@@ -97,39 +98,31 @@ Column {
 
             icon: IconCode.HORIZONTAL
             iconMode: IncrementalPropertyControl.Right
-            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("inspector", "sp") : qsTrc("inspector", "mm")
+            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("global", "sp") : qsTrc("global", "mm")
 
             navigationPanel: root.navigationPanel
             navigationRowStart: lockButton.navigation.row + 1
         }
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
-    CheckBox {
-        enabled: root.model ? root.model.shouldScaleToFrameSize.isEnabled : false
-        isIndeterminate: root.model ? root.model.shouldScaleToFrameSize.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.shouldScaleToFrameSize.value : false
+    PropertyCheckBox {
         text: qsTrc("inspector", "Scale to frame size")
+        propertyItem: root.model ? root.model.shouldScaleToFrameSize : null
 
         navigation.name: "ScaleToFrameSizeCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: imageWidthSection.navigationRowEnd + 1
-
-        onClicked: { root.model.shouldScaleToFrameSize.value = !checked }
     }
 
-    CheckBox {
+    PropertyCheckBox {
         id: staffSpaceUnitsCheckbox
-
-        isIndeterminate: root.model ? root.model.isSizeInSpatiums.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.isSizeInSpatiums.value : false
         text: qsTrc("inspector", "Use staff space units")
+        propertyItem: root.model ? root.model.isSizeInSpatiums : null
 
         navigation.name: "UseStaffSpaceUnitsCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: imageWidthSection.navigationRowEnd + 2
-
-        onClicked: { root.model.isSizeInSpatiums.value = !checked }
     }
 }

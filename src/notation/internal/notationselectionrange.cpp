@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -19,113 +19,67 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#include <cfloat>
+
 #include "notationselectionrange.h"
 
-#include "libmscore/masterscore.h"
-#include "libmscore/segment.h"
-#include "libmscore/measure.h"
-#include "libmscore/system.h"
-#include "libmscore/chordrest.h"
-#include "libmscore/skyline.h"
+#include "utilities/scorerangeutilities.h"
 
-#include "log.h"
-
-static const int SELECTION_SIDE_PADDING = 8;
+#include "engraving/dom/segment.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/chordrest.h"
+#include "engraving/dom/staff.h"
 
 using namespace mu::notation;
+using namespace mu::engraving;
 
 NotationSelectionRange::NotationSelectionRange(IGetScore* getScore)
     : m_getScore(getScore)
 {
 }
 
-int NotationSelectionRange::startStaffIndex() const
+staff_idx_t NotationSelectionRange::startStaffIndex() const
 {
-    const Ms::Selection& selection = score()->selection();
+    const mu::engraving::Selection& selection = score()->selection();
     return selection.staffStart();
 }
 
 Fraction NotationSelectionRange::startTick() const
 {
-    const Ms::Selection& selection = score()->selection();
+    const mu::engraving::Selection& selection = score()->selection();
     return selection.tickStart();
 }
 
-int NotationSelectionRange::endStaffIndex() const
+staff_idx_t NotationSelectionRange::endStaffIndex() const
 {
-    const Ms::Selection& selection = score()->selection();
+    const mu::engraving::Selection& selection = score()->selection();
     return selection.staffEnd();
 }
 
 Fraction NotationSelectionRange::endTick() const
 {
-    const Ms::Selection& selection = score()->selection();
+    const mu::engraving::Selection& selection = score()->selection();
     return selection.tickEnd();
 }
 
-int NotationSelectionRange::startMeasureIndex() const
+NotationSelectionRange::MeasureRange NotationSelectionRange::measureRange() const
 {
-    return measureRange().startIndex;
+    MeasureRange range;
+    score()->selection().measureRange(&range.startMeasure, &range.endMeasure);
+
+    return range;
 }
 
-int NotationSelectionRange::endMeasureIndex() const
+std::vector<muse::RectF> NotationSelectionRange::boundingArea() const
 {
-    return measureRange().endIndex;
-}
-
-std::vector<mu::RectF> NotationSelectionRange::boundingArea() const
-{
-    const Ms::Selection& selection = score()->selection();
-    if (!selection.isRange()) {
-        return {};
-    }
-
-    Ms::Segment* startSegment = rangeStartSegment();
-    Ms::Segment* endSegment = rangeEndSegment();
-    if (!endSegment) {
-        endSegment = score()->lastSegment();
-    }
-
-    if (!startSegment || !endSegment || startSegment->tick() > endSegment->tick()) {
-        return {};
-    }
-
-    std::vector<RectF> result;
-
-    std::vector<RangeSection> rangeSections = splitRangeBySections(startSegment, endSegment);
-
-    int lastStaff = selectionLastVisibleStaff();
-
-    for (const RangeSection& rangeSection: rangeSections) {
-        const Ms::System* sectionSystem = rangeSection.system;
-        const Ms::Segment* sectionStartSegment = rangeSection.startSegment;
-        const Ms::Segment* sectionEndSegment = rangeSection.endSegment;
-
-        Ms::SysStaff* segmentFirstStaff = sectionSystem->staff(score()->selection().staffStart());
-        Ms::SysStaff* segmentLastStaff = sectionSystem->staff(lastStaff);
-
-        int topY = sectionElementsMaxY(rangeSection);
-        int bottomY = sectionElementsMinY(rangeSection);
-
-        double x1 = sectionStartSegment->pagePos().x() - SELECTION_SIDE_PADDING;
-        double x2 = sectionEndSegment->pageBoundingRect().topRight().x();
-        double y1 = topY + segmentFirstStaff->y() + sectionStartSegment->pagePos().y() - SELECTION_SIDE_PADDING;
-        double y2 = bottomY + segmentLastStaff->y() + sectionStartSegment->pagePos().y() + SELECTION_SIDE_PADDING;
-
-        if (sectionStartSegment->measure()->first() == sectionStartSegment) {
-            x1 = sectionStartSegment->measure()->pagePos().x();
-        }
-
-        RectF rect = RectF(PointF(x1, y1), PointF(x2, y2)).translated(sectionSystem->page()->pos());
-        result.push_back(rect);
-    }
-
-    return result;
+    return ScoreRangeUtilities::boundingArea(score(),
+                                             rangeStartSegment(), rangeEndSegment(),
+                                             startStaffIndex(), endStaffIndex());
 }
 
 bool NotationSelectionRange::containsPoint(const PointF& point) const
 {
-    for (const mu::RectF& area : boundingArea()) {
+    for (const muse::RectF& area : boundingArea()) {
         if (area.contains(point)) {
             return true;
         }
@@ -134,16 +88,62 @@ bool NotationSelectionRange::containsPoint(const PointF& point) const
     return false;
 }
 
-Ms::Score* NotationSelectionRange::score() const
+/// When `item` is a Measure, use `staffIdx` to query whether a specific staff is contained in the selection.
+bool NotationSelectionRange::containsItem(const EngravingItem* item, engraving::staff_idx_t staffIdx) const
+{
+    Fraction itemTick = item->tick();
+    Fraction selectionStartTick = startTick();
+    Fraction selectionEndTick = endTick();
+
+    if (itemTick < selectionStartTick || itemTick >= selectionEndTick) {
+        return false;
+    }
+
+    if (item->isMeasure()) {
+        if (staffIdx != muse::nidx) {
+            return startStaffIndex() <= staffIdx && staffIdx < endStaffIndex();
+        }
+
+        return true;
+    }
+
+    track_idx_t itemTrack = item->track();
+    track_idx_t selectionStartTrack = VOICES * startStaffIndex();
+    track_idx_t selectionEndTrack = VOICES * (endStaffIndex() - 1) + VOICES;
+
+    return itemTrack >= selectionStartTrack && itemTrack < selectionEndTrack;
+}
+
+std::vector<const Part*> NotationSelectionRange::selectedParts() const
+{
+    std::vector<const Part*> result;
+
+    if (!score()->selection().isRange()) {
+        return result;
+    }
+
+    staff_idx_t startStaffIndex = this->startStaffIndex();
+    staff_idx_t endStaffIndex = this->endStaffIndex();
+
+    for (staff_idx_t i = startStaffIndex; i < endStaffIndex; ++i) {
+        const Staff* staff = score()->staff(i);
+
+        if (staff && staff->part()) {
+            result.push_back(staff->part());
+        }
+    }
+
+    return result;
+}
+
+mu::engraving::Score* NotationSelectionRange::score() const
 {
     return m_getScore->score();
 }
 
-Ms::Segment* NotationSelectionRange::rangeStartSegment() const
+mu::engraving::Segment* NotationSelectionRange::rangeStartSegment() const
 {
-    Ms::Segment* startSegment = score()->selection().startSegment();
-
-    startSegment->measure()->firstEnabled();
+    mu::engraving::Segment* startSegment = score()->selection().startSegment();
 
     if (!startSegment) {
         return nullptr;
@@ -154,147 +154,27 @@ Ms::Segment* NotationSelectionRange::rangeStartSegment() const
     }
 
     if (!startSegment->measure()->system()) {
-        const Measure* mmr = startSegment->measure()->mmRest1();
+        const Measure* mmr = startSegment->measure()->coveringMMRestOrThis();
         if (!mmr || mmr->system()) {
             return nullptr;
         }
-        startSegment = mmr->first(Ms::SegmentType::ChordRest);
+        startSegment = mmr->first(mu::engraving::SegmentType::ChordRest);
     }
 
     return startSegment;
 }
 
-Ms::Segment* NotationSelectionRange::rangeEndSegment() const
+mu::engraving::Segment* NotationSelectionRange::rangeEndSegment() const
 {
-    Ms::Segment* endSegment = score()->selection().endSegment();
+    mu::engraving::Segment* endSegment = score()->selection().endSegment();
 
-    if (!endSegment) {
-        return nullptr;
-    }
-
-    if (!endSegment->enabled()) {
+    if (endSegment && !endSegment->enabled()) {
         endSegment = endSegment->next1MMenabled();
     }
 
+    if (!endSegment) {
+        endSegment = score()->lastSegmentMM();
+    }
+
     return endSegment;
-}
-
-int NotationSelectionRange::selectionLastVisibleStaff() const
-{
-    for (int i = score()->selection().staffEnd() - 1; i >= 0; --i) {
-        if (score()->staff(i)->show()) {
-            return i;
-        }
-    }
-
-    return 0;
-}
-
-std::vector<NotationSelectionRange::RangeSection> NotationSelectionRange::splitRangeBySections(const Ms::Segment* rangeStartSegment,
-                                                                                               const Ms::Segment* rangeEndSegment) const
-{
-    std::vector<RangeSection> sections;
-
-    const Ms::Segment* startSegment = rangeStartSegment;
-    for (const Ms::Segment* segment = rangeStartSegment; segment && (segment != rangeEndSegment);) {
-        Ms::System* currentSegmentSystem = segment->measure()->system();
-
-        Ms::Segment* nextSegment = segment->next1MMenabled();
-        Ms::System* nextSegmentSystem = nextSegment->measure()->system();
-
-        if (!nextSegmentSystem) {
-            const Measure* mmr = nextSegment->measure()->mmRest1();
-            if (mmr) {
-                nextSegmentSystem = mmr->system();
-            }
-            if (!nextSegmentSystem) {
-                break;
-            }
-        }
-
-        if (nextSegmentSystem != currentSegmentSystem || nextSegment == rangeEndSegment) {
-            RangeSection section;
-            section.system = currentSegmentSystem;
-            section.startSegment = startSegment;
-            section.endSegment = segment;
-
-            sections.push_back(section);
-            startSegment = nextSegment;
-        }
-
-        segment = nextSegment;
-    }
-
-    return sections;
-}
-
-int NotationSelectionRange::sectionElementsMaxY(const NotationSelectionRange::RangeSection& selection) const
-{
-    const Ms::System* segmentSystem = selection.system;
-    const Ms::Segment* startSegment = selection.startSegment;
-    const Ms::Segment* endSegment = selection.endSegment;
-
-    Ms::SysStaff* segmentFirstStaff = segmentSystem->staff(score()->selection().staffStart());
-
-    Ms::SkylineLine north = segmentFirstStaff->skyline().north();
-    int maxY = INT_MAX;
-    for (Ms::SkylineSegment segment: north) {
-        bool ok = segment.x >= startSegment->pagePos().x() && segment.x <= endSegment->pagePos().x();
-        if (!ok) {
-            continue;
-        }
-
-        if (segment.y < maxY) {
-            maxY = segment.y;
-        }
-    }
-
-    if (maxY == INT_MAX) {
-        maxY = 0;
-    }
-
-    return maxY;
-}
-
-int NotationSelectionRange::sectionElementsMinY(const NotationSelectionRange::RangeSection& selection) const
-{
-    const Ms::System* segmentSystem = selection.system;
-    const Ms::Segment* startSegment = selection.startSegment;
-    const Ms::Segment* endSegment = selection.endSegment;
-
-    int lastStaff = selectionLastVisibleStaff();
-    Ms::SysStaff* segmentLastStaff = segmentSystem->staff(lastStaff);
-
-    Ms::SkylineLine south = segmentLastStaff->skyline().south();
-    int minY = INT_MIN;
-    for (Ms::SkylineSegment segment: south) {
-        bool ok = segment.x >= startSegment->pagePos().x() && segment.x <= endSegment->pagePos().x();
-        if (!ok) {
-            continue;
-        }
-
-        if (segment.y > minY) {
-            minY = segment.y;
-        }
-    }
-
-    if (minY == INT_MIN) {
-        minY = segmentLastStaff->bbox().height();
-    }
-
-    return minY;
-}
-
-NotationSelectionRange::MeasureRange NotationSelectionRange::measureRange() const
-{
-    const Ms::Selection& selection = score()->selection();
-    Measure* startMeasure = nullptr;
-    Measure* endMeasure = nullptr;
-    selection.measureRange(&startMeasure, &endMeasure);
-
-    MeasureRange range;
-    range.startIndex = startMeasure ? startMeasure->index() : 0;
-    range.endIndex = endMeasure ? endMeasure->index() : 0;
-
-    return range;
 }

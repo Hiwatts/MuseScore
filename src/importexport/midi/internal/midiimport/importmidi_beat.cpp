@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,9 +32,10 @@
 #include "importmidi_tempo.h"
 #include "importmidi_operations.h"
 #include "thirdparty/beatroot/BeatTracker.h"
-#include "libmscore/mscore.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/sig.h"
 
-namespace Ms {
+namespace mu::iex::midi {
 namespace MidiBeat {
 int beatsInBar(const ReducedFraction& barFraction)
 {
@@ -301,7 +302,7 @@ std::vector<ReducedFraction> findTimeSignatures(const ReducedFraction& timeSigFr
     return fractions;
 }
 
-void setTimeSig(TimeSigMap* sigmap, const ReducedFraction& timeSig)
+void setTimeSig(engraving::TimeSigMap* sigmap, const ReducedFraction& timeSig)
 {
     sigmap->clear();
     sigmap->add(0, timeSig.fraction());
@@ -309,7 +310,7 @@ void setTimeSig(TimeSigMap* sigmap, const ReducedFraction& timeSig)
 
 void findBeatLocations(
     const std::multimap<ReducedFraction, MidiChord>& allChords,
-    TimeSigMap* sigmap,
+    engraving::TimeSigMap* sigmap,
     double ticksPerSec)
 {
     const size_t MIN_BEAT_COUNT = 8;
@@ -423,7 +424,7 @@ void adjustChordsToBeats(std::multimap<int, MTrack>& tracks)
 
         Q_ASSERT_X(beats.size() > 1, "MidiBeat::adjustChordsToBeats", "Human beat count < 2");
 
-        const auto newBeatLen = ReducedFraction::fromTicks(MScore::division);
+        const auto newBeatLen = ReducedFraction::fromTicks(engraving::Constants::DIVISION);
 
         for (auto trackIt = tracks.begin(); trackIt != tracks.end(); ++trackIt) {
             auto& chords = trackIt->second.chords;
@@ -501,7 +502,7 @@ void updateFirstLastBeats(MidiOperations::HumanBeatData& beatData, const Reduced
                            beatsInBar, beatData.addedLastBeats);
 }
 
-void setTimeSignature(TimeSigMap* sigmap)
+void setTimeSignature(engraving::TimeSigMap* sigmap)
 {
     auto* data = midiImportOperations.data();
     const std::set<ReducedFraction>& beats = data->humanBeatData.beatSet;
@@ -514,4 +515,4 @@ void setTimeSignature(TimeSigMap* sigmap)
     updateFirstLastBeats(data->humanBeatData, timeSig);
 }
 } // namespace MidiBeat
-} // namespace Ms
+} // namespace mu::iex::midi

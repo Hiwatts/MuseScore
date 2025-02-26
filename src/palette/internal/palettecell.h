@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,42 +22,58 @@
 #ifndef MU_PALETTE_PALETTECELL_H
 #define MU_PALETTE_PALETTECELL_H
 
-#include "libmscore/engravingitem.h"
+#include "engraving/dom/engravingitem.h"
+
+#include <QAccessibleInterface>
 
 #include "modularity/ioc.h"
 #include "ui/iuiactionsregister.h"
 
-namespace Ms {
+namespace mu::engraving {
 class XmlReader;
 class XmlWriter;
 }
 
 namespace mu::palette {
-struct PaletteCell;
+class PaletteCell;
 using PaletteCellPtr = std::shared_ptr<PaletteCell>;
 using PaletteCellConstPtr = std::shared_ptr<const PaletteCell>;
 
-struct PaletteCell
+class AccessiblePaletteCellInterface : public QAccessibleInterface
 {
-    INJECT_STATIC(palette, mu::ui::IUiActionsRegister, actionsRegister)
+public:
+    AccessiblePaletteCellInterface(PaletteCell* cell);
 
-    explicit PaletteCell();
-    PaletteCell(Ms::ElementPtr e, const QString& _name, qreal _mag = 1.0);
+    bool isValid() const override;
+    QObject* object() const override;
+    QAccessibleInterface* childAt(int x, int y) const override;
+    QAccessibleInterface* parent() const override;
+    QAccessibleInterface* child(int index) const override;
+    int childCount() const override;
+    int indexOfChild(const QAccessibleInterface*) const override;
+    QString text(QAccessible::Text t) const override;
+    void setText(QAccessible::Text t, const QString& text) override;
+    QRect rect() const override;
+    QAccessible::Role role() const override;
+    QAccessible::State state() const override;
 
-    Ms::ElementPtr element;
-    Ms::ElementPtr untranslatedElement;
-    QString id;
-    QString name; // used for tool tip
+private:
+    QObject* parentWidget() const;
 
-    bool drawStaff { false };
-    double xoffset { 0.0 }; // in spatium units of "gscore"
-    double yoffset { 0.0 };
-    qreal mag      { 1.0 };
-    bool readOnly { false };
+    PaletteCell* m_cell = nullptr;
+};
 
-    bool visible { true };
-    bool custom { false };
-    bool active { false };
+class PaletteCell : public QObject
+{
+    Q_OBJECT
+    INJECT_STATIC(muse::ui::IUiActionsRegister, actionsRegister)
+
+public:
+    explicit PaletteCell(QObject* parent = nullptr);
+    PaletteCell(mu::engraving::ElementPtr e, const QString& _name, qreal _mag = 1.0,
+                const QPointF& offset = QPointF(), const QString& tag = "", QObject* parent = nullptr);
+
+    static QAccessibleInterface* accessibleInterface(QObject* object);
 
     static constexpr const char* mimeDataFormat = "application/musescore/palette/cell";
 
@@ -67,19 +83,33 @@ struct PaletteCell
     void retranslate();
     void setElementTranslated(bool translate);
 
-    void write(Ms::XmlWriter& xml) const;
-    bool read(Ms::XmlReader&);
+    void write(mu::engraving::XmlWriter& xml, bool pasteMode) const;
+    bool read(mu::engraving::XmlReader&, bool pasteMode);
     QByteArray toMimeData() const;
 
     static PaletteCellPtr fromMimeData(const QByteArray& data);
     static PaletteCellPtr fromElementMimeData(const QByteArray& data);
 
+    mu::engraving::ElementPtr element;
+    mu::engraving::ElementPtr untranslatedElement;
+    QString id;
+
+    QString name; // used for tool tip
+    qreal mag { 1.0 };
+    double xoffset { 0.0 }; // in spatium units of "gscore"
+    double yoffset { 0.0 };
+    QString tag;
+
+    bool drawStaff { false };
+    bool readOnly { false };
+    bool visible { true };
+    bool custom { false };
+    bool active { false };
+    bool focused { false };
+
 private:
     static QString makeId();
 };
 }
-
-Q_DECLARE_METATYPE(mu::palette::PaletteCell*)
-Q_DECLARE_METATYPE(const mu::palette::PaletteCell*)
 
 #endif // MU_PALETTE_PALETTECELL_H

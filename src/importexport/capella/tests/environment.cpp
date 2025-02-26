@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,16 +22,29 @@
 
 #include "testing/environment.h"
 
-#include "log.h"
-#include "framework/fonts/fontsmodule.h"
+#include "draw/drawmodule.h"
 #include "engraving/engravingmodule.h"
+#include "engraving/tests/utils/scorerw.h"
 
-static mu::testing::SuiteEnvironment importexport_se(
+#include "engraving/dom/instrtemplate.h"
+#include "engraving/dom/mscore.h"
+
+#include "log.h"
+
+static muse::testing::SuiteEnvironment importexport_se(
 {
-    new mu::fonts::FontsModule(), // needs for libmscore
+    new muse::draw::DrawModule(),
     new mu::engraving::EngravingModule()
 },
+    nullptr,
     []() {
-    LOGI() << "braille tests suite post init";
+    LOGI() << "capella tests suite post init";
+
+    mu::engraving::ScoreRW::setRootPath(muse::String::fromUtf8(iex_capella_tests_DATA_ROOT));
+
+    mu::engraving::MScore::testMode = true;
+    mu::engraving::MScore::noGui = true;
+
+    mu::engraving::loadInstrumentTemplates(":/data/instruments.xml");
 }
     );

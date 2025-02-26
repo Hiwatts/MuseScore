@@ -1,4 +1,4 @@
-﻿/*
+/*
  * SPDX-License-Identifier: GPL-3.0-only
  * MuseScore-CLA-applies
  *
@@ -22,11 +22,14 @@
 
 #include "dialogview.h"
 
+#include <QStyle>
 #include <QWindow>
+#include <QScreen>
+#include <QApplication>
 
 #include "log.h"
 
-using namespace mu::uicomponents;
+using namespace muse::uicomponents;
 
 static const int DIALOG_WINDOW_FRAME_HEIGHT(20);
 
@@ -34,7 +37,7 @@ DialogView::DialogView(QQuickItem* parent)
     : PopupView(parent)
 {
     setObjectName("DialogView");
-    m_closePolicy = NoAutoClose;
+    setClosePolicies(ClosePolicy::NoAutoClose);
 }
 
 bool DialogView::isDialog() const
@@ -42,25 +45,12 @@ bool DialogView::isDialog() const
     return true;
 }
 
-void DialogView::beforeShow()
+void DialogView::beforeOpen()
 {
-    if (!m_localPos.isNull()) {
-        return;
+    //! NOTE Set default title
+    if (m_title.isEmpty()) {
+        setTitle(application()->title());
     }
-
-    QWindow* qMainWindow = mainWindow()->qWindow();
-    IF_ASSERT_FAILED(qMainWindow) {
-        return;
-    }
-
-    QRect appRect = qMainWindow->geometry();
-    const QRect& dlgRect = geometry();
-
-    m_globalPos.setX(appRect.x() + (appRect.width() / 2 - dlgRect.width() / 2));
-    m_globalPos.setY(appRect.y() + (appRect.height() / 2 - dlgRect.height() / 2) - DIALOG_WINDOW_FRAME_HEIGHT);
-
-    //! NOTE ok will be if they call accept
-    setErrCode(Ret::Code::Cancel);
 }
 
 void DialogView::onHidden()
@@ -72,10 +62,86 @@ void DialogView::onHidden()
     }
 }
 
+QScreen* DialogView::resolveScreen() const
+{
+    QWindow* qMainWindow = mainWindow()->qWindow();
+    QScreen* mainWindowScreen = qMainWindow->screen();
+    if (!mainWindowScreen) {
+        mainWindowScreen = QGuiApplication::primaryScreen();
+    }
+
+    return mainWindowScreen;
+}
+
+void DialogView::updateGeometry()
+{
+    const QScreen* screen = resolveScreen();
+    QRect anchorRect = screen->availableGeometry();
+
+    const QWindow* qMainWindow = mainWindow()->qWindow();
+    bool mainWindowVisible = qMainWindow->isVisible();
+    QRect referenceRect = qMainWindow->geometry();
+
+    if (referenceRect.isEmpty() || !mainWindowVisible) {
+        referenceRect = anchorRect;
+    }
+
+    QRect dlgRect = viewGeometry();
+
+    // position the dialog in the center of the main window
+    dlgRect.moveLeft(referenceRect.x() + (referenceRect.width() - dlgRect.width()) / 2);
+    dlgRect.moveTop(referenceRect.y() + (referenceRect.height() - dlgRect.height()) / 2 + DIALOG_WINDOW_FRAME_HEIGHT);
+
+    dlgRect.moveLeft(dlgRect.x() + m_localPos.x());
+    dlgRect.moveTop(dlgRect.y() + m_localPos.y());
+
+    // try to move the dialog if it doesn't fit on the screen
+
+    int titleBarHeight = QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
+
+    if (dlgRect.left() <= anchorRect.left()) {
+        dlgRect.moveLeft(anchorRect.left() + DIALOG_WINDOW_FRAME_HEIGHT);
+    }
+
+    if (dlgRect.top() - titleBarHeight <= anchorRect.top()) {
+        dlgRect.moveTop(anchorRect.top() + titleBarHeight + DIALOG_WINDOW_FRAME_HEIGHT);
+    }
+
+    if (dlgRect.right() >= anchorRect.right()) {
+        dlgRect.moveRight(anchorRect.right() - DIALOG_WINDOW_FRAME_HEIGHT);
+    }
+
+    if (dlgRect.bottom() >= anchorRect.bottom()) {
+        dlgRect.moveBottom(anchorRect.bottom() - DIALOG_WINDOW_FRAME_HEIGHT);
+    }
+
+    // if after moving the dialog does not fit on the screen, then adjust the size of the dialog
+    if (!anchorRect.contains(dlgRect)) {
+        anchorRect -= QMargins(DIALOG_WINDOW_FRAME_HEIGHT, DIALOG_WINDOW_FRAME_HEIGHT + titleBarHeight,
+                               DIALOG_WINDOW_FRAME_HEIGHT, DIALOG_WINDOW_FRAME_HEIGHT);
+        dlgRect = anchorRect.intersected(dlgRect);
+    }
+
+    m_globalPos = dlgRect.topLeft();
+
+    setContentWidth(dlgRect.width());
+    setContentHeight(dlgRect.height());
+
+    //! NOTE ok will be if they call accept
+    setErrCode(Ret::Code::Cancel);
+}
+
+QRect DialogView::viewGeometry() const
+{
+    return QRect(m_globalPos.toPoint(), QSize(contentWidth(), contentHeight()));
+}
+
 void DialogView::exec()
 {
     open();
     m_loop.exec();
+
+    activateNavigationParentControl();
 }
 
 void DialogView::show()
@@ -86,6 +152,13 @@ void DialogView::show()
 void DialogView::hide()
 {
     close();
+}
+
+void DialogView::raise()
+{
+    if (isOpened()) {
+        m_window->raise();
+    }
 }
 
 void DialogView::accept()

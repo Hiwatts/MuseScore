@@ -24,7 +24,7 @@
 
 #include "log.h"
 
-using namespace mu::uicomponents;
+using namespace muse::uicomponents;
 
 SelectableItemListModel::Item::Item(QObject* parent)
     : QObject(parent)
@@ -134,6 +134,10 @@ void SelectableItemListModel::moveSelectionDown()
 void SelectableItemListModel::removeSelection()
 {
     TRACEFUNC;
+
+    if (!isRemovingAvailable()) {
+        return;
+    }
 
     QList<int> selectedRows = m_selection->selectedRows();
     if (selectedRows.isEmpty()) {

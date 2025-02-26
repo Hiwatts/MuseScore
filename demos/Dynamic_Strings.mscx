@@ -27,7 +27,6 @@
     <metaTag name="movementNumber"></metaTag>
     <metaTag name="movementTitle"></metaTag>
     <metaTag name="platform">Linux</metaTag>
-    <metaTag name="poet"></metaTag>
     <metaTag name="source"></metaTag>
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
@@ -283,11 +282,11 @@
       <VBox>
         <height>10</height>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Dynamic Strings</text>
           </Text>
         <Text>
-          <style>Composer</style>
+          <style>composer</style>
           <text>James Thistlewood</text>
           </Text>
         </VBox>

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2024 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,15 +21,16 @@
  */
 #include "staffcontroltreeitem.h"
 
-#include "engraving/libmscore/factory.h"
+#include "engraving/dom/factory.h"
 
 using namespace mu::instrumentsscene;
 using namespace mu::notation;
+using namespace mu::engraving;
 
 StaffControlTreeItem::StaffControlTreeItem(IMasterNotationPtr masterNotation, INotationPtr notation, QObject* parent)
-    : AbstractInstrumentsPanelTreeItem(InstrumentsTreeItemType::ItemType::CONTROL_ADD_STAFF, masterNotation, notation, parent)
+    : AbstractLayoutPanelTreeItem(LayoutPanelItemType::CONTROL_ADD_STAFF, masterNotation, notation, parent)
 {
-    setTitle(qtrc("instruments", "Add staff"));
+    setTitle(muse::qtrc("layoutpanel", "Add staff"));
 }
 
 void StaffControlTreeItem::init(const ID& partId)
@@ -44,9 +45,9 @@ void StaffControlTreeItem::appendNewItem()
         return;
     }
 
-    int lastStaffIndex = part->nstaves();
+    staff_idx_t lastStaffIndex = part->nstaves();
 
-    Staff* staff = engraving::Factory::createStaff(const_cast<Part*>(part));
+    Staff* staff = Factory::createStaff(const_cast<Part*>(part));
     staff->setDefaultClefType(part->instrument()->clefType(lastStaffIndex));
 
     masterNotation()->parts()->appendStaff(staff, m_partId);

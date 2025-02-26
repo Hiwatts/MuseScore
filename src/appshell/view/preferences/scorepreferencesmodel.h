@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -31,14 +31,12 @@
 #include "audio/iaudioconfiguration.h"
 
 namespace mu::appshell {
-class ScorePreferencesModel : public QAbstractListModel, public async::Asyncable
+class ScorePreferencesModel : public QAbstractListModel, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
-    INJECT(appshell, audio::IAudioConfiguration, audioConfiguration)
-
-    Q_PROPERTY(bool isShowMIDIControls READ isShowMIDIControls WRITE setIsShowMIDIControls NOTIFY isShowMIDIControlsChanged)
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
+    muse::Inject<muse::audio::IAudioConfiguration> audioConfiguration = { this };
 
 public:
     explicit ScorePreferencesModel(QObject* parent = nullptr);
@@ -49,14 +47,6 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void load();
-
-    bool isShowMIDIControls() const;
-
-public slots:
-    void setIsShowMIDIControls(bool value);
-
-signals:
-    void isShowMIDIControlsChanged(bool isShowMIDIControls);
 
 private:
     enum Roles {
@@ -69,8 +59,6 @@ private:
 
     enum class DefaultFileType {
         Undefined,
-        FirstInstrumentList,
-        SecondInstrumentList,
         FirstScoreOrderList,
         SecondScoreOrderList,
         Style,
@@ -81,17 +69,11 @@ private:
         DefaultFileType type = DefaultFileType::Undefined;
         QString title;
         QString path;
-        QString pathFilter;
+        QStringList pathFilter;
         QString chooseTitle;
     };
 
     void savePath(DefaultFileType fileType, const QString& path);
-
-    QString firstInstrumentListPath() const;
-    void setFirstInstrumentListPath(const QString& path);
-
-    QString secondInstrumentListPath() const;
-    void setSecondInstrumentListPath(const QString& path);
 
     QString firstScoreOrderListPath() const;
     void setFirstScoreOrderListPath(const QString& path);
@@ -102,11 +84,9 @@ private:
     QString stylePath() const;
     QString partStylePath() const;
 
-    QString instrumentPathFilter() const;
-    QString scoreOrderPathFilter() const;
-    QString stylePathFilter() const;
+    QStringList scoreOrderPathFilter() const;
+    QStringList stylePathFilter() const;
 
-    QString instrumentChooseTitle() const;
     QString scoreOrderChooseTitle() const;
     QString styleChooseTitle() const;
     QString partStyleChooseTitle() const;

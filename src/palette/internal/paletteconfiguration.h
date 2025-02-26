@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,16 +23,17 @@
 #define MU_PALETTE_PALETTECONFIGURATION_H
 
 #include "../ipaletteconfiguration.h"
+#include "async/asyncable.h"
 
 #include "modularity/ioc.h"
 #include "iglobalconfiguration.h"
 #include "ui/iuiconfiguration.h"
 
 namespace mu::palette {
-class PaletteConfiguration : public IPaletteConfiguration
+class PaletteConfiguration : public IPaletteConfiguration, public muse::async::Asyncable
 {
-    INJECT(palette, ui::IUiConfiguration, uiConfiguration)
-    INJECT(palette, framework::IGlobalConfiguration, globalConfiguration)
+    INJECT(muse::ui::IUiConfiguration, uiConfiguration)
+    INJECT(muse::IGlobalConfiguration, globalConfiguration)
 
 public:
     void init();
@@ -42,32 +43,42 @@ public:
 
     double paletteSpatium() const override;
 
-    bool isSinglePalette() const override;
+    muse::ValCh<bool> isSinglePalette() const override;
     void setIsSinglePalette(bool isSingle) override;
+
+    muse::ValCh<bool> isSingleClickToOpenPalette() const override;
+    void setIsSingleClickToOpenPalette(bool isSingleClick) override;
+
+    muse::ValCh<bool> isPaletteDragEnabled() const override;
+    void setIsPaletteDragEnabled(bool enabled) override;
 
     QColor elementsBackgroundColor() const override;
     QColor elementsColor() const override;
     QColor gridColor() const override;
     QColor accentColor() const override;
-    async::Notification colorsChanged() const override;
+    muse::async::Notification colorsChanged() const override;
 
-    io::path keySignaturesDirPath() const override;
-    io::path timeSignaturesDirPath() const override;
+    muse::io::path_t keySignaturesDirPath() const override;
+    muse::io::path_t timeSignaturesDirPath() const override;
 
     bool useFactorySettings() const override;
     bool enableExperimental() const override;
 
-    ValCh<PaletteConfig> paletteConfig(const QString& paletteId) const override;
+    muse::ValCh<PaletteConfig> paletteConfig(const QString& paletteId) const override;
     void setPaletteConfig(const QString& paletteId, const PaletteConfig& config) override;
 
-    ValCh<PaletteCellConfig> paletteCellConfig(const QString& cellId) const override;
+    muse::ValCh<PaletteCellConfig> paletteCellConfig(const QString& cellId) const override;
     void setPaletteCellConfig(const QString& cellId, const PaletteCellConfig& config) override;
 
 private:
-    QColor themeColor(ui::ThemeStyleKey key) const;
+    QColor themeColor(muse::ui::ThemeStyleKey key) const;
 
-    mutable QHash<QString, ValCh<PaletteConfig> > m_paletteConfigs;
-    mutable QHash<QString, ValCh<PaletteCellConfig> > m_paletteCellsConfigs;
+    muse::ValCh<bool> m_isSinglePalette;
+    muse::ValCh<bool> m_isSingleClickToOpenPalette;
+    muse::ValCh<bool> m_isPaletteDragEnabled;
+
+    mutable QHash<QString, muse::ValCh<PaletteConfig> > m_paletteConfigs;
+    mutable QHash<QString, muse::ValCh<PaletteCellConfig> > m_paletteCellsConfigs;
 };
 }
 

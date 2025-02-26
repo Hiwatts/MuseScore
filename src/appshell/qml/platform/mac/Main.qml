@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,109 +20,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import Qt.labs.platform 1.1 as PLATFORM
 
 import MuseScore.AppShell 1.0
 
+import "../"
 import "../../"
 
 AppWindow {
     id: root
 
-    PLATFORM.MenuBar {
+    PlatformMenuBar {
         id: menuBar
     }
 
-    AppMenuModel {
-        id: menuModel
-    }
-
     Component.onCompleted: {
-        menuModel.load()
-
-        for (var i in menuModel.items) {
-            var item = menuModel.items[i]
-            var menu = makeMenu(item)
-
-            for (var j in item.subitems) {
-                var menuItem = makeMenuItem(menu, item.subitems[j])
-                menu.addItem(menuItem)
-            }
-
-            menuBar.addMenu(menu)
-        }
-
-        menuModel.itemsChanged.connect(function() {
-            for (var i in menuModel.items) {
-                menuBar.menus[i].subitems = menuModel.items[i].subitems
-            }
-        })
-    }
-
-    function makeMenu(menuInfo) {
-        var menu = menuComponent.createObject(menuBar)
-
-        menu.title = menuInfo.title
-        menu.enabled = menuInfo.enabled
-        menu.subitems = menuInfo.subitems
-
-        return menu
-    }
-
-    function makeMenuItem(parentMenu, itemInfo) {
-        var menuItem = menuItemComponent.createObject(parentMenu)
-
-        menuItem.id = itemInfo.id
-        menuItem.text = itemInfo.title
-        menuItem.enabled = itemInfo.enabled
-        menuItem.checked = itemInfo.checked
-        menuItem.checkable = itemInfo.checkable
-        menuItem.shortcut = itemInfo.shortcut
-        menuItem.separator = !Boolean(itemInfo.title)
-
-        return menuItem
-    }
-
-    Component {
-        id: menuComponent
-
-        PLATFORM.Menu {
-            property var subitems: []
-
-            onAboutToShow: {
-                clear()
-
-                for (var i in subitems) {
-                    var item = subitems[i]
-                    var isMenu = Boolean(item.subitems) && item.subitems.length > 0
-
-                    if (isMenu) {
-                        var subMenu = makeMenu(item)
-
-                        addMenu(subMenu)
-                    } else {
-                        var menuItem = makeMenuItem(this, item)
-
-                        addItem(menuItem)
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: menuItemComponent
-
-        PLATFORM.MenuItem {
-            property string id: ""
-
-            onTriggered: {
-                Qt.callLater(menuModel.handleMenuItem, id)
-            }
-        }
+        menuBar.load();
+        window.init()
     }
 
     WindowContent {
+        id: window
+
         anchors.fill: parent
     }
 }

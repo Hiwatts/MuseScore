@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 #ifndef MU_PROJECT_IPROJECTMIGRATOR_H
 #define MU_PROJECT_IPROJECTMIGRATOR_H
 
-#include "modularity/imoduleexport.h"
-#include "ret.h"
+#include "modularity/imoduleinterface.h"
+#include "types/ret.h"
 #include "engraving/engravingproject.h"
 
 namespace mu::project {
@@ -34,7 +34,7 @@ class IProjectMigrator : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IProjectMigrator() = default;
 
-    virtual Ret migrateEngravingProjectIfNeed(engraving::EngravingProjectPtr project) = 0;
+    virtual muse::Ret migrateEngravingProjectIfNeed(engraving::EngravingProjectPtr project) = 0;
 };
 }
 

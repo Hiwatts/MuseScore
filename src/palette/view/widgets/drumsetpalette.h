@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,8 +28,10 @@
 
 #include "modularity/ioc.h"
 #include "actions/iactionsdispatcher.h"
+#include "playback/iplaybackcontroller.h"
+#include "engraving/rendering/isinglerenderer.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Drumset;
 }
 
@@ -38,7 +40,9 @@ class DrumsetPalette : public PaletteScrollArea
 {
     Q_OBJECT
 
-    INJECT(Ms, mu::actions::IActionsDispatcher, dispatcher)
+    INJECT(muse::actions::IActionsDispatcher, dispatcher)
+    INJECT(playback::IPlaybackController, playback)
+    INJECT(engraving::rendering::ISingleRenderer, engravingRenderer)
 
 public:
     explicit DrumsetPalette(QWidget* parent = nullptr);
@@ -47,10 +51,12 @@ public:
     void updateDrumset();
     bool handleEvent(QEvent* event);
 
-    mu::async::Channel<QString> pitchNameChanged() const;
+    muse::async::Channel<QString> pitchNameChanged() const;
+
+    PaletteWidget* paletteWidget() const;
 
 private slots:
-    void drumNoteSelected(int val);
+    void drumNoteClicked(int val);
 
 private:
     void clear();
@@ -58,18 +64,21 @@ private:
     void changeEvent(QEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
-    void enterEvent(QEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void enterEvent(QEnterEvent* event) override;
     void leaveEvent(QEvent* event) override;
 
     int selectedDrumNote();
     void retranslate();
 
+    void previewSound(const mu::engraving::Chord* chord, bool newChordSelected, const notation::NoteInputState& inputState);
+
     mu::notation::INotationNoteInputPtr noteInput() const;
 
     PaletteWidget* m_drumPalette = nullptr;
-    const Ms::Drumset* m_drumset = nullptr;
+    const mu::engraving::Drumset* m_drumset = nullptr;
     mu::notation::INotationPtr m_notation;
-    mu::async::Channel<QString> m_pitchNameChanged;
+    muse::async::Channel<QString> m_pitchNameChanged;
 };
 }
 

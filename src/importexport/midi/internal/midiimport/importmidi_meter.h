@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,9 +25,12 @@
 #include <vector>
 #include <QList>
 
-namespace Ms {
-class ReducedFraction;
+namespace mu::engraving {
 class TDuration;
+}
+
+namespace mu::iex::midi {
+class ReducedFraction;
 
 namespace MidiTuplet {
 struct TupletData;
@@ -72,11 +75,11 @@ std::vector<ReducedFraction> divisionsOfBarForTuplets(const ReducedFraction& bar
 
 // duration and all tuplets should belong to the same voice
 // nested tuplets are not allowed
-QList<std::pair<ReducedFraction, TDuration> >
+QList<std::pair<ReducedFraction, engraving::TDuration> >
 toDurationList(const ReducedFraction& startTickInBar, const ReducedFraction& endTickInBar, const ReducedFraction& barFraction,
                const std::vector<MidiTuplet::TupletData>& tupletsInBar, DurationType durationType, bool useDots,
                bool printRestRemains = true);
 } // namespace Meter
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_METER_H

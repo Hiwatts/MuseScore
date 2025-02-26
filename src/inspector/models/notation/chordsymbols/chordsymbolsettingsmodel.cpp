@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,21 +29,21 @@ ChordSymbolSettingsModel::ChordSymbolSettingsModel(QObject* parent, IElementRepo
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_CHORD_SYMBOL);
-    setTitle(qtrc("inspector", "Chord symbol"));
-    setIcon(ui::IconCode::Code::CHORD_SYMBOL);
+    setTitle(muse::qtrc("inspector", "Chord symbol"));
+    setIcon(muse::ui::IconCode::Code::CHORD_SYMBOL);
     createProperties();
 }
 
 void ChordSymbolSettingsModel::createProperties()
 {
-    m_isLiteral = buildPropertyItem(Ms::Pid::HARMONY_VOICE_LITERAL);
-    m_voicingType = buildPropertyItem(Ms::Pid::HARMONY_VOICING);
-    m_durationType = buildPropertyItem(Ms::Pid::HARMONY_DURATION);
+    m_isLiteral = buildPropertyItem(mu::engraving::Pid::HARMONY_VOICE_LITERAL);
+    m_voicingType = buildPropertyItem(mu::engraving::Pid::HARMONY_VOICING);
+    m_durationType = buildPropertyItem(mu::engraving::Pid::HARMONY_DURATION);
 }
 
 void ChordSymbolSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::HARMONY);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::HARMONY);
 }
 
 void ChordSymbolSettingsModel::loadProperties()

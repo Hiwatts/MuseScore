@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,59 +22,97 @@
 
 #include "templatesrepository.h"
 
+#include "io/path.h"
+#include "translation.h"
 #include "log.h"
 
-#include "io/path.h"
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
-using namespace mu;
+using namespace muse;
 using namespace mu::project;
 
 RetVal<Templates> TemplatesRepository::templates() const
 {
-    Templates result;
+    TRACEFUNC;
 
-    for (const io::path& dirPath: configuration()->availableTemplatesPaths()) {
-        QStringList filters { "*.mscz", "*.mscx" };
-        RetVal<io::paths> files = fileSystem()->scanFiles(dirPath, filters);
+    Templates templates;
 
+    for (const muse::io::path_t& dir : configuration()->availableTemplateDirs()) {
+        templates << readTemplates(dir);
+    }
+
+    return RetVal<Templates>::make_ok(templates);
+}
+
+Templates TemplatesRepository::readTemplates(const muse::io::path_t& dirPath) const
+{
+    TRACEFUNC;
+
+    muse::io::path_t categoriesJsonPath = configuration()->templateCategoriesJsonPath(dirPath);
+
+    if (!fileSystem()->exists(categoriesJsonPath)) {
+        RetVal<io::paths_t> files = fileSystem()->scanFiles(dirPath, { "*.mscz", "*.mscx" });
         if (!files.ret) {
             LOGE() << files.ret.toString();
-            continue;
+            return Templates();
         }
 
-        result << loadTemplates(files.val);
+        return readTemplates(files.val, muse::qtrc("project", "My templates"), true /*isCustom*/);
     }
 
-    return RetVal<Templates>::make_ok(result);
+    RetVal<ByteArray> categoriesJson = fileSystem()->readFile(categoriesJsonPath);
+    if (!categoriesJson.ret) {
+        LOGE() << categoriesJson.ret.toString();
+        return Templates();
+    }
+
+    QJsonDocument document = QJsonDocument::fromJson(categoriesJson.val.toQByteArrayNoCopy());
+    QVariantList categoryObjList = document.array().toVariantList();
+
+    Templates templates;
+
+    for (const QVariant& obj : categoryObjList) {
+        QVariantMap map = obj.toMap();
+        QString categoryTitle = muse::qtrc("project", map["title"].toString().toUtf8().data());
+        QStringList files = map["files"].toStringList();
+
+        io::paths_t paths;
+        for (const QString& path : files) {
+            paths.push_back(path);
+        }
+
+        templates << readTemplates(paths, categoryTitle, false /*isCustom*/, dirPath);
+    }
+
+    return templates;
 }
 
-Templates TemplatesRepository::loadTemplates(const io::paths& filePaths) const
+Templates TemplatesRepository::readTemplates(const io::paths_t& files, const QString& category, bool isCustom,
+                                             const muse::io::path_t& dirPath) const
 {
-    Templates result;
+    TRACEFUNC;
 
-    for (const io::path& path : filePaths) {
+    Templates templates;
+
+    for (const muse::io::path_t& file : files) {
+        muse::io::path_t path = dirPath.empty() ? file : dirPath + "/" + file;
         RetVal<ProjectMeta> meta = mscReader()->readMeta(path);
         if (!meta.ret) {
-            LOGE() << "failed read template: " << path;
+            LOGE() << QString("failed read template %1: %2")
+                .arg(path.toQString())
+                .arg(QString::fromStdString(meta.ret.toString()));
             continue;
         }
-        Template templ(meta.val);
-        templ.categoryTitle = correctedTitle(io::dirname(meta.val.filePath).toQString());
 
-        result << templ;
+        Template templ;
+        templ.categoryTitle = category;
+        templ.meta = std::move(meta.val);
+        templ.isCustom = isCustom;
+
+        templates << templ;
     }
 
-    return result;
-}
-
-QString TemplatesRepository::correctedTitle(const QString& title) const
-{
-    QString corrected = title;
-
-    if (!corrected.isEmpty() && corrected[0].isNumber()) {
-        constexpr int NUMBER_LENGTH = 3;
-        corrected = corrected.mid(NUMBER_LENGTH);
-    }
-
-    return corrected.replace('_', ' ');
+    return templates;
 }

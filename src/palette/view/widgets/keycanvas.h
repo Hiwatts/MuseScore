@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,11 +28,14 @@
 #include "modularity/ioc.h"
 #include "ipaletteconfiguration.h"
 #include "iengravingconfiguration.h"
+#include "engraving/rendering/isinglerenderer.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Accidental;
 class Clef;
+}
 
+namespace mu::palette {
 //---------------------------------------------------------
 //   KeyCanvas
 //---------------------------------------------------------
@@ -41,17 +44,18 @@ class KeyCanvas : public QFrame
 {
     Q_OBJECT
 
-    INJECT(palette, mu::palette::IPaletteConfiguration, configuration)
-    INJECT(notation, mu::engraving::IEngravingConfiguration, engravingConfiguration)
+    INJECT(IPaletteConfiguration, configuration)
+    INJECT(engraving::IEngravingConfiguration, engravingConfiguration)
+    INJECT(engraving::rendering::ISingleRenderer, engravingRender)
 
-    Accidental* dragElement = nullptr;
-    Accidental* moveElement = nullptr;
+    engraving::Accidental* dragElement = nullptr;
+    engraving::Accidental* moveElement = nullptr;
     QTransform _matrix, imatrix;
-    double extraMag = false;
-    QList<Accidental*> accidentals;
+    double extraMag = 1.0;
+    QList<engraving::Accidental*> accidentals;
     QPointF startMove;
     QPointF base;
-    Clef* clef = nullptr;
+    engraving::Clef* clef = nullptr;
 
     virtual void paintEvent(QPaintEvent*);
     virtual void mousePressEvent(QMouseEvent*);
@@ -61,7 +65,7 @@ class KeyCanvas : public QFrame
     virtual void dragEnterEvent(QDragEnterEvent*);
     virtual void dragMoveEvent(QDragMoveEvent*);
     virtual void dropEvent(QDropEvent*);
-    void snap(Accidental*);
+    void snap(engraving::Accidental*);
 
 private slots:
     void deleteElement();
@@ -69,7 +73,7 @@ private slots:
 public:
     KeyCanvas(QWidget* parent = 0);
     void clear();
-    const QList<Accidental*> getAccidentals() const { return accidentals; }
+    const QList<engraving::Accidental*> getAccidentals() const { return accidentals; }
 };
 } // namespace Ms
 #endif

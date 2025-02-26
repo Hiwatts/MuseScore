@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,17 +21,18 @@
  */
 #include "notationbbreader.h"
 
-#include "libmscore/masterscore.h"
-#include "notation/notationerrors.h"
-
-namespace Ms {
-extern Score::FileError importBB(MasterScore*, const QString& name);
-}
+#include "engraving/dom/score.h"
+#include "engraving/engravingerrors.h"
 
 using namespace mu::iex::bb;
+using namespace mu::engraving;
 
-mu::Ret NotationBBReader::read(Ms::MasterScore* score, const io::path& path, const Options&)
+namespace mu::iex::bb {
+extern Err importBB(MasterScore* score, const QString& name);
+}
+
+muse::Ret NotationBBReader::read(MasterScore* score, const muse::io::path_t& path, const Options&)
 {
-    Ms::Score::FileError err = Ms::importBB(score, path.toQString());
-    return mu::notation::scoreFileErrorToRet(err, path);
+    Err err = importBB(score, path.toQString());
+    return make_ret(err, path);
 }

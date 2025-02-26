@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,12 +21,14 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 StyledPopupView {
     id: root
+
+    property bool needActiveFirstItem: false
 
     contentHeight: contentColumn.childrenRect.height
     contentWidth: 240
@@ -43,7 +45,9 @@ StyledPopupView {
     }
 
     onOpened: {
-        staffTypesComboBox.navigation.requestActive()
+        if (root.needActiveFirstItem) {
+            staffTypesDropdown.navigation.requestActive()
+        }
     }
 
     StaffSettingsModel {
@@ -59,20 +63,25 @@ StyledPopupView {
         spacing: 12
 
         StyledTextLabel {
-            text: qsTrc("instruments", "Staff type")
+            id: typeLabel
+            text: qsTrc("layoutpanel", "Staff type")
         }
 
-        Dropdown {
-            id: staffTypesComboBox
+        StyledDropdown {
+            id: staffTypesDropdown
+
             width: parent.width
 
             navigation.panel: root.navigationPanel
             navigation.row: 1
+            navigation.accessible.name: typeLabel.text + " " + currentValue
 
-            model: settingsModel.allStaffTypes()
+            currentIndex: staffTypesDropdown.indexOfValue(settingsModel.staffType)
+            model: settingsModel.allStaffTypes
+            enabled: staffTypesDropdown.count > 1
 
-            onCurrentValueChanged: {
-                settingsModel.setStaffType(staffTypesComboBox.currentValue)
+            onActivated: function(index, value) {
+                settingsModel.staffType = value
             }
         }
 
@@ -82,7 +91,7 @@ StyledPopupView {
 
         StyledTextLabel {
             visible: !settingsModel.isMainScore
-            text: qsTrc("instruments", "Voices visible in the score")
+            text: qsTrc("layoutpanel", "Voices visible in the score")
         }
 
         Row {
@@ -104,8 +113,7 @@ StyledPopupView {
                     objectName: "Voice" + modelData.title + "CheckBox"
 
                     navigation.panel: root.navigationPanel
-                    navigation.row: model.index + 2 //! NOTE after staffTypesComboBox
-                    navigation.enabled: !settingsModel.isMainScore
+                    navigation.row: model.index + 2 //! NOTE after staffTypesDropdown
 
                     text: modelData.title
                     checked: modelData.visible
@@ -132,11 +140,11 @@ StyledPopupView {
             navigation.panel: root.navigationPanel
             navigation.row: 20 // Should be more than a voices checkbox
 
-            text: qsTrc("instruments", "Small staff")
+            text: qsTrc("layoutpanel", "Small staff")
             checked: settingsModel.isSmallStaff
 
             onClicked: {
-                settingsModel.setIsSmallStaff(!checked)
+                settingsModel.isSmallStaff = !checked
             }
         }
 
@@ -148,13 +156,12 @@ StyledPopupView {
             navigation.panel: root.navigationPanel
             navigation.row: 21 // after small staff CheckBox
 
-            text: qsTrc("instruments", "Hide all measures that do not contain notation (cutaway)")
-            wrapMode: Text.WordWrap
+            text: qsTrc("layoutpanel", "Hide all measures that do not contain notation (cutaway)")
 
             checked: settingsModel.cutawayEnabled
 
             onClicked: {
-                settingsModel.setCutawayEnabled(!checked)
+                settingsModel.cutawayEnabled = !checked
             }
         }
 
@@ -166,7 +173,7 @@ StyledPopupView {
             navigation.panel: root.navigationPanel
             navigation.row: 22 // after cutaway CheckBox
 
-            text: qsTrc("instruments", "Create a linked staff")
+            text: qsTrc("layoutpanel", "Create a linked staff")
 
             onClicked: {
                 settingsModel.createLinkedStaff()
@@ -177,7 +184,7 @@ StyledPopupView {
         StyledTextLabel {
             width: parent.width
 
-            text: qsTrc("instruments", "Note: linked staves contain identical information.")
+            text: qsTrc("layoutpanel", "Note: linked staves contain identical information.")
             wrapMode: Text.WordWrap
         }
     }

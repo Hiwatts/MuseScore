@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,8 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../common"
@@ -40,7 +40,7 @@ Column {
     spacing: 12
 
     function focusOnFirst() {
-        horizontalScaleControl.focusOnFirst()
+        horizontalScaleControl.navigation.requestActive()
     }
 
     InspectorPropertyView {
@@ -53,6 +53,23 @@ Column {
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart + 1
         navigationRowEnd: verticalScaleControl.navigation.row
+
+        isModified: root.model ? (root.model.horizontalScale.isModified
+                                  || root.model.verticalScale.isModified) : false
+
+        onRequestResetToDefault: {
+            if (root.model) {
+                root.model.horizontalScale.resetToDefault()
+                root.model.verticalScale.resetToDefault()
+            }
+        }
+
+        onRequestApplyToStyle: {
+            if (root.model) {
+                root.model.horizontalScale.applyToStyle()
+                root.model.verticalScale.applyToStyle()
+            }
+        }
 
         Item {
             height: childrenRect.height
@@ -72,7 +89,7 @@ Column {
                 measureUnitsSymbol: "%"
                 step: 1
                 decimals: 0
-                maxValue: 300
+                maxValue: 1000
                 minValue: 1
 
                 navigation.name: "HorizontalScale"
@@ -80,7 +97,9 @@ Column {
                 navigation.row: scaleSection.navigationRowStart + 2
                 navigation.accessible.name: scaleSection.titleText + " " + qsTrc("inspector", "Horizontal") + currentValue
 
-                onValueEdited: { root.model.horizontalScale.value = newValue }
+                onValueEditingFinished: function(newValue) {
+                    root.model.horizontalScale.value = newValue
+                }
             }
 
             IncrementalPropertyControl {
@@ -97,35 +116,34 @@ Column {
                 measureUnitsSymbol: "%"
                 step: 1
                 decimals: 0
-                maxValue: 300
+                maxValue: 1000
                 minValue: 1
 
-                navigation.name: "VeriticalScale"
+                navigation.name: "VerticalScale"
                 navigation.panel: root.navigationPanel
                 navigation.row: scaleSection.navigationRowStart + 3
                 navigation.accessible.name: scaleSection.titleText + " " + qsTrc("inspector", "Vertical") + currentValue
 
-                onValueEdited: { root.model.verticalScale.value = newValue }
+                onValueEditingFinished: function(newValue) {
+                    root.model.verticalScale.value = newValue
+                }
             }
         }
     }
 
-    CheckBox {
-        isIndeterminate: root.model ? root.model.shouldShowCourtesy.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.shouldShowCourtesy.value : false
-        text: qsTrc("inspector", "Show courtesy time signature on previous system")
+    PropertyCheckBox {
+        text: qsTrc("inspector", "Show courtesy time signature")
+        propertyItem: root.model ? root.model.shouldShowCourtesy : null
 
         navigation.name: "ShowCourtesyCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: scaleSection.navigationRowEnd + 1
-
-        onClicked: { root.model.shouldShowCourtesy.value = !checked }
     }
 
     FlatButton {
         width: parent.width
 
-        text: qsTrc("inspector", "Change time signature")
+        text: qsTrc("inspector", "Time signature properties")
 
         navigation.name: "ChangeButton"
         navigation.panel: root.navigationPanel
@@ -136,5 +154,7 @@ Column {
                 root.model.showTimeSignatureProperties()
             }
         }
+
+        enabled: root.model ? !root.model.isGenerated : false
     }
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,18 +23,28 @@
 #ifndef __IMPORTGTP_H__
 #define __IMPORTGTP_H__
 
-#include <QDomNode>
+#include <vector>
+#include <map>
+
+#include "io/file.h"
+#include "engraving/dom/measurebase.h"
 
 #include "gtp/gp67dombuilder.h"
-#include "libmscore/score.h"
-#include "libmscore/vibrato.h"
+#include "continiouselementsbuilder.h"
+#include "guitarbendimport/guitarbendimporter.h"
+#include "engraving/types/types.h"
+#include "engraving/engravingerrors.h"
 
 #include "modularity/ioc.h"
-#include "iguitarproconfiguration.h"
+#include "iengravingconfiguration.h"
 
-namespace Ms {
+#include "guitarprodrumset.h"
+
+namespace mu::engraving {
 class Chord;
-class Fraction;
+class ChordRest;
+class Drumset;
+class Instrument;
 class LetRing;
 class Measure;
 class Note;
@@ -44,7 +54,14 @@ class Segment;
 class Tuplet;
 class Vibrato;
 class Volta;
+class MasterScore;
+class Ottava;
+class Hairpin;
+class Bend;
+class Slur;
+} // namespace mu::engraving
 
+namespace mu::iex::guitarpro {
 static constexpr int GP_MAX_LYRIC_LINES = 5;
 static constexpr int GP_MAX_TRACK_NUMBER = 32;
 static constexpr int GP_MAX_STRING_NUMBER = 7;
@@ -53,18 +70,18 @@ static constexpr int GP_INVALID_KEYSIG = 127;
 static constexpr int GP_VOLTA_BINARY = 1;
 static constexpr int GP_VOLTA_FLAGS = 2;
 
-Score::FileError importGTP(Score* score, const QString& filename, const char* data, unsigned int data_len);
+mu::engraving::Err importGTP(mu::engraving::Score* score, const muse::String& filename, const char* data, unsigned int data_len);
 
 enum class Repeat : char;
 
 struct GpTrack {
     int patch;
-    uchar volume, pan, chorus, reverb, phase, tremolo;
+    uint8_t volume, pan, chorus, reverb, phase, tremolo;
 };
 
 struct GPVolta {
     int voltaType;
-    QList<int> voltaInfo;
+    std::vector<int> voltaInfo;
 };
 
 /* How the fermatas are represented in Guitar Pro is two integers, the
@@ -81,102 +98,134 @@ struct GPVolta {
 struct GPFermata {
     int index;
     int timeDivision;
-    QString type;
+    muse::String type;
 };
 
 struct GPLyrics {
-    QStringList lyrics;
-    std::vector<Segment*> segments;
-    int fromBeat;
-    int beatCounter;
-    int lyricTrack;
+    muse::StringList lyrics;
+    std::vector<mu::engraving::Segment*> segments;
+    std::vector<size_t> lyricPos;
+    size_t fromBeat = 0;
+    size_t beatCounter = 0;
+    size_t lyricTrack = 0;
 };
 
 struct GpBar {
-    Fraction timesig;
-    bool freeTime;
-    int keysig;
-    QString marker;
-    BarLineType barLine;
-    Repeat repeatFlags;
-    int repeats;
+    mu::engraving::Fraction timesig = mu::engraving::Fraction(4, 4);
+    bool freeTime = false;
+    int keysig = GP_INVALID_KEYSIG;
+    muse::String marker;
+    mu::engraving::BarLineType barLine = mu::engraving::BarLineType::NORMAL;
+    mu::engraving::Repeat repeatFlags = mu::engraving::Repeat::NONE;
+    int repeats = 2;
     GPVolta volta;
-    QString direction;
-    QString directionStyle;
-
-    QString section[2];
-
-    std::vector<QString> directions;
-
-    GpBar();
+    muse::String direction;
+    muse::String directionStyle;
+    muse::String section[2];
+    std::vector<muse::String> directions;
 };
-
-inline Drumset* gpDrumset = nullptr;
 
 //---------------------------------------------------------
 //   GuitarPro
 //---------------------------------------------------------
 
-class GuitarPro
+class GuitarPro : public muse::Injectable
 {
-    INJECT(iex_guitarpro, mu::iex::guitarpro::IGuitarProConfiguration, configuration)
+public:
+    muse::Inject<mu::engraving::IEngravingConfiguration> engravingConfiguration = { this };
 
 protected:
+
+    using staff_idx_t = mu::engraving::staff_idx_t;
+    using track_idx_t = mu::engraving::track_idx_t;
+    using Fraction = mu::engraving::Fraction;
+    using Measure = mu::engraving::Measure;
+    using ChordRest = mu::engraving::ChordRest;
+    using Note = mu::engraving::Note;
+
+    enum class TabImportOption {
+        STANDARD = 1,
+        TAB      = 2,
+        BOTH     = 3
+    };
+
+    struct GPProperties {
+        std::vector<TabImportOption> partsImportOptions;
+    };
+
+    struct ReadNoteResult {
+        bool slur = false;
+        bool letRing = false;
+        bool palmMute = false;
+        bool trill = false;
+        bool vibrato = false;
+
+        /// harmonic marks
+        bool harmonicArtificial = false;
+        bool harmonicPinch = false;
+        bool harmonicTap = false;
+        bool harmonicSemi = false;
+    };
+
+    GPProperties m_properties;
+
     std::list<Note*> slideList;   //list of start slide notes
 
     // note effect bit masks
-    static const uchar EFFECT_BEND = 0x1;
-    static const uchar EFFECT_STACATTO = 0x1;
-    static const uchar EFFECT_HAMMER = 0x2;
-    static const uchar EFFECT_PALM_MUTE = 0x2;
-    static const uchar EFFECT_TREMOLO = 0x4;
-    static const uchar EFFECT_LET_RING = 0x8;
-    static const uchar EFFECT_SLIDE_OLD = 0x4;
-    static const uchar EFFECT_SLIDE = 0x8;
-    static const uchar EFFECT_GRACE = 0x10;
-    static const uchar EFFECT_ARTIFICIAL_HARMONIC = 0x10;
-    static const uchar EFFECT_TRILL = 0x20;
-    static const uchar EFFECT_GHOST = 0x01;
+    static const uint8_t EFFECT_BEND = 0x1;
+    static const uint8_t EFFECT_STACCATO = 0x1;
+    static const uint8_t EFFECT_HAMMER = 0x2;
+    static const uint8_t EFFECT_PALM_MUTE = 0x2;
+    static const uint8_t EFFECT_TREMOLO = 0x4;
+    static const uint8_t EFFECT_LET_RING = 0x8;
+    static const uint8_t EFFECT_SLIDE_OLD = 0x4;
+    static const uint8_t EFFECT_SLIDE = 0x8;
+    static const uint8_t EFFECT_GRACE = 0x10;
+    static const uint8_t EFFECT_ARTIFICIAL_HARMONIC = 0x10;
+    static const uint8_t EFFECT_TRILL = 0x20;
+    static const uint8_t EFFECT_GHOST = 0x01;
+    static const uint8_t EFFECT_VIBRATO = 0x40;
 
     // arpeggio direction masks
-    static const uchar ARPEGGIO_UP = 0xa;
-    static const uchar ARPEGGIO_DOWN = 0x2;
+    static const uint8_t ARPEGGIO_UP = 0xa;
+    static const uint8_t ARPEGGIO_DOWN = 0x2;
 
     // note bit masks
-    static const uchar NOTE_GHOST = 0x04;   // 2
-    static const uchar NOTE_DEAD = 0x20;   //5
-    static const uchar NOTE_DYNAMIC = 0x10;   // 4
-    static const uchar NOTE_FRET = 0x20;   //5
-    static const uchar NOTE_FINGERING = 0x80;   //7
-    static const uchar NOTE_MARCATO = 0x02;   //1
-    static const uchar NOTE_SFORZATO = 0x40;   //6
-    static const uchar NOTE_SLUR = 0x8;  //3
-    static const uchar NOTE_APPOGIATURA = 0x02;  //1
+    static const uint8_t NOTE_GHOST = 0x04;   // 2
+    static const uint8_t NOTE_DEAD = 0x20;   //5
+    static const uint8_t NOTE_DYNAMIC = 0x10;   // 4
+    static const uint8_t NOTE_FRET = 0x20;   //5
+    static const uint8_t NOTE_FINGERING = 0x80;   //7
+    static const uint8_t NOTE_MARCATO = 0x02;   //1
+    static const uint8_t NOTE_SFORZATO = 0x40;   //6
+    static const uint8_t NOTE_SLUR = 0x8;  //3
+    static const uint8_t NOTE_APPOGIATURA = 0x02;  //1
 
     // beat bit masks
-    static const uchar BEAT_VIBRATO_TREMOLO = 0x02;
-    static const uchar BEAT_FADE = 0x10;
-    static const uchar BEAT_EFFECT = 0x20;
-    static const uchar BEAT_TREMOLO = 0x04;
-    static const uchar BEAT_ARPEGGIO = 0x40;
-    static const uchar BEAT_STROKE_DIR = 0x02;
-    static const uchar BEAT_DOTTED = 0x01;
-    static const uchar BEAT_PAUSE = 0x40;
-    static const uchar BEAT_TUPLET = 0x20;
-    static const uchar BEAT_LYRICS = 0x4;
-    static const uchar BEAT_EFFECTS = 0x8;
-    static const uchar BEAT_MIX_CHANGE = 0x10;
-    static const uchar BEAT_CHORD = 0x2;
+    static const uint8_t BEAT_RASGUEADO = 0x01;
+    static const uint8_t BEAT_VIBRATO_TREMOLO = 0x02;
+    static const uint8_t BEAT_FADE = 0x10;
+    static const uint8_t BEAT_EFFECT = 0x20;
+    static const uint8_t BEAT_TREMOLO = 0x04;
+    static const uint8_t BEAT_ARPEGGIO = 0x40;
+    static const uint8_t BEAT_STROKE_DIR = 0x02;
+    static const uint8_t BEAT_DOTTED = 0x01;
+    static const uint8_t BEAT_PAUSE = 0x40;
+    static const uint8_t BEAT_TUPLET = 0x20;
+    static const uint8_t BEAT_LYRICS = 0x4;
+    static const uint8_t BEAT_EFFECTS = 0x8;
+    static const uint8_t BEAT_MIX_CHANGE = 0x10;
+    static const uint8_t BEAT_CHORD = 0x2;
 
     // score bit masks
-    static const uchar SCORE_TIMESIG_NUMERATOR = 0x1;
-    static const uchar SCORE_TIMESIG_DENOMINATOR = 0x2;
-    static const uchar SCORE_REPEAT_START = 0x4;
-    static const uchar SCORE_REPEAT_END = 0x8;
-    static const uchar SCORE_MARKER = 0x20;
-    static const uchar SCORE_VOLTA = 0x10;
-    static const uchar SCORE_KEYSIG = 0x40;
-    static const uchar SCORE_DOUBLE_BAR = 0x80;
+    static const uint8_t SCORE_TIMESIG_NUMERATOR = 0x1;
+    static const uint8_t SCORE_TIMESIG_DENOMINATOR = 0x2;
+    static const uint8_t SCORE_REPEAT_START = 0x4;
+    static const uint8_t SCORE_REPEAT_END = 0x8;
+    static const uint8_t SCORE_MARKER = 0x20;
+    static const uint8_t SCORE_VOLTA = 0x10;
+    static const uint8_t SCORE_KEYSIG = 0x40;
+    static const uint8_t SCORE_DOUBLE_BAR = 0x80;
 
     // slide kinds
     static const int SHIFT_SLIDE = 1;
@@ -186,100 +235,106 @@ protected:
     static const int SLIDE_IN_ABOVE = 16;
     static const int SLIDE_IN_BELOW = 32;
 
+    // harmonic mark types
+    static const int HARMONIC_MARK_NATURAL = 1;
+    static const int HARMONIC_MARK_ARTIFICIAL = 2;
+    static const int HARMONIC_MARK_TAP = 3;
+    static const int HARMONIC_MARK_PINCH = 4;
+    static const int HARMONIC_MARK_SEMI = 5;
+
     static const int MAX_PITCH = 127;
     static const char* const errmsg[];
-    int version;
-    int key { 0 };
+    int version = 0;
+    int key = 0;
 
-    Segment* last_segment   { nullptr };
-    Measure* last_measure   { nullptr };
-    int last_tempo          { -1 };
+    mu::engraving::Segment* last_segment = nullptr;
+    Measure* last_measure = nullptr;
+    int last_tempo = -1;
 
-    QMap<int, QList<GPFermata>*> fermatas;
-    std::vector<Ottava*> ottava;
-    Hairpin** hairpins;
-    MasterScore* score;
-    QFile* f;
-    int curPos;
-    int previousTempo;
-    int previousDynamic;
-    std::vector<int> ottavaFound;
-    std::vector<QString> ottavaValue;
-    std::map<int, std::pair<int, bool> > tempoMap;
-    int tempo;
-    QMap<int, int> slides;
+    std::vector<mu::engraving::Ottava*> ottava; /// will be removed
+    mu::engraving::Hairpin** hairpins = nullptr; /// will be removed
+    mu::engraving::MasterScore* score = nullptr;
+    muse::io::IODevice* f = nullptr;
+    int curPos = 0;
+    int previousTempo = -1;
+    std::vector<int> previousDynamicByTrack;
+    constexpr static int INVALID_DYNAMIC = -1;
+    constexpr static int DEFAULT_DYNAMIC = 0;
+    int tempo = -1;
+    std::map<int, int> slides;
 
     GPLyrics gpLyrics;
-    int slide;
-    int voltaSequence;
-    QTextCodec* _codec { 0 };
-    Slur** slurs       { nullptr };
+    int slide = 0;
+    int voltaSequence = 0;
+    mu::engraving::Slur** slurs = nullptr;
 
-    void skip(qint64 len);
-    void read(void* p, qint64 len);
-    int readUChar();
+    void skip(int64_t len);
+    void read(void* p, int64_t len);
+    uint8_t readUInt8();
     int readChar();
-    QString readPascalString(int);
-    QString readWordPascalString();
-    QString readBytePascalString();
+    muse::String readPascalString(int);
+
+    muse::String readWordPascalString();
+    muse::String readBytePascalString();
     int readInt();
-    QString readDelphiString();
+    muse::String readDelphiString();
     void readVolta(GPVolta*, Measure*);
-    virtual void readBend(Note*);
+    void readBend(Note*);
+    std::vector<mu::engraving::PitchValue> readBendDataFromFile();
+    void createBend(Note* note, std::vector<mu::engraving::PitchValue>& bendData);
     virtual bool readMixChange(Measure* measure);
-    virtual int readBeatEffects(int track, Segment*) = 0;
+    virtual int readBeatEffects(int track, mu::engraving::Segment*) = 0;
     void readLyrics();
     void readChannels();
-    void setTuplet(Tuplet* tuplet, int tuple);
-    void setupTupletStyle(Tuplet* tuplet);
+    void setTuplet(mu::engraving::Tuplet* tuplet, int tuple);
+    void setupTupletStyle(mu::engraving::Tuplet* tuplet);
     Fraction len2fraction(int len);
     void addDynamic(Note*, int d);
     void createMeasures();
-    void applyBeatEffects(Chord*, int beatEffects);
-    void readTremoloBar(int track, Segment*);
-    void readChord(Segment* seg, int track, int numStrings, QString name, bool gpHeader);
-    void restsForEmptyBeats(Segment* seg, Measure* measure, ChordRest* cr, Fraction& l, int track, const Fraction& tick);
-    void createSlur(bool hasSlur, int staffIdx, ChordRest* cr);
-    void createOttava(bool hasOttava, int track, ChordRest* cr, QString value);
+    void applyBeatEffects(mu::engraving::Chord*, int beatEffects, bool& hasVibratoLeftHand, bool& hasVibratoWTremBar);
+    void readTremoloBar(int track, mu::engraving::Segment*);
+    void readChord(mu::engraving::Segment* seg, int track, int numStrings, muse::String name, bool gpHeader);
+    void restsForEmptyBeats(mu::engraving::Segment* seg, Measure* measure, ChordRest* cr, Fraction& l, int track, const Fraction& tick);
+    void createSlur(bool hasSlur, staff_idx_t staffIdx, ChordRest* cr);
     void createSlide(int slide, ChordRest* cr, int staffIdx, Note* note = nullptr);
-    void createCrecDim(int staffIdx, int track, const Fraction& tick, bool crec);
-    Text* addTextToNote(QString, Align, Note*);
-    void addPalmMute(Note*);
-    void addLetRing(Note*);
-    void addVibrato(Note*, Vibrato::Type type = Vibrato::Type::GUITAR_VIBRATO);
+    void addTextToNote(muse::String text, Note* note);
+    void addTextArticulation(Note* note, mu::engraving::ArticulationTextType type);
+    void addPalmMute(ChordRest* cr, bool hasPalmMute);
+    void addLetRing(ChordRest* cr, bool hasPalmMute);
+    void addTrill(ChordRest* cr, bool hasTrill);
+    void addRasgueado(ChordRest* cr, bool hasRasgueado);
+    void addVibratoLeftHand(ChordRest* cr, bool hasVibratoLeftHand);
+    void addVibratoWTremBar(ChordRest* cr, bool hasVibratoWTremBar);
+    void addHarmonicMarks(ChordRest* cr, bool hasHarmonicArtificial, bool hasHarmonicPinch, bool hasHarmonicTap, bool hasHarmonicSemi);
     void addTap(Note*);
     void addSlap(Note*);
     void addPop(Note*);
-    void createTuningString(int strings, int tuning[]);
+    bool createTuningString(int strings, int tuning[]); // returns useFlats
     virtual std::unique_ptr<IGPDomBuilder> createGPDomBuilder() const { return nullptr; }
-
-    std::vector<PalmMute*> _palmMutes;
-    std::vector<LetRing*> _letRings;
-    std::vector<Vibrato*> _vibratos;
+    void initDynamics(size_t stavesNum);
 
 public:
     std::vector<std::string> tunings;
 
-    static int harmonicOvertone(Note* note, float harmonicValue, int harmonicType);
     void setTempo(int n, Measure* measure);
-    void initGuitarProDrumset();
-    QString title, subtitle, artist, album, composer;
-    QString transcriber, instructions;
-    QStringList comments;
+    muse::String title, subtitle, artist, album, composer;
+    muse::StringList comments;
     GpTrack channelDefaults[GP_MAX_TRACK_NUMBER * 2];
-    int staves;
-    int measures;
-    QList<GpBar> bars;
+    size_t staves = 0;
+    size_t measures = 0;
+    std::vector<GpBar> bars;
+    std::unique_ptr<ContiniousElementsBuilder> m_continiousElementsBuilder;
+    std::unique_ptr<GuitarBendImporter> m_guitarBendImporter;
 
     enum class GuitarProError : char {
         GP_NO_ERROR, GP_UNKNOWN_FORMAT,
         GP_EOF, GP_BAD_NUMBER_OF_STRINGS
     };
 
-    GuitarPro(MasterScore*, int v);
+    GuitarPro(mu::engraving::MasterScore*, int v, const muse::modularity::ContextPtr& iocCtx);
     virtual ~GuitarPro();
-    virtual bool read(QFile*) = 0;
-    QString error(GuitarProError n) const { return QString(errmsg[int(n)]); }
+    virtual bool read(muse::io::IODevice*) = 0;
+    muse::String error(GuitarProError n) const { return muse::String::fromUtf8(errmsg[int(n)]); }
 };
 
 //---------------------------------------------------------
@@ -289,13 +344,13 @@ public:
 class GuitarPro1 : public GuitarPro
 {
 protected:
-    bool readNote(int string, Note* note);
-    virtual int readBeatEffects(int track, Segment*);
+    ReadNoteResult readNote(int string, mu::engraving::Note* note);
+    int readBeatEffects(int track, mu::engraving::Segment*) override;
 
 public:
-    GuitarPro1(MasterScore* s, int v)
-        : GuitarPro(s, v) {}
-    virtual bool read(QFile*);
+    GuitarPro1(mu::engraving::MasterScore* s, int v, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro(s, v, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
 };
 
 //---------------------------------------------------------
@@ -305,9 +360,9 @@ public:
 class GuitarPro2 : public GuitarPro1
 {
 public:
-    GuitarPro2(MasterScore* s, int v)
-        : GuitarPro1(s, v) {}
-    virtual bool read(QFile*);
+    GuitarPro2(mu::engraving::MasterScore* s, int v, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro1(s, v, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
 };
 
 //---------------------------------------------------------
@@ -316,12 +371,12 @@ public:
 
 class GuitarPro3 : public GuitarPro1
 {
-    virtual int readBeatEffects(int track, Segment* segment);
+    int readBeatEffects(int track, mu::engraving::Segment* segment) override;
 
 public:
-    GuitarPro3(MasterScore* s, int v)
-        : GuitarPro1(s, v) {}
-    virtual bool read(QFile*);
+    GuitarPro3(mu::engraving::MasterScore* s, int v, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro1(s, v, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
 };
 
 //---------------------------------------------------------
@@ -333,15 +388,15 @@ class GuitarPro4 : public GuitarPro
     std::vector<int> curDynam;
     std::vector<int> tupleKind;
     void readInfo();
-    bool readNote(int string, int staffIdx, Note* note);
-    virtual int readBeatEffects(int track, Segment* segment);
-    virtual bool readMixChange(Measure* measure);
+    ReadNoteResult readNote(int string, int staffIdx, Note* note);
+    int readBeatEffects(int track, mu::engraving::Segment* segment) override;
+    bool readMixChange(mu::engraving::Measure* measure) override;
     int convertGP4SlideNum(int slide);
 
 public:
-    GuitarPro4(MasterScore* s, int v)
-        : GuitarPro(s, v) {}
-    virtual bool read(QFile*);
+    GuitarPro4(mu::engraving::MasterScore* s, int v, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro(s, v, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
 };
 
 //---------------------------------------------------------
@@ -352,22 +407,27 @@ class GuitarPro5 : public GuitarPro
 {
     std::map<std::pair<int, int>, bool> dead_end;
     int _beat_counter{ 0 };
+    std::unordered_map<mu::engraving::Chord*, mu::engraving::TremoloType> m_tremolosInChords; // for adding tremolo for tied notes
+    std::unordered_map<Note*, Note*> m_harmonicNotes; // for adding ties for harmonic notes
+    bool m_currentBeatHasRasgueado = false;
+    std::unordered_set<ChordRest*> m_letRingForChords; // fixing gp5 bug with no storing let ring for tied notes
+
     void readInfo();
     void readPageSetup();
-    virtual int readBeatEffects(int track, Segment* segment);
-    bool readNote(int string, Note* note);
-    virtual bool readMixChange(Measure* measure);
-    void readMeasure(Measure* measure, int staffIdx, Tuplet*[], bool mixChange);
-    int readArtificialHarmonic();
+    int readBeatEffects(int track, mu::engraving::Segment* segment) override;
+    ReadNoteResult readNote(int string, Note* note);
+    bool readMixChange(Measure* measure) override;
+    void readMeasure(Measure * measure, int staffIdx, mu::engraving::Tuplet*[], bool mixChange);
     bool readTracks();
     void readMeasures(int startingTempo);
-    Fraction readBeat(const Fraction& tick, int voice, Measure* measure, int staffIdx, Tuplet** tuplets, bool mixChange);
-    bool readNoteEffects(Note*);
+    Fraction readBeat(const Fraction& tick, int voice, Measure* measure, int staffIdx, mu::engraving::Tuplet** tuplets, bool mixChange);
+    ReadNoteResult readNoteEffects(Note*);
+    float naturalHarmonicFromFret(int fret);
 
 public:
-    GuitarPro5(MasterScore* s, int v)
-        : GuitarPro(s, v) {}
-    virtual bool read(QFile*);
+    GuitarPro5(mu::engraving::MasterScore* s, int v, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro(s, v, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
 };
 
 //---------------------------------------------------------
@@ -376,8 +436,6 @@ public:
 
 class GuitarPro6 : public GuitarPro
 {
-    Fraction _lastTick;
-    Volta* _lastVolta{ nullptr };
     // an integer stored in the header indicating that the file is not compressed (BCFS).
     const int GPX_HEADER_UNCOMPRESSED = 1397113666;
     // an integer stored in the header indicating that the file is not compressed (BCFZ).
@@ -387,47 +445,45 @@ class GuitarPro6 : public GuitarPro
     const int BITS_IN_BYTE = 8;
     // contains all the information about notes that will go in the parts
     struct GPPartInfo {
-        QDomNode masterBars;
-        QDomNode bars;
-        QDomNode voices;
-        QDomNode beats;
-        QDomNode notes;
-        QDomNode rhythms;
+        muse::XmlDomNode masterBars;
+        muse::XmlDomNode bars;
+        muse::XmlDomNode voices;
+        muse::XmlDomNode beats;
+        muse::XmlDomNode notes;
+        muse::XmlDomNode rhythms;
     };
-    Slur** legatos;
-    // a mapping from identifiers to fret diagrams
-    QMap<int, FretDiagram*> fretDiagrams;
-    void parseFile(const char* filename, QByteArray* data);
-    int readBit(QByteArray* buffer);
-    QByteArray getBytes(QByteArray* buffer, int offset, int length);
-    void readGPX(QByteArray* buffer);
-    int readInteger(QByteArray* buffer, int offset);
-    QByteArray readString(QByteArray* buffer, int offset, int length);
-    int readBits(QByteArray* buffer, int bitsToRead);
-    int readBitsReversed(QByteArray* buffer, int bitsToRead);
+
+    void parseFile(const char* filename, muse::ByteArray* data);
+
+    int readBit(muse::ByteArray* buffer);
+    muse::ByteArray getBytes(muse::ByteArray* buffer, int offset, int length);
+    void readGPX(muse::ByteArray* buffer);
+    int readInteger(muse::ByteArray* buffer, int offset);
+    muse::ByteArray readString(muse::ByteArray* buffer, int offset, int length);
+    int readBits(muse::ByteArray* buffer, int bitsToRead);
+    int readBitsReversed(muse::ByteArray* buffer, int bitsToRead);
     int findNumMeasures(GPPartInfo* partInfo);
-    void readMasterTracks(QDomNode* masterTrack);
+    void readMasterTracks(muse::XmlDomNode* masterTrack);
     void readDrumNote(Note* note, int element, int variation);
-    QDomNode getNode(const QString& id, QDomNode currentDomNode);
-    void unhandledNode(QString nodeName);
+    muse::XmlDomNode getNode(const muse::String& id, muse::XmlDomNode currentDomNode);
+    void unhandledNode(muse::String nodeName);
     void makeTie(Note* note);
-    int readBeatEffects(int /*track*/, Segment*) override { return 0; }
+    int readBeatEffects(int /*track*/, mu::engraving::Segment*) override { return 0; }
 
     std::map<std::pair<int, int>, Note*> slideMap;
 
 protected:
-    const static std::map<QString, QString> instrumentMapping;
-    int* previousDynamic;
-    void readGpif(QByteArray* data);
+    const static std::map<std::string, std::string> instrumentMapping;
+    void readGpif(muse::ByteArray* data);
 
     virtual std::unique_ptr<IGPDomBuilder> createGPDomBuilder() const override;
 
 public:
-    GuitarPro6(MasterScore* s)
-        : GuitarPro(s, 6) {}
-    GuitarPro6(MasterScore* s, int v)
-        : GuitarPro(s, v) {}
-    bool read(QFile*) override;
+    GuitarPro6(mu::engraving::MasterScore* s, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro(s, 6, iocCtx) {}
+    GuitarPro6(mu::engraving::MasterScore* s, int v, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro(s, v, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
 };
 
 class GuitarPro7 : public GuitarPro6
@@ -435,9 +491,10 @@ class GuitarPro7 : public GuitarPro6
     virtual std::unique_ptr<IGPDomBuilder> createGPDomBuilder() const override;
 
 public:
-    GuitarPro7(MasterScore* s)
-        : GuitarPro6(s, 7) {}
-    bool read(QFile*) override;
+    GuitarPro7(mu::engraving::MasterScore* s, const muse::modularity::ContextPtr& iocCtx)
+        : GuitarPro6(s, 7, iocCtx) {}
+    bool read(muse::io::IODevice*) override;
+    GPProperties readProperties(muse::ByteArray* data);
 };
-} // namespace Ms
+} // namespace mu::iex::guitarpro
 #endif

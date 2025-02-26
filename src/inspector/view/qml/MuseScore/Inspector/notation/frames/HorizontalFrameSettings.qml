@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,9 @@
  */
 import QtQuick 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
+import MuseScore.Inspector 1.0
 
 import "../../common"
 import "internal"
@@ -44,6 +45,17 @@ Column {
         widthSection.focusOnFirst()
     }
 
+    PropertyCheckBox {
+        id: matchStaffSize
+
+        navigation.name: "Scale with staff size"
+        navigation.panel: root.navigationPanel
+        navigation.row: root.navigationRowStart + 1
+
+        text: qsTrc("inspector", "Scale with staff size")
+        propertyItem: root.model ? root.model.isSizeSpatiumDependent : null
+    }
+
     SpinBoxPropertyView {
         id: widthSection
         anchors.left: parent.left
@@ -59,8 +71,6 @@ Column {
         navigationRowStart: root.navigationRowStart + 1
     }
 
-    SeparatorLine { anchors.margins: -10 }
-
     HorizontalGapsSection {
         id: horizontalGapsSection
         leftGap: root.model ? root.model.leftGap : null
@@ -70,18 +80,14 @@ Column {
         navigationRowStart: widthSection.navigationRowEnd + 1
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
-    CheckBox {
-        isIndeterminate: root.model ? root.model.shouldDisplayKeysAndBrackets.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.shouldDisplayKeysAndBrackets.value : false
-        text: qsTrc("inspector", "Display key, brackets and braces")
+    PropertyCheckBox {
+        text: qsTrc("inspector", "Display brackets, clefs and key signatures in the next measure")
+        propertyItem: root.model ? root.model.shouldDisplayKeysAndBrackets : null
 
         navigation.name: "DisplayKeysAndBracketsCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: horizontalGapsSection.navigationRowEnd + 1
-        navigation.enabled: root.enabled
-
-        onClicked: { root.model.shouldDisplayKeysAndBrackets.value = !checked }
     }
 }

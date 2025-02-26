@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,23 +22,34 @@
 
 #include "style.h"
 
+#include "types/constants.h"
 #include "compat/pageformat.h"
 #include "rw/compat/readchordlisthook.h"
-#include "io/xml.h"
+#include "rw/compat/compatutils.h"
+#include "rw/xmlreader.h"
+#include "rw/xmlwriter.h"
+#include "types/typesconv.h"
 
-#include "libmscore/mscore.h"
+#include "dom/mscore.h"
+#include "dom/pedal.h"
+#include "dom/types.h"
 
 #include "defaultstyle.h"
 
 #include "log.h"
 
 using namespace mu;
+using namespace muse::io;
 using namespace mu::engraving;
-using namespace Ms;
 
-const QVariant& MStyle::value(Sid idx) const
+const PropertyValue& MStyle::value(Sid idx) const
 {
-    const QVariant& val = m_values[size_t(idx)];
+    if (idx == Sid::NOSTYLE) {
+        static PropertyValue dummy;
+        return dummy;
+    }
+
+    const PropertyValue& val = m_values[size_t(idx)];
     if (val.isValid()) {
         return val;
     }
@@ -46,35 +57,43 @@ const QVariant& MStyle::value(Sid idx) const
     return StyleDef::styleValues[size_t(idx)].defaultValue();
 }
 
-qreal MStyle::pvalue(Sid idx) const
+Millimetre MStyle::valueMM(Sid idx) const
 {
+    if (idx == Sid::NOSTYLE) {
+        return Millimetre();
+    }
+
     return m_precomputedValues[size_t(idx)];
 }
 
-void MStyle::set(Sid idx, const mu::PointF& v)
+void MStyle::set(const Sid t, const PropertyValue& val)
 {
-    set(idx, QVariant::fromValue(v));
-}
+    if (t == Sid::NOSTYLE) {
+        return;
+    }
 
-void MStyle::set(const Sid t, const QVariant& val)
-{
     const size_t idx = size_t(t);
     m_values[idx] = val;
     if (t == Sid::spatium) {
         precomputeValues();
     } else {
-        if (!strcmp(StyleDef::styleValues[idx].valueType(), "Ms::Spatium")) {
-            qreal _spatium = value(Sid::spatium).toDouble();
+        if (StyleDef::styleValues[idx].valueType() == P_TYPE::SPATIUM) {
+            double _spatium = value(Sid::spatium).toReal();
             m_precomputedValues[idx] = m_values[idx].value<Spatium>().val() * _spatium;
         }
     }
 }
 
+double MStyle::defaultSpatium() const
+{
+    return DefaultStyle::resolveStyleDefaults(defaultStyleVersion()).spatium();
+}
+
 void MStyle::precomputeValues()
 {
-    qreal _spatium = value(Sid::spatium).toDouble();
+    double _spatium = value(Sid::spatium).toReal();
     for (const StyleDef::StyleValue& t : StyleDef::styleValues) {
-        if (!strcmp(t.valueType(), "Ms::Spatium")) {
+        if (t.valueType() == P_TYPE::SPATIUM) {
             m_precomputedValues[t.idx()] = value(t.styleIdx()).value<Spatium>().val() * _spatium;
         }
     }
@@ -97,82 +116,100 @@ int MStyle::defaultStyleVersion() const
 
 bool MStyle::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     for (const StyleDef::StyleValue& t : StyleDef::styleValues) {
         Sid idx = t.styleIdx();
         if (t.name() == tag) {
-            const char* type = t.valueType();
-            if (!strcmp("Ms::Spatium", type)) {
-                set(idx, Spatium(e.readElementText().toDouble()));
-            } else if (!strcmp("double", type)) {
-                set(idx, QVariant(e.readElementText().toDouble()));
-            } else if (!strcmp("bool", type)) {
-                set(idx, QVariant(bool(e.readElementText().toInt())));
-            } else if (!strcmp("int", type)) {
-                set(idx, QVariant(e.readElementText().toInt()));
-            } else if (!strcmp("Ms::Direction", type)) {
-                set(idx, QVariant::fromValue(Direction(e.readElementText().toInt())));
-            } else if (!strcmp("QString", type)) {
-                set(idx, QVariant(e.readElementText()));
-            } else if (!strcmp("Ms::Align", type)) {
-                QStringList sl = e.readElementText().split(',');
-                if (sl.size() != 2) {
-                    qDebug("bad align text <%s>", qPrintable(e.readElementText()));
-                    return true;
-                }
-                Align align = Align::LEFT;
-                if (sl[0] == "center") {
-                    align = align | Align::HCENTER;
-                } else if (sl[0] == "right") {
-                    align = align | Align::RIGHT;
-                } else if (sl[0] == "left") {
-                } else {
-                    qDebug("bad align text <%s>", qPrintable(sl[0]));
-                    return true;
-                }
-                if (sl[1] == "center") {
-                    align = align | Align::VCENTER;
-                } else if (sl[1] == "bottom") {
-                    align = align | Align::BOTTOM;
-                } else if (sl[1] == "baseline") {
-                    align = align | Align::BASELINE;
-                } else if (sl[1] == "top") {
-                } else {
-                    qDebug("bad align text <%s>", qPrintable(sl[1]));
-                    return true;
-                }
-                set(idx, QVariant::fromValue(align));
-            } else if (!strcmp("QPointF", type)) {
-                qreal x = e.doubleAttribute("x", 0.0);
-                qreal y = e.doubleAttribute("y", 0.0);
+            P_TYPE type = t.valueType();
+            switch (type) {
+            case P_TYPE::SPATIUM:
+                set(idx, Spatium(e.readDouble()));
+                break;
+            case P_TYPE::REAL:
+                set(idx, e.readDouble());
+                break;
+            case P_TYPE::BOOL:
+                set(idx, bool(e.readInt()));
+                break;
+            case P_TYPE::INT:
+                set(idx, e.readInt());
+                break;
+            case P_TYPE::DIRECTION_V:
+                set(idx, DirectionV(e.readInt()));
+                break;
+            case P_TYPE::STRING:
+                set(idx, e.readText());
+                break;
+            case P_TYPE::ALIGN: {
+                Align align = TConv::fromXml(e.readText(), Align());
+                set(idx, align);
+            } break;
+            case P_TYPE::POINT: {
+                double x = e.doubleAttribute("x", 0.0);
+                double y = e.doubleAttribute("y", 0.0);
                 set(idx, PointF(x, y));
-                e.readElementText();
-            } else if (!strcmp("mu::PointF", type)) {
-                qreal x = e.doubleAttribute("x", 0.0);
-                qreal y = e.doubleAttribute("y", 0.0);
-                set(idx, PointF(x, y));
-                e.readElementText();
-            } else if (!strcmp("QSizeF", type)) {
-                qreal x = e.doubleAttribute("w", 0.0);
-                qreal y = e.doubleAttribute("h", 0.0);
+                e.readText();
+            } break;
+            case P_TYPE::SIZE: {
+                double x = e.doubleAttribute("w", 0.0);
+                double y = e.doubleAttribute("h", 0.0);
                 set(idx, SizeF(x, y));
-                e.readElementText();
-            } else if (!strcmp("mu::SizeF", type)) {
-                qreal x = e.doubleAttribute("w", 0.0);
-                qreal y = e.doubleAttribute("h", 0.0);
-                set(idx, SizeF(x, y));
-                e.readElementText();
-            } else if (!strcmp("QColor", type) || !strcmp("mu::draw::Color", type)) {
-                mu::draw::Color c;
+                e.readText();
+            } break;
+            case P_TYPE::SCALE: {
+                double sx = e.doubleAttribute("w", 0.0);
+                double sy = e.doubleAttribute("h", 0.0);
+                set(idx, ScaleF(sx, sy));
+                e.readText();
+            } break;
+            case P_TYPE::COLOR: {
+                Color c;
                 c.setRed(e.intAttribute("r"));
                 c.setGreen(e.intAttribute("g"));
                 c.setBlue(e.intAttribute("b"));
                 c.setAlpha(e.intAttribute("a", 255));
-                set(idx, QVariant::fromValue<mu::draw::Color>(c));
-                e.readElementText();
-            } else {
-                qFatal("unhandled type %s", type);
+                set(idx, c);
+                e.readText();
+            } break;
+            case P_TYPE::PLACEMENT_V:
+                set(idx, PlacementV(e.readText().toInt()));
+                break;
+            case P_TYPE::PLACEMENT_H:
+                set(idx, PlacementH(e.readText().toInt()));
+                break;
+            case P_TYPE::HOOK_TYPE:
+                set(idx, HookType(e.readText().toInt()));
+                break;
+            case P_TYPE::LINE_TYPE:
+                set(idx, TConv::fromXml(e.readAsciiText(), LineType::SOLID));
+                break;
+            case P_TYPE::CLEF_TO_BARLINE_POS:
+                set(idx, ClefToBarlinePosition(e.readInt()));
+                break;
+            case P_TYPE::TIE_PLACEMENT:
+                set(idx, TConv::fromXml(e.readAsciiText(), TiePlacement::AUTO));
+                break;
+            case P_TYPE::TIE_DOTS_PLACEMENT:
+                set(idx, TConv::fromXml(e.readAsciiText(), TieDotsPlacement::AUTO));
+                break;
+            case P_TYPE::GLISS_STYLE:
+                set(idx, GlissandoStyle(e.readText().toInt()));
+                break;
+            case P_TYPE::GLISS_TYPE:
+                set(idx, GlissandoType(e.readText().toInt()));
+                break;
+            case P_TYPE::TIMESIG_PLACEMENT:
+                set(idx, TConv::fromXml(e.readAsciiText(), TimeSigPlacement::NORMAL));
+                break;
+            case P_TYPE::TIMESIG_STYLE:
+                set(idx, TConv::fromXml(e.readAsciiText(), TimeSigStyle::NORMAL));
+                break;
+            case P_TYPE::TIMESIG_MARGIN:
+                set(idx, TConv::fromXml(e.readAsciiText(), TimeSigVSMargin::RIGHT_ALIGN_TO_BARLINE));
+                break;
+            default:
+                ASSERT_X(u"unhandled type " + String::number(int(type)));
             }
             return true;
         }
@@ -191,14 +228,14 @@ bool MStyle::readProperties(XmlReader& e)
 
 bool MStyle::readStyleValCompat(XmlReader& e)
 {
-    const QStringRef tag(e.name());
+    const AsciiStringView tag(e.name());
     if (tag == "tempoOffset") {   // pre-3.0-beta
-        const qreal x = e.doubleAttribute("x", 0.0);
-        const qreal y = e.doubleAttribute("y", 0.0);
+        const double x = e.doubleAttribute("x", 0.0);
+        const double y = e.doubleAttribute("y", 0.0);
         const PointF val(x, y);
         set(Sid::tempoPosAbove, val);
         set(Sid::tempoPosBelow, val);
-        e.readElementText();
+        e.readText();
         return true;
     }
     if (readTextStyleValCompat(e)) {
@@ -209,26 +246,27 @@ bool MStyle::readStyleValCompat(XmlReader& e)
 
 //---------------------------------------------------------
 //   readTextStyleValCompat
-//    Handle transition from separate bold, underline and
-//    italic style properties to the single *FontStyle
+//    Handle transition from separate bold, underline, strike
+//    and italic style properties to the single *FontStyle
 //    property set.
 //---------------------------------------------------------
 
 bool MStyle::readTextStyleValCompat(XmlReader& e)
 {
-    static const std::array<std::pair<const char*, FontStyle>, 3> styleNamesEndings { {
-        { "FontBold",      FontStyle::Bold },
-        { "FontItalic",    FontStyle::Italic },
-        { "FontUnderline", FontStyle::Underline }
+    static const std::array<std::pair<String, FontStyle>, 4> styleNamesEndings { {
+        { u"FontBold",      FontStyle::Bold },
+        { u"FontItalic",    FontStyle::Italic },
+        { u"FontUnderline", FontStyle::Underline },
+        { u"FontStrike",    FontStyle::Strike }
     } };
 
-    const QStringRef tag(e.name());
+    const String tag = String::fromAscii(e.name().ascii());
     FontStyle readFontStyle = FontStyle::Normal;
-    QStringRef typeName;
+    String typeName;
     for (auto& fontStyle : styleNamesEndings) {
         if (tag.endsWith(fontStyle.first)) {
             readFontStyle = fontStyle.second;
-            typeName = tag.mid(0, tag.length() - int(strlen(fontStyle.first)));
+            typeName = tag.mid(0, tag.size() - fontStyle.first.size());
             break;
         }
     }
@@ -236,16 +274,16 @@ bool MStyle::readTextStyleValCompat(XmlReader& e)
         return false;
     }
 
-    const QString newFontStyleName = typeName.toString() + "FontStyle";
+    const String newFontStyleName = typeName + u"FontStyle";
     const Sid sid = MStyle::styleIdx(newFontStyleName);
     if (sid == Sid::NOSTYLE) {
-        qWarning() << "readFontStyleValCompat: couldn't read text readFontStyle value:" << tag;
+        LOGW() << "readFontStyleValCompat: couldn't read text readFontStyle value:" << tag;
         return false;
     }
 
-    const bool readVal = bool(e.readElementText().toInt());
-    const QVariant val = value(sid);
-    FontStyle newFontStyle = (val == QVariant()) ? FontStyle::Normal : FontStyle(val.toInt());
+    const bool readVal = bool(e.readText().toInt());
+    const PropertyValue& val = value(sid);
+    FontStyle newFontStyle = val.isValid() ? FontStyle(val.toInt()) : FontStyle::Normal;
     if (readVal) {
         newFontStyle = newFontStyle + readFontStyle;
     } else {
@@ -256,17 +294,19 @@ bool MStyle::readTextStyleValCompat(XmlReader& e)
     return true;
 }
 
-bool MStyle::read(QIODevice* device, bool ign)
+void MStyle::readVersion(String versionTag)
 {
+    versionTag.remove(u".");
+    m_version = versionTag.toInt();
+}
+
+bool MStyle::read(IODevice* device, bool ign)
+{
+    UNUSED(ign);
     XmlReader e(device);
     while (e.readNextStartElement()) {
         if (e.name() == "museScore") {
-            QString version = e.attribute("version");
-            QStringList sl  = version.split('.');
-            int mscVersion  = sl[0].toInt() * 100 + sl[1].toInt();
-            if (mscVersion != MSCVERSION && !ign) {
-                return false;
-            }
+            readVersion(e.attribute("version"));
             while (e.readNextStartElement()) {
                 if (e.name() == "Style") {
                     read(e, nullptr);
@@ -279,10 +319,10 @@ bool MStyle::read(QIODevice* device, bool ign)
     return true;
 }
 
-bool MStyle::isValid(QIODevice* device)
+bool MStyle::isValid(IODevice* device)
 {
     XmlReader e(device);
-    while (e.error() == XmlReader::Error::NoError && e.readNextStartElement()) {
+    while (!e.isError() && e.readNextStartElement()) {
         if (e.name() == "museScore") {
             while (e.readNextStartElement()) {
                 if (e.name() == "Style") {
@@ -299,32 +339,220 @@ void MStyle::read(XmlReader& e, compat::ReadChordListHook* readChordListHook)
     TRACEFUNC;
 
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
 
         if (tag == "TextStyle") {
             //readTextStyle206(this, e);        // obsolete
-            e.readElementText();
-        } else if (tag == "ottavaHook") {             // obsolete, for 3.0dev bw. compatibility, should be removed in final release
-            qreal y = qAbs(e.readDouble());
+            e.readText();
+        } else if (tag == "ottavaHook") {       // obsolete, for 3.0dev bw. compatibility, should be removed in final release
+            double y = std::abs(e.readDouble());
             set(Sid::ottavaHookAbove, y);
             set(Sid::ottavaHookBelow, -y);
-        } else if (tag == "Spatium") {
+        } else if (tag == "Spatium" || tag == "spatium") {
             set(Sid::spatium, e.readDouble() * DPMM);
         } else if (tag == "page-layout") {      // obsolete
             compat::readPageFormat206(this, e);
         } else if (tag == "displayInConcertPitch") {
-            set(Sid::concertPitch, QVariant(bool(e.readInt())));
+            set(Sid::concertPitch, e.readBool());
         } else if (tag == "ChordList") {
             if (readChordListHook) {
                 readChordListHook->read(e);
             }
         } else if (tag == "lyricsDashMaxLegth") { // pre-3.6 typo
-            set(Sid::lyricsDashMaxLength, e.readDouble());
+            set(Sid::lyricsDashMaxLength, Spatium(e.readDouble()));
         } else if (tag == "dontHidStavesInFirstSystm") { // pre-3.6.3/4.0 typo
             set(Sid::dontHideStavesInFirstSystem, e.readBool());
+        } else if (tag == "minSpreadSpread") { // pre-4.4 typo
+            set(Sid::minStaffSpread, Spatium(e.readDouble()));
+        } else if (tag == "maxSpreadSpread") { // pre-4.4 typo
+            set(Sid::maxStaffSpread, Spatium(e.readDouble()));
+        } else if (tag == "beamDistance") { // beamDistance maps to useWideBeams in 4.0
+            set(Sid::useWideBeams, e.readDouble() > 0.75);
+        } else if (tag == "hairpinWidth") { // pre-4.4 typo
+            set(Sid::hairpinLineWidth, Spatium(e.readDouble()));
+        } else if (tag == "chordSymbolPosAbove") { // pre-4.4 typo
+            set(Sid::chordSymbolAPosAbove, e.readPoint());
+        } else if (tag == "chordSymbolPosBelow") { // pre-4.4 typo
+            set(Sid::chordSymbolAPosBelow, e.readPoint());
+        } else if (tag == "measureNumberAllStaffs") { // pre-4.4 typo
+            set(Sid::measureNumberAllStaves, e.readBool());
+        } else if (tag == "dontHidStavesInFirstSystm") { // pre-3.6.3/4.0 typo
+            set(Sid::dontHideStavesInFirstSystem, e.readBool());
+        } else if (tag == "firstSystemInsNameVisibility") { // pre-4.4 typo
+            set(Sid::firstSystemInstNameVisibility, e.readInt());
+        } else if ((tag == "articulationMinDistance"
+                    || tag == "propertyDistanceHead"
+                    || tag == "propertyDistanceStem"
+                    || tag == "propertyDistance"
+                    || tag == "bracketDistance")
+                   && m_version < 400) {
+            // Ignoring pre-4.0 articulation style and brackets distance settings. Using the new defaults instead
+            e.skipCurrentElement();
+        } else if (tag == "pedalListStyle") { // pre-3.6.3/4.0 typo
+            set(Sid::pedalLineStyle, TConv::fromXml(e.readAsciiText(), LineType::SOLID));
+        } else if (tag == "chordlineThickness" && m_version < 410) {
+            // Ignoring pre-4.1 value as it was wrong (it wasn't user-editable anyway)
+            e.skipCurrentElement();
+        } else if (tag == "pedalText" && m_version < 420) {
+            // Ignore old default
+            String pedText = e.readText();
+            if (!pedText.empty()) {
+                set(Sid::pedalText, pedText);
+            }
+        } else if (tag == "pedalContinueText" && m_version < 420 && e.readAsciiText() == "") {
+            // Ignore old default
+            String pedContText = e.readText();
+            if (!pedContText.empty()) {
+                set(Sid::pedalText, pedContText);
+            }
+        } else if (tag == "ArpeggioNoteDistance") { // pre-4.4 typo
+            set(Sid::arpeggioNoteDistance, Spatium(e.readDouble()));
+        } else if (tag == "ArpeggioAccidentalDistance") { // pre-4.4 typo
+            set(Sid::arpeggioAccidentalDistance, Spatium(e.readDouble()));
+        } else if (tag == "ArpeggioAccidentalDistanceMin") { // pre-4.4 typo
+            set(Sid::arpeggioAccidentalDistanceMin, Spatium(e.readDouble()));
+        } else if (tag == "ArpeggioLineWidth") { // pre-x.4 typo
+            set(Sid::arpeggioLineWidth, Spatium(e.readDouble()));
+        } else if (tag == "ArpeggioHookLen") { // pre-x.4 typo
+            set(Sid::arpeggioHookLen, Spatium(e.readDouble()));
+        } else if (tag == "ArpeggioHiddenInStdIfTab") { // pre-x.4 typo
+            set(Sid::arpeggioHiddenInStdIfTab, e.readBool());
+        } else if ((tag == "slurEndWidth"
+                    || tag == "slurMidWidth"
+                    || tag == "slurDottedWidth"
+                    || tag == "slurMinDistance")
+                   && m_version < 430) {
+            // Pre-4.3 scores used identical style values for slurs and ties.
+            // When opening older scores, use the same values for both.
+            double _val = e.readDouble();
+            if (tag == "slurEndWidth") {
+                set(Sid::tieEndWidth,     Spatium(_val));
+                set(Sid::slurEndWidth,    Spatium(_val));
+            } else if (tag == "slurMidWidth") {
+                set(Sid::tieMidWidth,     Spatium(_val));
+                set(Sid::slurMidWidth,    Spatium(_val));
+            } else if (tag == "slurDottedWidth") {
+                set(Sid::tieDottedWidth,  Spatium(_val));
+                set(Sid::slurDottedWidth, Spatium(_val));
+            } else if (tag == "slurMinDistance") {
+                set(Sid::tieMinDistance,  Spatium(_val));
+                set(Sid::slurMinDistance, Spatium(_val));
+            }
+        } else if (tag == "measureNumberOffset" && m_version < 440) { // pre-4.4 typo
+            set(Sid::measureNumberPosAbove, PointF(e.readPoint()));
+        } else if (tag == "measureNumberPosAbove" && m_version < 440) { // pre-4.4 typo
+            set(Sid::mmRestRangePosAbove, PointF(e.readPoint()));
+        } else if (tag == "ottavaTextAlign") {
+            // Pre-x.x (?) scores used identical style values for Above and Below
+            // apparently the old default was "VCENTER",
+            // so better ignore and take the new defaults
+            e.skipCurrentElement(); // obsolete
+        } else if (tag == "tremoloStrokeStyle") { // pre-4.4 typo
+            set(Sid::tremoloStyle, e.readInt());
+        } else if (tag == "systemFontFace") { // pre-4.4 typo
+            set(Sid::systemTextFontFace, e.readText());
+        } else if (tag == "systemFontSize") { // pre-4.4 typo
+            set(Sid::systemTextFontSize, e.readDouble());
+        } else if (tag == "systemFontSpatiumDependent") { // pre-4.4 typo
+            set(Sid::systemTextFontSpatiumDependent, bool(e.readInt()));
+        } else if (tag == "systemFontStyle") { // pre-4.4 typo
+            set(Sid::systemTextFontStyle, e.readInt());
+        } else if (tag == "systemAlign") { // pre-4.4 typo
+            set(Sid::systemTextAlign, TConv::fromXml(e.readText(), Align()));
+        } else if (tag == "systemOffsetType") { // pre-4.4 typo
+            set(Sid::systemTextOffsetType, e.readInt());
+        } else if (tag == "systemPlacement") { // pre-4.4 typo
+            set(Sid::systemTextPlacement, PlacementV(e.readText().toInt()));
+        } else if (tag == "systemPosAbove") { // pre-4.4 typo
+            set(Sid::systemTextPosAbove, PointF(e.readPoint()));
+        } else if (tag == "systemPosBelow") { // pre-4.4 typo
+            set(Sid::systemTextPosBelow, PointF(e.readPoint()));
+        } else if (tag == "systemMinDistance") { // pre-4.4 typo
+            set(Sid::systemTextMinDistance, Spatium(e.readDouble()));
+        } else if (tag == "systemFrameType") { // pre-4.4 typo
+            set(Sid::systemTextFrameType, e.readInt());
+        } else if (tag == "systemFramePadding") { // pre-4.4 typo
+            set(Sid::systemTextFramePadding, e.readDouble());
+        } else if (tag == "systemFrameWidth") { // pre-4.4 typo
+            set(Sid::systemTextFrameWidth, e.readDouble());
+        } else if (tag == "systemFrameRound") { // pre-4.4 typo
+            set(Sid::systemTextFrameRound, e.readInt());
+        } else if (tag == "systemFrameFgColor") { // pre-4.4 typo
+            set(Sid::systemTextFrameFgColor, e.readColor());
+        } else if (tag == "systemFrameBgColor") { // pre-4.4 typo
+            set(Sid::systemTextFrameBgColor, e.readColor());
+        } else if (tag == "staffFontFace") { // pre-4.4 typo
+            set(Sid::staffTextFontFace, e.readText());
+        } else if (tag == "staffFontSize") { // pre-4.4 typo
+            set(Sid::staffTextFontSize, e.readDouble());
+        } else if (tag == "staffFontSpatiumDependent") { // pre-4.4 typo
+            set(Sid::staffTextFontSpatiumDependent, e.readBool());
+        } else if (tag == "staffFontStyle") { // pre-4.4 typo
+            set(Sid::staffTextFontStyle, e.readInt());
+        } else if (tag == "staffAlign") { // pre-4.4 typo
+            set(Sid::staffTextAlign, TConv::fromXml(e.readText(), Align()));
+        } else if (tag == "staffOffsetType") { // pre-4.4 typo
+            set(Sid::staffTextOffsetType, e.readInt());
+        } else if (tag == "staffPlacement") { // pre-4.4 typo
+            set(Sid::staffTextPlacement, PlacementV(e.readText().toInt()));
+        } else if (tag == "staffTextPosAbove"  // pre-4.4 typo, certainly before 3.6, even before 3.5
+                   && m_version <= 410) { // so we might test for < 302, however m_version seems set to 410 here?!?
+            double staffTextPosAboveY = e.readDouble();
+            set(Sid::staffTextPosAbove, PointF(0.0, staffTextPosAboveY));
+        } else if (tag == "staffPosAbove") { // pre-4.4 typo
+            set(Sid::staffTextPosAbove, e.readPoint());
+        } else if (tag == "staffPosBelow") { // pre-4.4 typo
+            set(Sid::staffTextPosBelow, e.readPoint());
+        } else if (tag == "staffTextMinDistance" // pre-4.4 typo, certainly before 3.6, even before 3.5
+                   && m_version <= 410) { // so we might test for < 302, however m_version seems set to 410 here?!?
+            set(Sid::staffTextMinDistance, Spatium(e.readDouble()));
+        } else if (tag == "staffMinDistance") { // pre-4.4 typo
+            set(Sid::staffTextMinDistance, Spatium(e.readDouble()));
+        } else if (tag == "staffFrameType") { // pre-4.4 typo
+            set(Sid::staffTextFrameType, e.readInt());
+        } else if (tag == "staffFramePadding") { // pre-4.4 typo
+            set(Sid::staffTextFramePadding, e.readDouble());
+        } else if (tag == "staffFrameWidth") { // pre-4.4 typo
+            set(Sid::staffTextFrameWidth, e.readDouble());
+        } else if (tag == "staffFrameRound") { // pre-4.4 typo
+            set(Sid::staffTextFrameRound, e.readInt());
+        } else if (tag == "staffFrameFgColor") { // pre-4.4 typo
+            set(Sid::staffTextFrameFgColor, e.readColor());
+        } else if (tag == "staffFrameBgColor") { // pre-4.4 typo
+            set(Sid::staffTextFrameBgColor, e.readColor());
+        } else if (tag == "dymanicsShowTabCommon") { // pre-4.4 typo in gp-style.mss
+            set(Sid::dynamicsShowTabCommon, bool(e.readInt()));
+        } else if (tag == "tupletOufOfStaff") {
+            set(Sid::tupletOutOfStaff, bool(e.readInt()));
+        } else if (tag == "pedalBeginTextOffset"
+                   || tag == "letRingBeginTextOffset"
+                   || tag == "palmMuteBeginTextOffset"
+                   || tag == "defaultFontSpatiumDependent"
+                   || tag == "usePre_3_6_defaults") {
+            e.skipCurrentElement(); // obsolete
+        } else if (tag == "articulationAnchorDefault" && m_version < 410) {
+            set(Sid::articulationAnchorDefault, (int)compat::CompatUtils::translateToNewArticulationAnchor(e.readInt()));
+        } else if (tag == "articulationAnchorLuteFingering" && m_version < 410) {
+            set(Sid::articulationAnchorLuteFingering, (int)compat::CompatUtils::translateToNewArticulationAnchor(e.readInt()));
+        } else if (tag == "articulationAnchorOther" && m_version < 410) {
+            set(Sid::articulationAnchorOther, (int)compat::CompatUtils::translateToNewArticulationAnchor(e.readInt()));
+        } else if (tag == "lineEndToSystemEndDistance") { // renamed in 4.5
+            set(Sid::lineEndToBarlineDistance, Spatium(e.readDouble()));
         } else if (!readProperties(e)) {
             e.unknown();
         }
+    }
+
+    if (m_version < 450) {
+        // Didn't exist before 4.5. Default to false for compatibility.
+        set(Sid::scaleRythmicSpacingForSmallNotes, false);
+        set(Sid::maskBarlinesForText, false);
+    }
+
+    if (m_version < 420 && !MScore::testMode) {
+        // This style didn't exist before version 4.2. For files older than 4.2, defaults
+        // to INSIDE for compatibility. For files 4.2 and newer, defaults to OUTSIDE.
+        set(Sid::tiePlacementChord, TiePlacement::INSIDE);
     }
 
     if (readChordListHook) {
@@ -332,19 +560,19 @@ void MStyle::read(XmlReader& e, compat::ReadChordListHook* readChordListHook)
     }
 }
 
-bool MStyle::write(QIODevice* device)
+bool MStyle::write(IODevice* device)
 {
-    XmlWriter xml(nullptr, device);
-    xml.writeHeader();
-    xml.startObject("museScore version=\"" MSC_VERSION "\"");
+    XmlWriter xml(device);
+    xml.startDocument();
+    xml.startElement("museScore", { { "version", Constants::MSC_VERSION_STR } });
     save(xml, false);
-    xml.endObject();
+    xml.endElement();
     return true;
 }
 
 void MStyle::save(XmlWriter& xml, bool optimize)
 {
-    xml.startObject("Style");
+    xml.startElement("Style");
 
     for (const StyleDef::StyleValue& st : StyleDef::styleValues) {
         Sid idx = st.styleIdx();
@@ -354,48 +582,49 @@ void MStyle::save(XmlWriter& xml, bool optimize)
         if (optimize && isDefault(idx)) {
             continue;
         }
-        const char* type = st.valueType();
-        if (!strcmp("Ms::Spatium", type)) {
+        P_TYPE type = st.valueType();
+        if (P_TYPE::SPATIUM == type) {
             xml.tag(st.name(), value(idx).value<Spatium>().val());
-        } else if (!strcmp("Ms::Direction", type)) {
-            xml.tag(st.name(), value(idx).toInt());
-        } else if (!strcmp("Ms::Align", type)) {
-            Align a = Align(value(idx).toInt());
+        } else if (P_TYPE::DIRECTION_V == type) {
+            xml.tag(st.name(), int(value(idx).value<DirectionV>()));
+        } else if (P_TYPE::ALIGN == type) {
+            Align a = value(idx).value<Align>();
             // Don't write if it's the default value
-            if (optimize && a == Align(st.defaultValue().toInt())) {
+            if (optimize && a == st.defaultValue().value<Align>()) {
                 continue;
             }
-            QString horizontal = "left";
-            QString vertical = "top";
-            if (a & Align::HCENTER) {
-                horizontal = "center";
-            } else if (a & Align::RIGHT) {
-                horizontal = "right";
-            }
-
-            if (a & Align::VCENTER) {
-                vertical = "center";
-            } else if (a & Align::BOTTOM) {
-                vertical = "bottom";
-            } else if (a & Align::BASELINE) {
-                vertical = "baseline";
-            }
-
-            xml.tag(st.name(), horizontal + "," + vertical);
+            xml.tag(st.name(), TConv::toXml(a));
+        } else if (P_TYPE::LINE_TYPE == type) {
+            xml.tagProperty(st.name(), value(idx));
+        } else if (P_TYPE::TIE_PLACEMENT == type) {
+            xml.tag(st.name(), TConv::toXml(value(idx).value<TiePlacement>()));
+        } else if (P_TYPE::TIE_DOTS_PLACEMENT == type) {
+            xml.tag(st.name(), TConv::toXml(value(idx).value<TieDotsPlacement>()));
+        } else if (P_TYPE::TIMESIG_PLACEMENT == type) {
+            xml.tag(st.name(), TConv::toXml(value(idx).value<TimeSigPlacement>()));
+        } else if (P_TYPE::TIMESIG_STYLE == type) {
+            xml.tag(st.name(), TConv::toXml(value(idx).value<TimeSigStyle>()));
+        } else if (P_TYPE::TIMESIG_MARGIN == type) {
+            xml.tag(st.name(), TConv::toXml(value(idx).value<TimeSigVSMargin>()));
         } else {
-            xml.tag(st.name(), value(idx));
+            PropertyValue val = value(idx);
+            //! NOTE for compatibility
+            if (val.isEnum()) {
+                val = val.value<int>();
+            }
+            xml.tagProperty(st.name(), val);
         }
     }
 
-    xml.tag("Spatium", value(Sid::spatium).toDouble() / DPMM);
-    xml.endObject();
+    xml.tag("spatium", value(Sid::spatium).toReal() / DPMM);
+    xml.endElement();
 }
 
 // ====================================================
 // Static
 // ====================================================
 
-const char* MStyle::valueType(const Sid i)
+P_TYPE MStyle::valueType(const Sid i)
 {
     return StyleDef::styleValues[size_t(i)].valueType();
 }
@@ -406,13 +635,14 @@ const char* MStyle::valueName(const Sid i)
         static const char* no_style = "no style";
         return no_style;
     }
-    return StyleDef::styleValues[size_t(i)].name();
+    return StyleDef::styleValues[size_t(i)].name().ascii();
 }
 
-Sid MStyle::styleIdx(const QString& name)
+Sid MStyle::styleIdx(const String& name)
 {
-    for (StyleDef::StyleValue st : StyleDef::styleValues) {
-        if (st.name() == name) {
+    muse::ByteArray ba = name.toAscii();
+    for (const StyleDef::StyleValue& st : StyleDef::styleValues) {
+        if (st.name() == ba.constChar()) {
             return st.styleIdx();
         }
     }

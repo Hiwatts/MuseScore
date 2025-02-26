@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,15 +30,14 @@
 #include "async/asyncable.h"
 
 namespace mu::appshell {
-class AppearancePreferencesModel : public QObject, public async::Asyncable
+class AppearancePreferencesModel : public QObject, public muse::Injectable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(appshell, ui::IUiConfiguration, uiConfiguration)
-    INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
-    INJECT(appshell, engraving::IEngravingConfiguration, engravingConfiguration)
+    Q_PROPERTY(bool isFollowSystemThemeAvailable READ isFollowSystemThemeAvailable CONSTANT)
+    Q_PROPERTY(bool isFollowSystemTheme READ isFollowSystemTheme WRITE setFollowSystemTheme NOTIFY isFollowSystemThemeChanged)
 
-    Q_PROPERTY(bool highContrastEnabled READ highContrastEnabled WRITE setHighContrastEnabled NOTIFY highContrastEnabledChanged)
+    Q_PROPERTY(bool highContrastEnabled READ highContrastEnabled WRITE setHighContrastEnabled NOTIFY themesChanged)
     Q_PROPERTY(QVariantList generalThemes READ generalThemes NOTIFY themesChanged)
     Q_PROPERTY(QVariantList highContrastThemes READ highContrastThemes NOTIFY themesChanged)
     Q_PROPERTY(QStringList accentColors READ accentColors NOTIFY themesChanged)
@@ -61,6 +60,10 @@ class AppearancePreferencesModel : public QObject, public async::Asyncable
 
     Q_PROPERTY(bool scoreInversionEnabled READ scoreInversionEnabled WRITE setScoreInversionEnabled NOTIFY invertScoreColorChanged)
 
+    muse::Inject<muse::ui::IUiConfiguration> uiConfiguration = { this };
+    muse::Inject<notation::INotationConfiguration> notationConfiguration = { this };
+    muse::Inject<engraving::IEngravingConfiguration> engravingConfiguration = { this };
+
 public:
     explicit AppearancePreferencesModel(QObject* parent = nullptr);
 
@@ -73,6 +76,9 @@ public:
         BorderColor
     };
     Q_ENUM(ColorType)
+
+    bool isFollowSystemThemeAvailable() const;
+    bool isFollowSystemTheme() const;
 
     bool highContrastEnabled() const;
     QVariantList generalThemes() const;
@@ -96,13 +102,14 @@ public:
 
     bool scoreInversionEnabled() const;
 
-    Q_INVOKABLE void resetThemeToDefault();
+    Q_INVOKABLE void resetAppearancePreferencesToDefault();
     Q_INVOKABLE void setNewColor(const QColor& newColor, ColorType colorType);
     Q_INVOKABLE QStringList allFonts() const;
-    Q_INVOKABLE QString wallpaperPathFilter() const;
+    Q_INVOKABLE QStringList wallpaperPathFilter() const;
     Q_INVOKABLE QString wallpapersDir() const;
 
 public slots:
+    void setFollowSystemTheme(bool enabled);
     void setHighContrastEnabled(bool enabled);
     void setCurrentThemeCode(const QString& themeCode);
     void setCurrentAccentColorIndex(int index);
@@ -117,7 +124,7 @@ public slots:
     void setScoreInversionEnabled(bool value);
 
 signals:
-    void highContrastEnabledChanged();
+    void isFollowSystemThemeChanged();
     void themesChanged();
     void currentFontIndexChanged();
     void bodyTextSizeChanged();
@@ -130,8 +137,8 @@ signals:
     void invertScoreColorChanged();
 
 private:
-    ui::ThemeInfo currentTheme() const;
-    ui::ThemeList allThemes() const;
+    muse::ui::ThemeInfo currentTheme() const;
+    muse::ui::ThemeList allThemes() const;
 };
 }
 

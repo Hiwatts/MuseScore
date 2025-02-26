@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,8 @@
  */
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 Rectangle {
     id: root
@@ -45,6 +45,7 @@ Rectangle {
             anchors.margins: 8
             verticalAlignment: Text.AlignVCenter
             text: "Last clicked: " + root.lastClickedInfo
+            color: "#000000"
         }
     }
 
@@ -54,7 +55,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 64
-        color: "#fce94f"
+        color: "#729fcf"
 
         anchors.margins: ui.theme.navCtrlBorderWidth
 
@@ -80,7 +81,10 @@ Rectangle {
                     keynavSection: mainMenu.keynavSection
                     subsectionName: "subsec" + model.index
                     subsectionOrder: model.index
-                    onClicked: root.lastClickedInfo = "sec: " + mainMenu.sectionName + ", " + info
+                    color: mainMenu.color
+                    onClicked: function(info) {
+                        root.lastClickedInfo = "sec: " + mainMenu.sectionName + ", " + info
+                    }
                 }
             }
         }
@@ -92,7 +96,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 64
-        color: "#e9b96e"
+        color: "#ef2929"
 
         anchors.margins: ui.theme.navCtrlBorderWidth
 
@@ -110,7 +114,10 @@ Rectangle {
                     keynavSection: topTools.keynavSection
                     subsectionName: "subsec" + model.index
                     subsectionOrder: model.index
-                    onClicked: root.lastClickedInfo = "sec: " + topTools.sectionName + ", " + info
+                    color: topTools.color
+                    onClicked: function(info) {
+                        root.lastClickedInfo = "sec: " + topTools.sectionName + ", " + info
+                    }
                 }
             }
         }
@@ -139,7 +146,10 @@ Rectangle {
                     keynavSection: leftPanel.keynavSection
                     subsectionName: "subsec" + model.index
                     subsectionOrder: model.index
-                    onClicked: root.lastClickedInfo = "sec: " + leftPanel.sectionName + ", " + info
+                    color: leftPanel.color
+                    onClicked: function(info) {
+                        root.lastClickedInfo = "sec: " + leftPanel.sectionName + ", " + info
+                    }
                 }
             }
         }
@@ -168,7 +178,10 @@ Rectangle {
                     keynavSection: rightPanel.keynavSection
                     subsectionName: "subsec" + model.index
                     subsectionOrder: model.index
-                    onClicked: root.lastClickedInfo = "sec: " + rightPanel.sectionName + ", " + info
+                    color: rightPanel.color
+                    onClicked: function(info) {
+                        root.lastClickedInfo = "sec: " + rightPanel.sectionName + ", " + info
+                    }
                 }
             }
         }
@@ -191,7 +204,10 @@ Rectangle {
             keynavSection: centerPanel.keynavSection
             subsectionName: "subsec0"
             subsectionOrder: 0
-            onClicked: root.lastClickedInfo = "sec: " + centerPanel.sectionName + ", " + info
+            color: centerPanel.color
+            onClicked: function(info) {
+                root.lastClickedInfo = "sec: " + centerPanel.sectionName + ", " + info
+            }
         }
     }
 }

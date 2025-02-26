@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,130 +24,144 @@
 
 #include <QPixmap>
 #include <QDate>
+#include <unordered_set>
 
-#include "io/path.h"
 #include "translation.h"
-#include "id.h"
-#include "midi/midievent.h"
 
-#include "libmscore/engravingitem.h"
-#include "libmscore/page.h"
-#include "libmscore/durationtype.h"
-#include "libmscore/mscore.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/timesig.h"
-#include "libmscore/key.h"
-#include "libmscore/part.h"
-#include "libmscore/staff.h"
-#include "libmscore/stafftype.h"
-#include "libmscore/chord.h"
-#include "libmscore/articulation.h"
-#include "libmscore/slur.h"
-#include "libmscore/rest.h"
-#include "libmscore/stem.h"
-#include "libmscore/hook.h"
-#include "libmscore/measure.h"
-#include "libmscore/ottava.h"
-#include "libmscore/hairpin.h"
-#include "libmscore/harmony.h"
-#include "libmscore/realizedharmony.h"
-#include "libmscore/instrument.h"
+#include "types/id.h"
+#include "types/translatablestring.h"
 
-#include "engraving/layout/layoutoptions.h"
+#include "engraving/dom/articulation.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/durationtype.h"
+#include "engraving/dom/engravingitem.h"
+#include "engraving/dom/hairpin.h"
+#include "engraving/dom/harmony.h"
+#include "engraving/dom/hook.h"
+#include "engraving/dom/instrtemplate.h"
+#include "engraving/dom/instrtemplate.h"
+#include "engraving/dom/instrument.h"
+#include "engraving/dom/key.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/ottava.h"
+#include "engraving/dom/page.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/realizedharmony.h"
+#include "engraving/dom/rest.h"
+#include "engraving/dom/score.h"
+#include "engraving/dom/slur.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/stafftype.h"
+#include "engraving/dom/stem.h"
+#include "engraving/dom/system.h"
+#include "engraving/dom/timesig.h"
+
+#include "engraving/rendering/layoutoptions.h"
 
 namespace mu::notation {
-using Page = Ms::Page;
-using EngravingItem = Ms::EngravingItem;
-using ElementType = Ms::ElementType;
-using Note = Ms::Note;
-using Measure = Ms::Measure;
-using DurationType = Ms::TDuration::DurationType;
-using Duration = Ms::TDuration;
-using SelectType = Ms::SelectType;
-using Pad = Ms::Pad;
+using Page = mu::engraving::Page;
+using System = mu::engraving::System;
+using EngravingItem = mu::engraving::EngravingItem;
+using ElementType = mu::engraving::ElementType;
+using PropertyValue = engraving::PropertyValue;
+using Note = mu::engraving::Note;
+using Measure = mu::engraving::Measure;
+using DurationType = mu::engraving::DurationType;
+using Duration = mu::engraving::TDuration;
+using SelectType = mu::engraving::SelectType;
+using SelectionState = mu::engraving::SelState;
+using Pad = mu::engraving::Pad;
 using ViewMode = engraving::LayoutMode;
-using PitchMode = Ms::UpDownMode;
-using StyleId = Ms::Sid;
-using SymbolId = Ms::SymId;
-using Key = Ms::Key;
-using KeyMode = Ms::KeyMode;
-using TimeSigType = Ms::TimeSigType;
-using TimeSignature = Ms::TimeSig;
-using Part = Ms::Part;
-using Staff = Ms::Staff;
-using NoteHead = Ms::NoteHead;
-using SharpFlat = Ms::PreferSharpFlat;
-using TransposeMode = Ms::TransposeMode;
-using TransposeDirection = Ms::TransposeDirection;
-using Fraction = Ms::Fraction;
-using ElementPattern = Ms::ElementPattern;
-using SelectionFilterType = Ms::SelectionFilterType;
-using Chord = Ms::Chord;
-using ChordRest = Ms::ChordRest;
-using Harmony = Ms::Harmony;
-using RealisedHarmony = Ms::RealizedHarmony;
-using Articulation = Ms::Articulation;
-using SlurSegment = Ms::SlurSegment;
-using Rest = Ms::Rest;
-using Stem = Ms::Stem;
-using Hook = Ms::Hook;
-using Fraction = Ms::Fraction;
-using NoteInputMethod = Ms::NoteEntryMethod;
-using AccidentalType = Ms::AccidentalType;
-using OttavaType = Ms::OttavaType;
-using HairpinType = Ms::HairpinType;
-using TextType = Ms::Tid;
-using TextBase = Ms::TextBase;
-using TupletNumberType = Ms::TupletNumberType;
-using TupletBracketType = Ms::TupletBracketType;
-using GraceNoteType = Ms::NoteType;
-using BeamMode = Ms::Beam::Mode;
-using LayoutBreakType = Ms::LayoutBreak::Type;
-using Interval = Ms::Interval;
-using Drumset = Ms::Drumset;
-using StringData = Ms::StringData;
-using Clef = Ms::Clef;
-using ClefType = Ms::ClefType;
-using ClefTypeList = Ms::ClefTypeList;
-using BracketType = Ms::BracketType;
-using StaffGroup = Ms::StaffGroup;
-using StaffType = Ms::StaffTypes;
-using StaffTypePreset = Ms::StaffType;
-using StaffName = Ms::StaffName;
-using StaffNameList = Ms::StaffNameList;
-using MidiArticulation = Ms::MidiArticulation;
-using Trait = Ms::Trait;
-using TraitType = Ms::TraitType;
-using InstrumentChannel = Ms::Channel;
-using Instrument = Ms::Instrument;
-using InstrumentTemplate = Ms::InstrumentTemplate;
-using InstrumentTrait = Ms::Trait;
-using ScoreOrder = Ms::ScoreOrder;
-using ScoreOrderGroup = Ms::ScoreGroup;
-using InstrumentOverwrite = Ms::InstrumentOverwrite;
-using InstrumentGenre = Ms::InstrumentGenre;
-using InstrumentGroup = Ms::InstrumentGroup;
-using MidiArticulation = Ms::MidiArticulation;
+using PitchMode = mu::engraving::UpDownMode;
+using StyleId = mu::engraving::Sid;
+using StyleIdSet = mu::engraving::StyleIdSet;
+using SymbolId = mu::engraving::SymId;
+using Key = mu::engraving::Key;
+using KeyMode = mu::engraving::KeyMode;
+using TimeSigType = mu::engraving::TimeSigType;
+using TimeSignature = mu::engraving::TimeSig;
+using Part = mu::engraving::Part;
+using Staff = mu::engraving::Staff;
+using NoteHead = mu::engraving::NoteHead;
+using SharpFlat = mu::engraving::PreferSharpFlat;
+using TransposeMode = mu::engraving::TransposeMode;
+using TransposeDirection = mu::engraving::TransposeDirection;
+using Fraction = mu::engraving::Fraction;
+using ElementPattern = mu::engraving::ElementPattern;
+using SelectionFilterType = mu::engraving::SelectionFilterType;
+using Chord = mu::engraving::Chord;
+using ChordRest = mu::engraving::ChordRest;
+using Harmony = mu::engraving::Harmony;
+using RealisedHarmony = mu::engraving::RealizedHarmony;
+using Articulation = mu::engraving::Articulation;
+using SlurSegment = mu::engraving::SlurSegment;
+using Rest = mu::engraving::Rest;
+using Stem = mu::engraving::Stem;
+using Hook = mu::engraving::Hook;
+using Fraction = mu::engraving::Fraction;
+using NoteInputMethod = mu::engraving::NoteEntryMethod;
+using NoteInputParams = mu::engraving::NoteInputParams;
+using AccidentalType = mu::engraving::AccidentalType;
+using OttavaType = mu::engraving::OttavaType;
+using HairpinType = mu::engraving::HairpinType;
+using TextBase = mu::engraving::TextBase;
+using TupletNumberType = mu::engraving::TupletNumberType;
+using TupletBracketType = mu::engraving::TupletBracketType;
+using GraceNoteType = mu::engraving::NoteType;
+using BeamMode = mu::engraving::BeamMode;
+using LayoutBreakType = mu::engraving::LayoutBreakType;
+using Interval = mu::engraving::Interval;
+using Drumset = mu::engraving::Drumset;
+using StringData = mu::engraving::StringData;
+using Clef = mu::engraving::Clef;
+using ClefType = mu::engraving::ClefType;
+using ClefTypeList = mu::engraving::ClefTypeList;
+using BracketType = mu::engraving::BracketType;
+using StaffGroup = mu::engraving::StaffGroup;
+using StaffType = mu::engraving::StaffType;
+using StaffTypeId = mu::engraving::StaffTypes;
+using StaffName = mu::engraving::StaffName;
+using StaffNameList = mu::engraving::StaffNameList;
+using Segment = mu::engraving::Segment;
+using TextStyleType = mu::engraving::TextStyleType;
+using TraitType = mu::engraving::TraitType;
+using HarmonyDurationType = mu::engraving::HDuration;
+using Voicing = mu::engraving::Voicing;
+using Instrument = mu::engraving::Instrument;
+using InstrumentTemplate = mu::engraving::InstrumentTemplate;
+using InstrumentTrait = mu::engraving::Trait;
+using ScoreOrder = mu::engraving::ScoreOrder;
+using InstrumentGenre = mu::engraving::InstrumentGenre;
+using InstrumentGroup = mu::engraving::InstrumentGroup;
 using PageList = std::vector<const Page*>;
 using PartList = std::vector<const Part*>;
-using InstrumentList = QList<Instrument>;
-using InstrumentTemplateList = QList<const InstrumentTemplate*>;
-using InstrumentGenreList = QList<const InstrumentGenre*>;
-using ScoreOrderList = QList<ScoreOrder>;
-using InstrumentGroupList = QList<const InstrumentGroup*>;
-using MidiArticulationList = QList<MidiArticulation>;
+using InstrumentTemplateList = std::vector<const InstrumentTemplate*>;
+using InstrumentGenreList = std::vector<const InstrumentGenre*>;
+using ScoreOrderList = std::vector<mu::engraving::ScoreOrder>;
+using InstrumentGroupList = std::vector<const InstrumentGroup*>;
+using InstrumentTrackId = mu::engraving::InstrumentTrackId;
+using InstrumentTrackIdSet = mu::engraving::InstrumentTrackIdSet;
+using voice_idx_t = mu::engraving::voice_idx_t;
+using track_idx_t = mu::engraving::track_idx_t;
+using staff_idx_t = mu::engraving::staff_idx_t;
+using ChangesRange = mu::engraving::ScoreChangesRange;
+using GuitarBendType = mu::engraving::GuitarBendType;
+using engraving::LoopBoundaryType;
+using Pid = mu::engraving::Pid;
+using VoiceAssignment = mu::engraving::VoiceAssignment;
 
-static const QString COMMON_GENRE_ID("common");
+static const muse::String COMMON_GENRE_ID("common");
 
-enum class DragMode
+enum class DragMode : unsigned char
 {
     BothXY = 0,
     OnlyX,
-    OnlyY,
-    LassoList
+    OnlyY
 };
 
-enum class MoveDirection
+enum class MoveDirection : unsigned char
 {
     Undefined = 0,
     Left,
@@ -156,32 +170,51 @@ enum class MoveDirection
     Down
 };
 
-enum class MoveSelectionType
+enum class MoveSelectionType : unsigned char
 {
     Undefined = 0,
     EngravingItem,
     Chord,
     Measure,
-    Track
+    Track,
+    Frame,
+    System,
+    String // TAB Staff
 };
 
-enum class BreaksSpawnIntervalType
+enum class ExpandSelectionMode : unsigned char
+{
+    BeginSystem,
+    EndSystem,
+    BeginScore,
+    EndScore,
+};
+
+enum class AddRemoveSystemLockType : signed char
 {
     AfterEachSystem = -1,
     None = 0,
     MeasuresInterval
 };
 
-enum class BoxType
+enum class BoxType : unsigned char
 {
     Unknown,
     Vertical,
     Horizontal,
     Measure,
-    Text
+    Text,
+    Fret
 };
 
-enum class NoteName
+enum class AddBoxesTarget : unsigned char {
+    AfterSelection,
+    BeforeSelection,
+    AtStartOfScore,
+    AtEndOfScore
+};
+
+enum class NoteName : unsigned char
 {
     C = 0,
     D,
@@ -192,83 +225,49 @@ enum class NoteName
     B
 };
 
-enum class NoteAddingMode
+using NoteVal = mu::engraving::NoteVal;
+using NoteValList = mu::engraving::NoteValList;
+
+enum class NoteAddingMode : unsigned char
 {
     CurrentChord,
     NextChord,
     InsertChord
 };
 
-enum class ResettableValueType
-{
-    Stretch,
-    BeamMode,
-    ShapesAndPosition,
-    TextStyleOverriders
-};
-
-enum class IntervalType
-{
-    Above,
-    Below
-};
-
-enum class TupletType
-{
-    Duplet,
-    Triplet,
-    Quadruplet,
-    Quintuplet,
-    Sextuplet,
-    Septuplet,
-    Octuplet,
-    Nonuplet
-};
-
-enum class PastingType {
+enum class PastingType : unsigned char {
     Default,
     Half,
     Double,
     Special
 };
 
-struct NoteInputState
-{
-    NoteInputMethod method = NoteInputMethod::UNKNOWN;
-    Duration duration;
-    AccidentalType accidentalType = AccidentalType::NONE;
-    std::set<SymbolId> articulationIds;
-    bool isRest = false;
-    bool withSlur = false;
-    int currentVoiceIndex = 0;
-    int currentTrack = 0;
-    const Drumset* drumset = nullptr;
-};
+using NoteInputState = mu::engraving::InputState;
 
-enum class NoteFilter
+enum class NoteFilter : unsigned char
 {
     All,
     WithTie,
     WithSlur
 };
 
-enum class ZoomType {
+enum class ZoomType : unsigned char {
     Percentage,
     PageWidth,
     WholePage,
     TwoPages
 };
 
-inline QString zoomTypeTitle(ZoomType type)
+inline muse::TranslatableString zoomTypeTitle(ZoomType type)
 {
     switch (type) {
-    case ZoomType::Percentage: return qtrc("notation", "Percentage");
-    case ZoomType::PageWidth: return qtrc("notation", "Page width");
-    case ZoomType::WholePage: return qtrc("notation", "Whole page");
-    case ZoomType::TwoPages: return qtrc("notation", "Two pages");
+    case ZoomType::Percentage: return muse::TranslatableString("notation", "Percentage");
+    case ZoomType::PageWidth: return muse::TranslatableString("notation", "Page width");
+    case ZoomType::WholePage: return muse::TranslatableString("notation", "Whole page");
+    case ZoomType::TwoPages: return muse::TranslatableString("notation", "Two pages");
     }
 
-    return QString();
+    return {};
 }
 
 struct Tempo
@@ -285,67 +284,74 @@ struct Tempo
 
 static constexpr int MAX_STAVES  = 4;
 
-struct ClefPair
-{
-    ClefType concertClef = ClefType::G;
-    ClefType transposingClef = ClefType::G;
-};
-
-struct PitchRange
-{
-    int min = 0;
-    int max = 0;
-
-    PitchRange() = default;
-    PitchRange(int min, int max)
-        : min(min), max(max) {}
-
-    bool operator ==(const PitchRange& other) const
-    {
-        return min == other.min && max == other.max;
-    }
-
-    bool operator !=(const PitchRange& other) const
-    {
-        return !operator ==(other);
-    }
-};
-
 struct InstrumentKey
 {
-    QString instrumentId;
-    ID partId;
-    Fraction tick = Ms::Fraction(0, 1);
+    muse::String instrumentId;
+    muse::ID partId;
+    Fraction tick = mu::engraving::Fraction(0, 1);
 };
 
-inline QString formatInstrumentTitle(const QString& instrumentName, const InstrumentTrait& trait, int instrumentNumber = 0)
+inline bool isMainInstrumentForPart(const InstrumentKey& instrumentKey, const Part* part)
 {
-    QString result = instrumentName;
+    return instrumentKey.instrumentId == part->instrumentId() && instrumentKey.tick == Part::MAIN_INSTRUMENT_TICK;
+}
 
+inline QString formatInstrumentTitle(const QString& instrumentName, const InstrumentTrait& trait)
+{
+    // Comments for translators start with //:
     switch (trait.type) {
     case TraitType::Tuning:
-        result = mu::qtrc("notation", "%1 %2").arg(trait.name).arg(instrumentName);
-        break;
-    case TraitType::Course:
-        result = mu::qtrc("notation", "%1 (%2)").arg(instrumentName).arg(trait.name);
-        break;
+        //: %1=tuning ("D"), %2=name ("Tin Whistle"). Example: "D Tin Whistle"
+        return muse::qtrc("notation", "%1 %2", "Tuned instrument displayed in the UI")
+               .arg(trait.name, instrumentName);
     case TraitType::Transposition:
-        result = mu::qtrc("notation", "%1 in %2").arg(instrumentName).arg(trait.name);
-        break;
+        //: %1=name ("Horn"), %2=transposition ("C alto"). Example: "Horn in C alto"
+        return muse::qtrc("notation", "%1 in %2", "Transposing instrument displayed in the UI")
+               .arg(instrumentName, trait.name);
+    case TraitType::Course:
+        //: %1=name ("Tenor Lute"), %2=course/strings ("7-course"). Example: "Tenor Lute (7-course)"
+        return muse::qtrc("notation", "%1 (%2)", "String instrument displayed in the UI")
+               .arg(instrumentName, trait.name);
     case TraitType::Unknown:
-        break;
+        return instrumentName; // Example: "Flute"
+    }
+    Q_UNREACHABLE();
+}
+
+inline QString formatInstrumentTitle(const QString& instrumentName, const InstrumentTrait& trait, int instrumentNumber)
+{
+    if (instrumentNumber == 0) {
+        // Only one instance of this instrument in the score
+        return formatInstrumentTitle(instrumentName, trait);
     }
 
-    if (!result.isEmpty() && instrumentNumber > 0) {
-        result += " " + QString::number(instrumentNumber);
-    }
+    QString number = QString::number(instrumentNumber);
 
-    return result;
+    // Comments for translators start with //:
+    switch (trait.type) {
+    case TraitType::Tuning:
+        //: %1=tuning ("D"), %2=name ("Tin Whistle"), %3=number ("2"). Example: "D Tin Whistle 2"
+        return muse::qtrc("notation", "%1 %2 %3", "One of several tuned instruments displayed in the UI")
+               .arg(trait.name, instrumentName, number);
+    case TraitType::Transposition:
+        //: %1=name ("Horn"), %2=transposition ("C alto"), %3=number ("2"). Example: "Horn in C alto 2"
+        return muse::qtrc("notation", "%1 in %2 %3", "One of several transposing instruments displayed in the UI")
+               .arg(instrumentName, trait.name, number);
+    case TraitType::Course:
+        //: %1=name ("Tenor Lute"), %2=course/strings ("7-course"), %3=number ("2"). Example: "Tenor Lute (7-course) 2"
+        return muse::qtrc("notation", "%1 (%2) %3", "One of several string instruments displayed in the UI")
+               .arg(instrumentName, trait.name, number);
+    case TraitType::Unknown:
+        //: %1=name ("Flute"), %2=number ("2"). Example: "Flute 2"
+        return muse::qtrc("notation", "%1 %2", "One of several instruments displayed in the UI")
+               .arg(instrumentName, number);
+    }
+    Q_UNREACHABLE();
 }
 
 struct PartInstrument
 {
-    ID partId;
+    muse::ID partId;
     InstrumentTemplate instrumentTemplate;
 
     bool isExistingPart = false;
@@ -377,8 +383,10 @@ struct FilterElementsOptions
     int staffStart = -1;
     int staffEnd = -1;
     int voice = -1;
-    const Ms::System* system = nullptr;
+    const mu::engraving::System* system = nullptr;
     Fraction durationTicks{ -1, 1 };
+    Fraction beat{ 0, 0 };
+    const mu::engraving::Measure* measure = nullptr;
 
     bool bySubtype = false;
     int subtype = -1;
@@ -394,44 +402,46 @@ struct FilterElementsOptions
 struct FilterNotesOptions : FilterElementsOptions
 {
     int pitch = -1;
-    int string = Ms::INVALID_STRING_INDEX;
-    int tpc = Ms::Tpc::TPC_INVALID;
-    NoteHead::Group notehead = NoteHead::Group::HEAD_INVALID;
-    Ms::TDuration durationType = Ms::TDuration();
-    Ms::NoteType noteType = Ms::NoteType::INVALID;
-};
-
-struct SelectionRange
-{
-    int startStaffIndex = 0;
-    int endStaffIndex = 0;
-    Fraction startTick;
-    Fraction endTick;
+    int string = mu::engraving::INVALID_STRING_INDEX;
+    int tpc = mu::engraving::Tpc::TPC_INVALID;
+    mu::engraving::NoteHeadGroup notehead = mu::engraving::NoteHeadGroup::HEAD_INVALID;
+    mu::engraving::TDuration durationType = mu::engraving::TDuration();
+    mu::engraving::NoteType noteType = mu::engraving::NoteType::INVALID;
 };
 
 struct StaffConfig
 {
     bool visible = false;
-    int linesCount = 0;
-    double lineDistance = 0.0;
-    mu::draw::Color linesColor;
-    bool visibleLines = false;
     qreal userDistance = 0.0;
-    double scale = 0.0;
-    bool isSmall = false;
     bool cutaway = false;
     bool showIfEmpty = false;
-    bool showClef = false;
-    bool showTimeSignature = false;
-    bool showKeySignature = false;
-    bool showBarlines = false;
-    bool showStemless = false;
-    bool showLedgerLinesPitched = false;
     bool hideSystemBarline = false;
-    bool mergeMatchingRests = false;
+    engraving::AutoOnOff mergeMatchingRests = engraving::AutoOnOff::AUTO;
+    bool reflectTranspositionInLinkedTab = false;
     Staff::HideMode hideMode = Staff::HideMode::AUTO;
-    NoteHead::Scheme noteheadScheme = NoteHead::Scheme::HEAD_AUTO;
     ClefTypeList clefTypeList;
+    engraving::StaffType staffType;
+
+    bool operator==(const StaffConfig& conf) const
+    {
+        bool equal = visible == conf.visible;
+        equal &= muse::RealIsEqual(userDistance, conf.userDistance);
+        equal &= cutaway == conf.cutaway;
+        equal &= showIfEmpty == conf.showIfEmpty;
+        equal &= hideSystemBarline == conf.hideSystemBarline;
+        equal &= mergeMatchingRests == conf.mergeMatchingRests;
+        equal &= hideMode == conf.hideMode;
+        equal &= clefTypeList == conf.clefTypeList;
+        equal &= staffType == conf.staffType;
+        equal &= reflectTranspositionInLinkedTab == conf.reflectTranspositionInLinkedTab;
+
+        return equal;
+    }
+
+    bool operator!=(const StaffConfig& conf) const
+    {
+        return !(*this == conf);
+    }
 };
 
 struct TransposeOptions
@@ -450,24 +460,14 @@ struct TupletOptions
     Fraction ratio = { -1, -1 };
     TupletNumberType numberType = TupletNumberType::SHOW_NUMBER;
     TupletBracketType bracketType = TupletBracketType::AUTO_BRACKET;
-};
-
-enum class LoopBoundaryType
-{
-    Unknown,
-    LoopIn,
-    LoopOut
+    bool autoBaseLen = false;
 };
 
 struct LoopBoundaries
 {
     int loopInTick = 0;
     int loopOutTick = 0;
-
-    QRect loopInRect = {};
-    QRect loopOutRect = {};
-
-    bool visible = false;
+    bool enabled = false;
 
     bool isNull() const
     {
@@ -480,9 +480,7 @@ struct LoopBoundaries
 
         equals &= loopInTick == boundaries.loopInTick;
         equals &= loopOutTick == boundaries.loopOutTick;
-        equals &= loopInRect == boundaries.loopInRect;
-        equals &= loopOutRect == boundaries.loopOutRect;
-        equals &= visible == boundaries.visible;
+        equals &= enabled == boundaries.enabled;
 
         return equals;
     }
@@ -493,12 +491,13 @@ struct LoopBoundaries
     }
 };
 
-enum class ScoreConfigType
+enum class ScoreConfigType : unsigned char
 {
     ShowInvisibleElements,
     ShowUnprintableElements,
     ShowFrames,
     ShowPageMargins,
+    ShowSoundFlags,
     MarkIrregularMeasures
 };
 
@@ -508,24 +507,26 @@ struct ScoreConfig
     bool isShowUnprintableElements = false;
     bool isShowFrames = false;
     bool isShowPageMargins = false;
+    bool isShowSoundFlags = false;
     bool isMarkIrregularMeasures = false;
+
+    bool operator==(const ScoreConfig& conf) const
+    {
+        bool equal = (isShowInvisibleElements == conf.isShowInvisibleElements);
+        equal &= (isShowUnprintableElements == conf.isShowUnprintableElements);
+        equal &= (isShowFrames == conf.isShowFrames);
+        equal &= (isShowPageMargins == conf.isShowPageMargins);
+        equal &= (isShowSoundFlags == conf.isShowSoundFlags);
+        equal &= (isMarkIrregularMeasures == conf.isMarkIrregularMeasures);
+
+        return equal;
+    }
 };
 
-inline QString staffTypeToString(StaffType type)
+inline QString staffTypeToString(StaffTypeId type)
 {
-    const Ms::StaffType* preset = Ms::StaffType::preset(type);
-    return preset ? preset->name() : QString();
-}
-
-inline QList<StaffType> allStaffTypes()
-{
-    QList<StaffType> result;
-
-    for (const Ms::StaffType& preset: Ms::StaffType::presets()) {
-        result << preset.type();
-    }
-
-    return result;
+    const StaffType* preset = StaffType::preset(type);
+    return preset ? preset->name().toQString() : QString();
 }
 
 struct MeasureBeat
@@ -536,7 +537,7 @@ struct MeasureBeat
     int maxBeatIndex = 0;
 };
 
-enum class BracketsType
+enum class BracketsType : unsigned char
 {
     Brackets,
     Braces,
@@ -553,7 +554,6 @@ struct ScoreCreateOptions
     TimeSigType timesigType = TimeSigType::NORMAL;
 
     Key key = Key::C;
-    KeyMode keyMode = KeyMode::UNKNOWN;
 
     bool withPickupMeasure = false;
     int measures = 0;
@@ -568,7 +568,7 @@ inline const ScoreOrder& customOrder()
 {
     static ScoreOrder order;
     order.id = "custom";
-    order.name = qtrc("OrderXML", "Custom");
+    order.name = muse::TranslatableString("engraving/scoreorder", "Custom");
 
     return order;
 }
@@ -584,18 +584,44 @@ constexpr bool isNotesIntervalValid(int interval)
            && interval != 0 && interval != -1;
 }
 
-constexpr bool isVoiceIndexValid(int voiceIndex)
+constexpr bool isVoiceIndexValid(voice_idx_t voiceIndex)
 {
-    return 0 <= voiceIndex && voiceIndex < Ms::VOICES;
+    return voiceIndex < mu::engraving::VOICES;
 }
 
-constexpr bool isFretIndexValid(int fretIndex)
+inline bool isVerticalBoxTextStyle(TextStyleType type)
 {
-    return 0 <= fretIndex && fretIndex < MAX_FRET;
-}
+    static const std::set<TextStyleType> types {
+        TextStyleType::TITLE,
+        TextStyleType::SUBTITLE,
+        TextStyleType::COMPOSER,
+        TextStyleType::LYRICIST,
+        TextStyleType::INSTRUMENT_EXCERPT,
+    };
+
+    return muse::contains(types, type);
 }
 
-Q_DECLARE_METATYPE(mu::notation::InstrumentTemplate)
-Q_DECLARE_METATYPE(mu::notation::ScoreOrder)
+struct StringTuningPreset
+{
+    std::string name;
+    std::vector<int> value;
+    bool useFlats = false;
+};
+
+struct StringTuningsInfo
+{
+    size_t number = 0;
+    std::vector<StringTuningPreset> presets;
+};
+
+using InstrumentStringTuningsMap = std::map<std::string, std::vector<StringTuningsInfo> >;
+
+enum class PercussionPanelAutoShowMode {
+    UNPITCHED_STAFF,
+    UNPITCHED_STAFF_NOTE_INPUT,
+    NEVER,
+};
+}
 
 #endif // MU_NOTATION_NOTATIONTYPES_H

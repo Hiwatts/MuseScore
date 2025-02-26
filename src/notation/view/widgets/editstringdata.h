@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,38 +22,59 @@
 #ifndef MU_NOTATION_EDITSTRINGDATA_H
 #define MU_NOTATION_EDITSTRINGDATA_H
 
+#include <QDialog>
+
 #include "ui_editstringdata.h"
-#include "libmscore/stringdata.h"
+#include "engraving/dom/stringdata.h"
+
+#include "modularity/ioc.h"
+#include "context/iglobalcontext.h"
 
 namespace mu::notation {
 //---------------------------------------------------------
 //   EditStringData
 //---------------------------------------------------------
 
-class EditStringData : public QDialog, private Ui::EditStringDataBase
+class EditStringData : public QDialog, private Ui::EditStringDataBase, public muse::Injectable
 {
     Q_OBJECT
 
-    int* _frets;
-    bool _modified;
-    QList<Ms::instrString>* _strings;           // pointer to original string list
-    QList<Ms::instrString> _stringsLoc;         // local working copy of string list
-
-    virtual void hideEvent(QHideEvent*);
+    muse::Inject<context::IGlobalContext> globalContext = { this };
 
 public:
-    EditStringData(QWidget* parent, QList<Ms::instrString>* strings, int* frets);
-    ~EditStringData();
+    EditStringData(QWidget* parent = nullptr, const std::vector<engraving::instrString>& strings = {}, int frets = 0);
+
+    std::vector<mu::engraving::instrString> strings() const;
+    int frets() const;
 
 protected:
     QString midiCodeToStr(int midiCode);
 
 private slots:
-    void accept();
+    void accept() override;
     void deleteStringClicked();
     void editStringClicked();
     void listItemClicked(QTableWidgetItem* item);
     void newStringClicked();
+
+private:
+    void init();
+    void initStringsData();
+
+    virtual void hideEvent(QHideEvent*) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
+    QString openColumnAccessibleText(const QTableWidgetItem* item) const;
+
+    INotationSelectionPtr currentNotationSelection() const;
+
+    int _frets = -1;
+    bool _modified = false;
+    std::vector<mu::engraving::instrString> _strings;           // pointer to original string list
+    std::vector<mu::engraving::instrString> _stringsLoc;         // local working copy of string list
+
+    bool m_updateOnExit = false;
+    Instrument* m_instrument = nullptr;
 };
 }
 

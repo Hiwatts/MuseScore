@@ -29,6 +29,9 @@
          <layout class="QVBoxLayout" name="verticalLayout">
           <item>
            <widget class="QTableWidget" name="staves">
+            <property name="editTriggers">
+             <set>QAbstractItemView::NoEditTriggers</set>
+            </property>
             <property name="alternatingRowColors">
              <bool>true</bool>
             </property>
@@ -46,7 +49,7 @@
             </property>
             <row>
              <property name="text">
-              <string>New Row</string>
+              <string>New row</string>
              </property>
             </row>
             <column>
@@ -65,9 +68,6 @@
              </property>
             </column>
             <item row="0" column="0">
-             <property name="text">
-              <string>a</string>
-             </property>
              <property name="checkState">
               <enum>Unchecked</enum>
              </property>
@@ -76,17 +76,11 @@
              </property>
             </item>
             <item row="0" column="1">
-             <property name="text">
-              <string>visible</string>
-             </property>
              <property name="checkState">
               <enum>Checked</enum>
              </property>
             </item>
             <item row="0" column="2">
-             <property name="text">
-              <string>c</string>
-             </property>
              <property name="checkState">
               <enum>Unchecked</enum>
              </property>
@@ -99,7 +93,7 @@
        <item>
         <widget class="QGroupBox" name="groupBox">
          <property name="title">
-          <string>Measure Duration</string>
+          <string>Measure duration</string>
          </property>
          <layout class="QGridLayout">
           <property name="verticalSpacing">
@@ -121,7 +115,7 @@
           <item row="0" column="3">
            <widget class="QLabel" name="label_3">
             <property name="text">
-             <string>/</string>
+             <string notr="true">/</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignCenter</set>
@@ -139,6 +133,9 @@
             <property name="text">
              <string>Actual:</string>
             </property>
+            <property name="buddy">
+             <cstring>actualZ</cstring>
+            </property>
            </widget>
           </item>
           <item row="1" column="1" colspan="2">
@@ -154,10 +151,13 @@
           <item row="1" column="3">
            <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>/</string>
+             <string notr="true">/</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignCenter</set>
+            </property>
+            <property name="buddy">
+             <cstring>actualN</cstring>
             </property>
            </widget>
           </item>
@@ -214,6 +214,11 @@
               <string>64</string>
              </property>
             </item>
+            <item>
+             <property name="text">
+              <string>128</string>
+             </property>
+            </item>
            </widget>
           </item>
           <item row="0" column="4" colspan="2">
@@ -226,9 +231,6 @@
             </property>
             <property name="frameShadow">
              <enum>QFrame::Sunken</enum>
-            </property>
-            <property name="text">
-             <string/>
             </property>
            </widget>
           </item>
@@ -300,6 +302,9 @@
             <property name="text">
              <string>Play count:</string>
             </property>
+            <property name="buddy">
+             <cstring>count</cstring>
+            </property>
            </widget>
           </item>
           <item row="2" column="4">
@@ -345,6 +350,9 @@
             <property name="text">
              <string>Layout stretch:</string>
             </property>
+            <property name="buddy">
+             <cstring>layoutStretch</cstring>
+            </property>
            </widget>
           </item>
           <item row="1" column="4">
@@ -377,6 +385,9 @@
             <property name="text">
              <string>Add to measure number:</string>
             </property>
+            <property name="buddy">
+             <cstring>measureNumberOffset</cstring>
+            </property>
            </widget>
           </item>
           <item row="2" column="1">
@@ -400,6 +411,9 @@
             <property name="text">
              <string>Measure number mode:</string>
             </property>
+            <property name="buddy">
+             <cstring>measureNumberMode</cstring>
+            </property>
            </widget>
           </item>
           <item row="1" column="1">
@@ -411,12 +425,12 @@
             </item>
             <item>
              <property name="text">
-              <string>Always Show</string>
+              <string>Always show</string>
              </property>
             </item>
             <item>
              <property name="text">
-              <string>Always Hide</string>
+              <string>Always hide</string>
              </property>
             </item>
            </widget>
@@ -454,14 +468,10 @@
             </sizepolicy>
            </property>
            <property name="toolTip">
-            <string>Go to previous measure</string>
+            <string>Apply and go to previous measure</string>
            </property>
            <property name="text">
             <string notr="true"/>
-           </property>
-           <property name="icon">
-            <iconset resource="../../notation_view.qrc">
-             <normaloff>:/view/resources/icons/go-previous.svg</normaloff>:/resources/icons/go-previous.svg</iconset>
            </property>
           </widget>
          </item>
@@ -474,14 +484,10 @@
             </sizepolicy>
            </property>
            <property name="toolTip">
-            <string>Go to next measure</string>
+            <string>Apply and go to next measure</string>
            </property>
            <property name="text">
             <string notr="true"/>
-           </property>
-           <property name="icon">
-            <iconset resource="../../notation_view.qrc">
-             <normaloff>:/view/resources/icons/go-next.svg</normaloff>:/resources/icons/go-next.svg</iconset>
            </property>
           </widget>
          </item>
@@ -516,9 +522,6 @@
   <tabstop>previousButton</tabstop>
   <tabstop>nextButton</tabstop>
  </tabstops>
- <resources>
-  <include location="../../notation_view.qrc"/>
- </resources>
  <connections>
   <connection>
    <sender>buttonBox</sender>

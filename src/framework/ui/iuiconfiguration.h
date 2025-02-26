@@ -20,21 +20,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UI_IUICONFIGURATION_H
-#define MU_UI_IUICONFIGURATION_H
+#ifndef MUSE_UI_IUICONFIGURATION_H
+#define MUSE_UI_IUICONFIGURATION_H
 
 #include <optional>
 
-#include "modularity/imoduleexport.h"
-#include "async/notification.h"
-#include "actions/actiontypes.h"
+#include "modularity/imoduleinterface.h"
+
+#include "global/types/retval.h"
+#include "global/types/val.h"
+#include "global/async/notification.h"
 
 #include "uitypes.h"
+#include "uiaction.h"
 
 class QByteArray;
 class QWindow;
 
-namespace mu::ui {
+namespace muse::ui {
 class IUiConfiguration : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IUiConfiguration)
@@ -46,19 +49,25 @@ public:
     virtual QStringList possibleFontFamilies() const = 0;
     virtual QStringList possibleAccentColors() const = 0;
 
+    virtual bool isDarkMode() const = 0;
+    virtual void setIsDarkMode(bool dark) = 0;
+
     virtual bool isHighContrast() const = 0;
     virtual void setIsHighContrast(bool highContrast) = 0;
 
-    virtual void resetCurrentThemeToDefault(const ThemeCode& codeKey) = 0;
-
     virtual const ThemeInfo& currentTheme() const = 0;
+    virtual async::Notification currentThemeChanged() const = 0;
     virtual void setCurrentTheme(const ThemeCode& codeKey) = 0;
     virtual void setCurrentThemeStyleValue(ThemeStyleKey key, const Val& val) = 0;
-    virtual async::Notification currentThemeChanged() const = 0;
+    virtual void resetThemes() = 0;
+
+    virtual bool isFollowSystemThemeAvailable() const = 0;
+    virtual ValNt<bool> isFollowSystemTheme() const = 0;
+    virtual void setFollowSystemTheme(bool follow) = 0;
 
     virtual std::string fontFamily() const = 0;
     virtual void setFontFamily(const std::string& family) = 0;
-    virtual int fontSize(FontSizeType type) const = 0;
+    virtual int fontSize(FontSizeType type = FontSizeType::BODY) const = 0;
     virtual void setBodyFontSize(int size) = 0;
     virtual async::Notification fontChanged() const = 0;
 
@@ -70,18 +79,26 @@ public:
     virtual int musicalFontSize() const = 0;
     virtual async::Notification musicalFontChanged() const = 0;
 
+    virtual std::string defaultFontFamily() const = 0;
+    virtual int defaultFontSize() const = 0;
+
+    virtual void resetFonts() = 0;
+
     virtual double guiScaling() const = 0;
-    virtual double physicalDotsPerInch() const = 0;
+    virtual double physicalDpi() const = 0;
+    virtual double logicalDpi() const = 0;
 
     //! NOTE Maybe set from command line
     virtual void setPhysicalDotsPerInch(std::optional<double> dpi) = 0;
 
-    virtual QByteArray pageState(const QString& pageName) const = 0;
+    virtual ValNt<QByteArray> pageState(const QString& pageName) const = 0;
     virtual void setPageState(const QString& pageName, const QByteArray& state) = 0;
 
     virtual QByteArray windowGeometry() const = 0;
     virtual void setWindowGeometry(const QByteArray& state) = 0;
     virtual async::Notification windowGeometryChanged() const = 0;
+
+    virtual bool isGlobalMenuAvailable() const = 0;
 
     virtual void applyPlatformStyle(QWindow* window) = 0;
 
@@ -89,10 +106,18 @@ public:
     virtual void setIsVisible(const QString& key, bool val) = 0;
     virtual async::Notification isVisibleChanged(const QString& key) const = 0;
 
-    virtual ToolConfig toolConfig(const QString& toolName) const = 0;
+    virtual QString uiItemState(const QString& itemName) const = 0;
+    virtual void setUiItemState(const QString& itemName, const QString& value) = 0;
+    virtual async::Notification uiItemStateChanged(const QString& itemName) const = 0;
+
+    virtual ToolConfig toolConfig(const QString& toolName, const ToolConfig& defaultConfig) const = 0;
     virtual void setToolConfig(const QString& toolName, const ToolConfig& config) = 0;
     virtual async::Notification toolConfigChanged(const QString& toolName) const = 0;
+
+    virtual int flickableMaxVelocity() const = 0;
+
+    virtual int tooltipDelay() const = 0;
 };
 }
 
-#endif // MU_UI_IUICONFIGURATION_H
+#endif // MUSE_UI_IUICONFIGURATION_H

@@ -1,9 +1,9 @@
-#ifndef GPBAR_H
-#define GPBAR_H
+#ifndef MU_IMPORTEXPORT_GPBAR_H
+#define MU_IMPORTEXPORT_GPBAR_H
 
 #include "gpvoice.h"
 
-namespace Ms {
+namespace mu::iex::guitarpro {
 class GPBar
 {
 public:
@@ -20,6 +20,8 @@ public:
     struct Clef {
         ClefType type{ ClefType::G2 };
         OttaviaType ottavia{ OttaviaType::Regular };
+
+        bool operator==(const GPBar::Clef& c) const { return type == c.type && ottavia == c.ottavia; }
     };
 
     ~GPBar() = default;
@@ -38,13 +40,11 @@ public:
 
 private:
 
-    friend class GP67DomFixer;
-
     int _id{ -1 };
     std::vector<std::unique_ptr<GPVoice> > _voices;
     Clef _clef;
     SimileMark _simileMark;
 };
-}
+} // namespace mu::iex::guitarpro
 
-#endif // GPBAR_H
+#endif // MU_IMPORTEXPORT_GPBAR_H

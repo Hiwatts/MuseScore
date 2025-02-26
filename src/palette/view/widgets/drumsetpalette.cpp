@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,25 +22,18 @@
 
 #include "drumsetpalette.h"
 
+#include "engraving/dom/drumset.h"
+
+#include "notation/utilities/percussionutilities.h"
+
 #include "translation.h"
-
-#include "engraving/libmscore/factory.h"
-#include "engraving/libmscore/chord.h"
-#include "engraving/libmscore/note.h"
-#include "engraving/libmscore/drumset.h"
-#include "engraving/libmscore/score.h"
-#include "engraving/libmscore/staff.h"
-#include "engraving/libmscore/part.h"
-#include "engraving/libmscore/stem.h"
-#include "engraving/libmscore/mscore.h"
-#include "engraving/libmscore/undo.h"
-
 #include "log.h"
+
+#include <QTimer>
 
 using namespace mu::notation;
 using namespace mu::engraving;
 using namespace mu::palette;
-using namespace Ms;
 
 DrumsetPalette::DrumsetPalette(QWidget* parent)
     : PaletteScrollArea(nullptr, parent)
@@ -58,7 +51,7 @@ DrumsetPalette::DrumsetPalette(QWidget* parent)
     setWidget(m_drumPalette);
     retranslate();
 
-    connect(m_drumPalette, SIGNAL(boxClicked(int)), SLOT(drumNoteSelected(int)));
+    connect(m_drumPalette, &PaletteWidget::boxClicked, this, &DrumsetPalette::drumNoteClicked);
 }
 
 void DrumsetPalette::setNotation(INotationPtr notation)
@@ -68,7 +61,7 @@ void DrumsetPalette::setNotation(INotationPtr notation)
 
 void DrumsetPalette::retranslate()
 {
-    m_drumPalette->setName(mu::qtrc("palette", "Drumset"));
+    m_drumPalette->setName(muse::qtrc("palette", "Drumset"));
 }
 
 void DrumsetPalette::updateDrumset()
@@ -79,13 +72,13 @@ void DrumsetPalette::updateDrumset()
         return;
     }
 
-    NoteInputState state = noteInput->state();
-    if (m_drumset == state.drumset) {
+    const NoteInputState& state = noteInput->state();
+    if (m_drumset == state.drumset()) {
         return;
     }
 
     clear();
-    m_drumset = state.drumset;
+    m_drumset = state.drumset();
 
     if (!m_drumset) {
         return;
@@ -93,54 +86,13 @@ void DrumsetPalette::updateDrumset()
 
     TRACEFUNC;
 
-    double _spatium = gpaletteScore->spatium();
-
-    for (int pitch = 0; pitch < 128; ++pitch) {
+    for (int pitch = 0; pitch < engraving::DRUM_INSTRUMENTS; ++pitch) {
         if (!m_drumset->isValid(pitch)) {
             continue;
         }
 
-        bool up = false;
-        int line = m_drumset->line(pitch);
-        NoteHead::Group noteHead = m_drumset->noteHead(pitch);
-        int voice = m_drumset->voice(pitch);
-        Direction dir = m_drumset->stemDirection(pitch);
-
-        if (dir == Direction::UP) {
-            up = true;
-        } else if (dir == Direction::DOWN) {
-            up = false;
-        } else {
-            up = line > 4;
-        }
-
-        auto chord = Factory::makeChord(gpaletteScore->dummy()->segment());
-        chord->setDurationType(TDuration::DurationType::V_QUARTER);
-        chord->setStemDirection(dir);
-        chord->setUp(up);
-        chord->setTrack(voice);
-        Stem* stem = Factory::createStem(chord.get());
-        stem->setBaseLength((up ? -3.0 : 3.0) * _spatium);
-        chord->add(stem);
-        Note* note = Factory::createNote(chord.get());
-        note->setMark(true);
-        note->setParent(chord.get());
-        note->setTrack(voice);
-        note->setPitch(pitch);
-        note->setTpcFromPitch();
-        note->setLine(line);
-        note->setPos(0.0, _spatium * .5 * line);
-        note->setHeadGroup(noteHead);
-        SymId noteheadSym = SymId::noteheadBlack;
-        if (noteHead == NoteHead::Group::HEAD_CUSTOM) {
-            noteheadSym = m_drumset->noteHeads(pitch, NoteHead::Type::HEAD_QUARTER);
-        } else {
-            noteheadSym = note->noteHead(true, noteHead, NoteHead::Type::HEAD_QUARTER);
-        }
-
-        note->setCachedNoteheadSym(noteheadSym);     // we use the cached notehead so we don't recompute it at each layout
-        chord->add(note);
-        m_drumPalette->appendElement(chord, mu::qtrc("drumset", m_drumset->name(pitch).toUtf8().data()));
+        std::shared_ptr<Chord> chord = notation::PercussionUtilities::getDrumNoteForPreview(m_drumset, pitch);
+        m_drumPalette->appendElement(chord, m_drumset->translatedName(pitch), 1.0, QPointF(0, 0), m_drumset->shortcut(pitch));
     }
 
     noteInput->setDrumNote(selectedDrumNote());
@@ -152,7 +104,7 @@ void DrumsetPalette::clear()
     m_drumPalette->clear();
 }
 
-void DrumsetPalette::drumNoteSelected(int val)
+void DrumsetPalette::drumNoteClicked(int val)
 {
     INotationNoteInputPtr noteInput = this->noteInput();
     if (!noteInput) {
@@ -164,21 +116,53 @@ void DrumsetPalette::drumNoteSelected(int val)
         return;
     }
 
-    TRACEFUNC;
+    const Chord* ch = mu::engraving::toChord(element.get());
+    bool newChordSelected = val != m_drumPalette->selectedIdx();
 
-    const Chord* ch = dynamic_cast<Chord*>(element.get());
-    const Note* note = ch->downNote();
-    int pitch = note->pitch();
-    int voice = element->voice();
+    if (newChordSelected) {
+        const Note* note = ch->downNote();
 
-    noteInput->setCurrentVoiceIndex(voice);
-    noteInput->setDrumNote(pitch);
+        track_idx_t track = (noteInput->state().track() / mu::engraving::VOICES) * mu::engraving::VOICES + element->track();
 
-    QString voiceActionCode = QString("voice-%1").arg(voice + 1);
-    dispatcher()->dispatch(voiceActionCode.toStdString());
+        noteInput->setCurrentTrack(track);
+        noteInput->setDrumNote(note->pitch());
 
-    auto pitchCell = m_drumPalette->cellAt(val);
-    m_pitchNameChanged.send(pitchCell->name);
+        PaletteCellPtr pitchCell = m_drumPalette->cellAt(val);
+        m_pitchNameChanged.send(pitchCell->name);
+    }
+
+    previewSound(ch, newChordSelected, noteInput->state());
+}
+
+void DrumsetPalette::previewSound(const Chord* chord, bool newChordSelected, const notation::NoteInputState& inputState)
+{
+    //! NOTE: prevents "sound spam" after multiple clicks on a selected element
+    static QTimer soundPauseTimer;
+    if (soundPauseTimer.isActive() && !newChordSelected) {
+        return;
+    }
+
+    Chord* preview = chord->clone();
+    preview->setParent(inputState.segment());
+    preview->setTrack(inputState.track());
+
+    const std::vector<Note*>& previewNotes = preview->notes();
+    const std::vector<Note*>& chordNotes = chord->notes();
+    IF_ASSERT_FAILED(previewNotes.size() == chordNotes.size()) {
+        return;
+    }
+
+    for (size_t i = 0; i < previewNotes.size(); ++i) {
+        SymId symId = chordNotes.at(i)->ldata()->cachedNoteheadSym.value();
+        previewNotes.at(i)->mutldata()->cachedNoteheadSym.set_value(symId);
+    }
+
+    playback()->playElements({ preview });
+
+    delete preview;
+
+    soundPauseTimer.setSingleShot(true);
+    soundPauseTimer.start(200);
 }
 
 int DrumsetPalette::selectedDrumNote()
@@ -213,12 +197,17 @@ void DrumsetPalette::mousePressEvent(QMouseEvent* event)
     m_drumPalette->handleEvent(event);
 }
 
+void DrumsetPalette::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    m_drumPalette->handleEvent(event);
+}
+
 void DrumsetPalette::mouseMoveEvent(QMouseEvent* event)
 {
     m_drumPalette->handleEvent(event);
 }
 
-void DrumsetPalette::enterEvent(QEvent* event)
+void DrumsetPalette::enterEvent(QEnterEvent* event)
 {
     m_drumPalette->handleEvent(event);
 }
@@ -233,9 +222,14 @@ bool DrumsetPalette::handleEvent(QEvent* event)
     return QWidget::event(event);
 }
 
-mu::async::Channel<QString> DrumsetPalette::pitchNameChanged() const
+muse::async::Channel<QString> DrumsetPalette::pitchNameChanged() const
 {
     return m_pitchNameChanged;
+}
+
+PaletteWidget* DrumsetPalette::paletteWidget() const
+{
+    return m_drumPalette;
 }
 
 INotationNoteInputPtr DrumsetPalette::noteInput() const

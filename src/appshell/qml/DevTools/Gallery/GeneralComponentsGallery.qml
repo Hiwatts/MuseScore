@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,17 +20,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.0
-import QtQuick.Controls 1.5
-import QtQuick.Layouts 1.3
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 Rectangle {
     id: root
 
     color: ui.theme.backgroundSecondaryColor
+    clip: true
 
     NavigationSection {
         id: navSec
@@ -59,11 +59,12 @@ Rectangle {
 
                 model: [
                     { textRole: "Dropdown", componentRole: dropdownSample },
-                    { textRole: "StyledPopup", componentRole: popupSample },
-                    { textRole: "StyledPopupView", componentRole: styledPopupViewComponent },
+                    { textRole: "StyledPopup", componentRole: styledPopupViewComponent },
                     { textRole: "StyledMenu", componentRole: styledMenuComponent },
+                    { textRole: "StyledMenuScrollable", componentRole: styledScrollableMenuComponent },
                     { textRole: "CheckBox", componentRole: checkBoxSample },
                     { textRole: "VisibilityBox", componentRole: visibilityBoxSample },
+                    { textRole: "ColorBlend", componentRole: colorBlendSample },
                     { textRole: "ColorPicker", componentRole: colorPickerSample },
                     { textRole: "ExpandableBlank", componentRole: expandableBlankSample },
                     { textRole: "FlatButton", componentRole: flatButtonSample },
@@ -72,17 +73,23 @@ Rectangle {
                     { textRole: "RoundedRadioButton", componentRole: roundedRadioButtonSample },
                     { textRole: "IncrementalPropertyControl (Hidden icon, Icon left, Icon right)", componentRole: incrementalPropertyControlSample },
                     { textRole: "FlatToggleButton", componentRole: flatToggleButtonSample },
+                    { textRole: "ToggleButton", componentRole: toggleButtonSample },
                     { textRole: "RoundedRectangle (which allows to round the particular corners)", componentRole: roundedRectangleSample },
                     { textRole: "TextInputField", componentRole: textInputFieldSample },
+                    { textRole: "RealInputField", componentRole: realInputFieldSample },
+                    { textRole: "TextInputArea", componentRole: textInputAreaSample },
                     { textRole: "SearchField", componentRole: searchFieldSample },
                     { textRole: "FilePicker", componentRole: filePickerSample },
-                    { textRole: "TabPanel", componentRole: tabPanelSample },
-                    { textRole: "GradientTabButton", componentRole: gradientTabButtonsSample },
+                    { textRole: "DirectoriesPicker", componentRole: directoriesPickerSample },
+                    { textRole: "StyledTabBar", componentRole: tabBarSample },
+                    { textRole: "PageTabButton", componentRole: pageTabButtonsSample },
                     { textRole: "GridView", componentRole: gridViewVertical },
                     { textRole: "StyledSlider", componentRole: slidersSample },
                     { textRole: "NumberInputField", componentRole: numberInputFieldSample },
                     { textRole: "TimeInputField", componentRole: timeInputFieldSample },
-                    { textRole: "ValueList", componentRole: valueListSample }
+                    { textRole: "ValueList", componentRole: valueListSample },
+                    { textRole: "StyledBusyIndicator", componentRole: styledBusyIndicatorSample },
+                    { textRole: "DialogButtonBox", componentRole: dialogButtonBoxSample }
                 ]
 
                 delegate: Column {
@@ -119,112 +126,47 @@ Rectangle {
                 order: 1
             }
 
-            Dropdown {
+            StyledDropdown {
                 navigation.name: "Dropdown 1"
                 navigation.panel: dropdownNav
                 navigation.order: 1
+
                 currentIndex: 0
-                model: [
-                    { text: "1 Option 1", value: 1 },
-                    { text: "2 Option 2", value: 2 },
-                    { text: "3 Option 3", value: 3 },
-                    { text: "4 Option 4", value: 4 },
-                    { text: "5 Option 5", value: 5 },
-                    { text: "6 Option 6", value: 6 },
-                    { text: "7 Option 7", value: 7 },
-                    { text: "8 Option 8", value: 8 },
-                    { text: "9 Option 9", value: 9 },
-                    { text: "10 Option 10", value: 10 },
-                    { text: "11 Option 11", value: 11 }
-                ]
+
+                model: {
+                    var items = []
+
+                    for (var i = 0; i < 40; i++) {
+                        items.push({text: i + " Option", value: i})
+                    }
+
+                    return items
+                }
+
+                onActivated: function(index, value) {
+                    currentIndex = index
+                }
             }
 
-            Dropdown {
+            StyledDropdown {
                 navigation.name: "Dropdown 2"
                 navigation.panel: dropdownNav
                 navigation.order: 2
+
                 currentIndex: 10
-                popupWidth: 200
-                model: [
-                    { text: "Option 1", value: 1 },
-                    { text: "Option 2", value: 2 },
-                    { text: "Option 3", value: 3 },
-                    { text: "Option 4", value: 4 },
-                    { text: "Option 5", value: 5 },
-                    { text: "Option 6", value: 6 },
-                    { text: "Option 7", value: 7 },
-                    { text: "Option 8", value: 8 },
-                    { text: "Option 9", value: 9 },
-                    { text: "Option 10", value: 10 },
-                    { text: "Option 11", value: 11 }
-                ]
-            }
-        }
-    }
 
-    Component {
-        id: popupSample
+                model: {
+                    var items = []
 
-        Row {
-            spacing: 12
-
-            FlatButton {
-                id: popupDownButton
-
-                text: "Show Popup downward"
-
-                onClicked: {
-                    if (popupDown.opened) {
-                        popupDown.close()
-                    } else {
-                        popupDown.open()
+                    for (var i = 0; i < 10; i++) {
+                        items.push({text: i + " Option", value: i})
                     }
+
+                    return items
                 }
-            }
 
-            StyledPopup {
-                id: popupDown
-
-                width: 200
-                height: 200
-
-                anchorItem: popupDownButton
-
-                StyledTextLabel {
-                    text: "Hello, World!"
-
-                    anchors.centerIn: parent
-                }
-            }
-
-            FlatButton {
-                id: popupUpButton
-
-                text: "Show Popup upward"
-
-                onClicked: {
-                    if (popupUp.opened) {
-                        popupUp.close()
-                    } else {
-                        popupUp.open()
-                    }
-                }
-            }
-
-            StyledPopup {
-                id: popupUp
-
-                width: 200
-                height: 200
-
-                anchorItem: popupUpButton
-
-                opensUpward: true
-
-                StyledTextLabel {
-                    text: "Hello, World!"
-
-                    anchors.centerIn: parent
+                onActivated: function(index, value) {
+                    currentIndex = index
                 }
             }
         }
@@ -283,7 +225,7 @@ Rectangle {
         Row {
             spacing: 12
 
-            FlatButton {
+            component SampleMenuButton : FlatButton {
                 text: "Show Menu"
 
                 onClicked: {
@@ -313,7 +255,47 @@ Rectangle {
                 StyledMenuLoader {
                     id: menuLoader
 
-                    onHandleMenuItem: {
+                    onHandleMenuItem: function(itemId) {
+                        console.log("selected " + itemId)
+                    }
+                }
+            }
+
+            SampleMenuButton {}
+
+            SampleMenuButton {
+                text: "With right-click and menu indicator triangle"
+
+                FlatButtonMenuIndicatorTriangle {}
+
+                mouseArea.acceptedButtons: Qt.LeftButton | Qt.RightButton
+            }
+        }
+    }
+
+    Component {
+        id: styledScrollableMenuComponent
+
+        Row {
+            spacing: 12
+
+            FlatButton {
+                text: "Show Scrollable Menu"
+
+                onClicked: {
+                    var items = []
+
+                    for (var i = 0; i < 100; i++) {
+                        items.push({id: i, icon: IconCode.PAGE, title: "some action", enabled: true})
+                    }
+
+                    menuLoader.toggleOpened(items)
+                }
+
+                StyledMenuLoader {
+                    id: menuLoader
+
+                    onHandleMenuItem: function(itemId) {
                         console.log("selected " + itemId)
                     }
                 }
@@ -353,6 +335,37 @@ Rectangle {
     }
 
     Component {
+        id: colorBlendSample
+
+        Row {
+            spacing: 12
+            Rectangle {
+                height: 20
+                width: 20
+                color: "#FFFFFF"
+            }
+
+            Rectangle {
+                height: 20
+                width: 20
+                color: "#677CE4"
+            }
+
+            Rectangle {
+                height: 20
+                width: 20
+                color: ui.blendColors("#FFFFFF", ui.colorWithAlphaF("#677CE4", 0.8))
+            }
+
+            Rectangle {
+                height: 20
+                width: 20
+                color: ui.blendColors("#FFFFFF", "#677CE4", 0.8)
+            }
+        }
+    }
+
+    Component {
         id: colorPickerSample
 
         ColorPicker {
@@ -360,7 +373,7 @@ Rectangle {
 
             color: "black"
 
-            onNewColorSelected: {
+            onNewColorSelected: function(newColor) {
                 color = newColor
             }
         }
@@ -403,8 +416,32 @@ Rectangle {
 
             FlatButton {
                 icon: IconCode.SAVE
+                text: "Suuuuuuuuuuuuuper long text with icon"
+            }
+
+            FlatButton {
+                icon: IconCode.SAVE
+                text: "Elided suuuuuuuuuuuuuper long text with icon"
+                width: 132
+            }
+
+            FlatButton {
+                icon: IconCode.SAVE
                 text: "Text with icon"
                 orientation: Qt.Horizontal
+            }
+
+            FlatButton {
+                icon: IconCode.SAVE
+                text: "Suuuuuuuuuuuuuper long text with icon"
+                orientation: Qt.Horizontal
+            }
+
+            FlatButton {
+                icon: IconCode.SAVE
+                text: "Elided suuuuuuuuuuuuuper long text with icon"
+                orientation: Qt.Horizontal
+                width: 132
             }
 
             FlatButton {
@@ -433,20 +470,22 @@ Rectangle {
         id: progressButtonSample
 
         ProgressButton {
+            id: progressButton
+
+            to: 100
+            progressStatus: "Processing…"
+
             Timer {
                 id: timer
 
                 interval: 1000
                 repeat: true
 
-                property int progress: 0
-
                 onTriggered: {
-                    progress += 10
-                    parent.setProgress(progress + "/100", false, progress, 100)
+                    progressButton.value += 10
 
-                    if (progress === 100) {
-                        progress = 0
+                    if (progressButton.value === 100) {
+                        progressButton.value = 0
                         stop()
                     }
                 }
@@ -521,6 +560,67 @@ Rectangle {
     }
 
     Component {
+        id: dialogButtonBoxSample
+
+        Column {
+            spacing: 8
+
+            Row {
+                spacing: 8
+                anchors.right: parent.right
+
+                FlatButton {
+                    text: "Windows"
+                    onClicked: {
+                        dialogButtonBox.buttonLayout = ButtonBoxModel.WinLayout
+                    }
+                }
+                FlatButton {
+                    text: "Mac"
+                    onClicked: {
+                        dialogButtonBox.buttonLayout = ButtonBoxModel.MacLayout
+                    }
+                }
+                FlatButton {
+                    text: "Linux"
+                    onClicked: {
+                        dialogButtonBox.buttonLayout = ButtonBoxModel.LinuxLayout
+                    }
+                }
+            }
+
+            ButtonBox {
+                id: dialogButtonBox
+                buttonLayout: ButtonBoxModel.WinLayout
+
+                FlatButton {
+                    text: "Details"
+                    buttonRole: ButtonBoxModel.CustomRole
+                    buttonId: ButtonBoxModel.CustomButton + 1
+                    isLeftSide: true
+                }
+
+                FlatButton {
+                    text: "Save"
+                    buttonRole: ButtonBoxModel.AcceptRole
+                    buttonId: ButtonBoxModel.Save
+                }
+                FlatButton {
+                    text: "Close"
+                    buttonRole: ButtonBoxModel.DestructiveRole
+                    buttonId: ButtonBoxModel.Close
+                }
+                FlatButton {
+                    text: "Details 2"
+                    buttonRole: ButtonBoxModel.CustomRole
+                    buttonId: ButtonBoxModel.CustomButton + 2
+                    isLeftSide: false
+                }
+            }
+        }
+    }
+
+    Component {
         id: roundedRadioButtonSample
 
         Row {
@@ -555,7 +655,7 @@ Rectangle {
                 minValue: 0
                 step: 0.5
 
-                onValueEdited: {
+                onValueEdited: function(newValue) {
                     currentValue = newValue
                 }
             }
@@ -570,7 +670,7 @@ Rectangle {
                 minValue: 0
                 step: 0.5
 
-                onValueEdited: {
+                onValueEdited: function(newValue) {
                     currentValue = newValue
                 }
             }
@@ -584,7 +684,7 @@ Rectangle {
                 minValue: 0
                 step: 0.5
 
-                onValueEdited: {
+                onValueEdited: function(newValue) {
                     currentValue = newValue
                 }
             }
@@ -601,6 +701,18 @@ Rectangle {
             width: 20
 
             icon: checked ? IconCode.LOCK_CLOSED : IconCode.LOCK_OPEN
+
+            onToggled: {
+                checked = !checked
+            }
+        }
+    }
+
+    Component {
+        id: toggleButtonSample
+
+        ToggleButton {
+            id: toggleButton
 
             onToggled: {
                 checked = !checked
@@ -674,6 +786,35 @@ Rectangle {
     }
 
     Component {
+        id: realInputFieldSample
+
+        RealInputField {
+            height: 40
+            width: 200
+
+            currentValue: 0.123456
+            decimals: 4
+            min: -100.0
+            max: 100.0
+
+            onCurrentValueChanged: {
+                console.info("onCurrentValueChanged: " + currentValue)
+            }
+        }
+    }
+
+    Component {
+        id: textInputAreaSample
+
+        TextInputArea {
+            height: 200
+            width: 200
+
+            hint: "This is a text area..."
+        }
+    }
+
+    Component {
         id: searchFieldSample
 
         SearchField {}
@@ -686,76 +827,87 @@ Rectangle {
             width: 220
 
             path: "/some/test/path/foo.txt"
+
+            onPathEdited: function(newPath) {
+                path = newPath
+            }
         }
     }
 
     Component {
-        id: tabPanelSample
+        id: directoriesPickerSample
 
-        TabPanel {
-            id: tabPanel
+        FilePicker {
+            width: 220
 
-            height: 40
+            pickerType: FilePicker.PickerType.MultipleDirectories
+
+            path: "/some/test/path1;/some/test/path2"
+
+            onPathEdited: function(newPath) {
+                path = newPath
+            }
+        }
+    }
+
+    Component {
+        id: tabBarSample
+
+        Column {
             width: 200
+            spacing: 0
 
-            Tab {
-                id: firstTab
+            StyledTabBar {
+                id: tabBar
+                width: parent.width
+                spacing: 12
 
-                title: "Tab 1"
+                StyledTabButton {
+                    fillWidth: true
+                    text: "Tab 1"
+                }
 
-                Rectangle {
-                    anchors.top: parent.top
-                    anchors.topMargin: 4
+                StyledTabButton {
+                    fillWidth: true
+                    text: "Tab 2"
+                }
 
-                    height: 40
-                    width: tabPanel.width
-
-                    color: "blue"
+                StyledTabButton {
+                    fillWidth: true
+                    text: "Tab 3"
                 }
             }
 
-            Tab {
-                id: secondTab
-
-                title: "Tab 2"
+            StackLayout {
+                width: parent.width
+                currentIndex: tabBar.currentIndex
 
                 Rectangle {
-                    anchors.top: parent.top
-                    anchors.topMargin: 4
-
                     height: 40
-                    width: tabPanel.width
-
-                    color: "gray"
+                    color: "lightblue"
                 }
-            }
-
-            Tab {
-                id: thirdTab
-
-                title: "Tab 3"
 
                 Rectangle {
-                    anchors.top: parent.top
-                    anchors.topMargin: 4
-
                     height: 40
-                    width: tabPanel.width
+                    color: "lightgreen"
+                }
 
-                    color: "black"
+                Rectangle {
+                    height: 40
+                    color: "orange"
                 }
             }
         }
     }
 
     Component {
-        id: gradientTabButtonsSample
+        id: pageTabButtonsSample
 
         Row {
             spacing: 30
 
             Column {
-                GradientTabButton {
+                PageTabButton {
                     title: "Tab 1"
 
                     orientation: Qt.Horizontal
@@ -769,7 +921,7 @@ Rectangle {
                     checked: true
                 }
 
-                GradientTabButton {
+                PageTabButton {
                     title: "Tab 2"
 
                     width: 200
@@ -777,7 +929,7 @@ Rectangle {
                     orientation: Qt.Horizontal
                 }
 
-                GradientTabButton {
+                PageTabButton {
                     title: "Tab 3"
 
                     width: 200
@@ -787,7 +939,7 @@ Rectangle {
             }
 
             Column {
-                GradientTabButton {
+                PageTabButton {
                     title: "Tab 1"
 
                     width: 200
@@ -799,13 +951,13 @@ Rectangle {
                     checked: true
                 }
 
-                GradientTabButton {
+                PageTabButton {
                     title: "Tab 2"
 
                     width: 200
                 }
 
-                GradientTabButton {
+                PageTabButton {
                     title: "Tab 3"
 
                     width: 200
@@ -966,6 +1118,17 @@ Rectangle {
                     valueType: "Int"
                 }
             }
+        }
+    }
+
+    Component {
+        id: styledBusyIndicatorSample
+
+        Item {
+            width: childrenRect.width
+            height: childrenRect.height
+
+            StyledBusyIndicator {}
         }
     }
 }

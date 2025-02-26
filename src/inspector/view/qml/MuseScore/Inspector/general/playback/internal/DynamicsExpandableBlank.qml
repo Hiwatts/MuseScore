@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,9 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.0
-import MuseScore.UiComponents 1.0
+
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
+
 import "../../../common"
 
 ExpandableBlank {
@@ -48,22 +49,6 @@ ExpandableBlank {
 
         spacing: 12
 
-        DropdownPropertyView {
-            id: appliesToSection
-            titleText: qsTrc("inspector", "Applies to")
-            propertyItem: root.model ? root.model.scopeType : null
-
-            navigationPanel: root.navigation.panel
-            navigationRowStart: root.navigation.row + 1
-            navigationEnabled: root.navigation.enabled && root.enabled
-
-            model: [
-                { text: qsTrc("inspector", "Staff"), value: Dynamic.SCOPE_STAFF },
-                { text: qsTrc("inspector", "Single instrument"), value: Dynamic.SCOPE_SINGLE_INSTRUMENT },
-                { text: qsTrc("inspector", "All instruments"), value: Dynamic.SCOPE_ALL_INSTRUMENTS }
-            ]
-        }
-
         Item {
             height: childrenRect.height
             width: parent.width
@@ -74,9 +59,9 @@ ExpandableBlank {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
+                navigationName: "Velocity"
                 navigationPanel: root.navigation.panel
-                navigationRowStart: appliesToSection.navigationRowEnd + 1
-                navigationEnabled: root.navigation.enabled && root.enabled
+                navigationRowStart: root.navigation.row + 1
 
                 titleText: qsTrc("inspector", "Velocity")
                 propertyItem: root.model ? root.model.velocity : null
@@ -93,9 +78,9 @@ ExpandableBlank {
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
+                navigationName: "Velocity change"
                 navigationPanel: root.navigation.panel
                 navigationRowStart: velocitySection.navigationRowEnd + 1
-                navigationEnabled: root.navigation.enabled && root.enabled
 
                 titleText: qsTrc("inspector", "Velocity change")
                 propertyItem: root.model ? root.model.velocityChange : null
@@ -112,14 +97,14 @@ ExpandableBlank {
             titleText: qsTrc("inspector", "Change speed")
             propertyItem: root.model ? root.model.velocityChangeSpeed : null
 
+            navigationName: "Change speed Menu"
             navigationPanel: root.navigation.panel
             navigationRowStart: velocityChangeSection.navigationRowEnd + 1
-            navigationEnabled: root.navigation.enabled && root.enabled
 
             model: [
-                { text: "Slow", value: Dynamic.VELOCITY_CHANGE_SPEED_SLOW },
-                { text: "Normal", value: Dynamic.VELOCITY_CHANGE_SPEED_NORMAL },
-                { text: "Fast", value: Dynamic.VELOCITY_CHANGE_SPEED_FAST }
+                { text: qsTrc("inspector", "Slow", "velocity change speed"), value: Dynamic.VELOCITY_CHANGE_SPEED_SLOW },
+                { text: qsTrc("inspector", "Normal", "velocity change speed"), value: Dynamic.VELOCITY_CHANGE_SPEED_NORMAL },
+                { text: qsTrc("inspector", "Fast", "velocity change speed"), value: Dynamic.VELOCITY_CHANGE_SPEED_FAST }
             ]
         }
     }

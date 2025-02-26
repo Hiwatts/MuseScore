@@ -19,11 +19,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_INAVIGATION_H
-#define MU_UI_INAVIGATION_H
+#ifndef MUSE_UI_INAVIGATION_H
+#define MUSE_UI_INAVIGATION_H
 
 #include <tuple>
 #include <memory>
+#include <functional>
 #include <QString>
 #include <QList>
 #include <QVariantMap>
@@ -32,14 +33,12 @@
 #include "async/notification.h"
 
 class QWindow;
+class QQuickItem;
 
-namespace mu::ui {
+namespace muse::ui {
 class INavigationSection;
 class INavigationPanel;
 class INavigationControl;
-
-using PanelControlChannel = async::Channel<INavigationPanel*, INavigationControl*>;
-using SectionPanelControlChannel = async::Channel<INavigationSection*, INavigationPanel*, INavigationControl*>;
 
 class INavigation
 {
@@ -86,9 +85,15 @@ public:
         std::string to_string() const { return std::string("[") + std::to_string(row) + "," + std::to_string(column) + "]"; }
     };
 
+    enum class ActivationType {
+        None,
+        ByMouse
+    };
+
     virtual QString name() const = 0;
 
     virtual const Index& index() const = 0;
+    virtual void setIndex(const Index& index) = 0;
     virtual async::Channel<Index> indexChanged() const = 0;
 
     virtual bool enabled() const = 0;
@@ -97,6 +102,9 @@ public:
     virtual bool active() const = 0;
     virtual void setActive(bool arg) = 0;
     virtual async::Channel<bool> activeChanged() const = 0;
+
+    virtual QWindow* window() const = 0;
+    virtual QQuickItem* visualItem() const = 0;
 
     virtual void onEvent(EventPtr e) = 0;
 };
@@ -110,7 +118,9 @@ public:
     virtual INavigationPanel* panel() const = 0;
 
     virtual void trigger() = 0;
-    virtual async::Channel<INavigationControl*> activeRequested() const = 0;
+    virtual async::Notification triggered() const = 0;
+
+    virtual void requestActive(bool enableHighlight = false) = 0;
 };
 
 class INavigationSection;
@@ -130,8 +140,12 @@ public:
     virtual Direction direction() const = 0;
     virtual const std::set<INavigationControl*>& controls() const = 0;
     virtual async::Notification controlsListChanged() const = 0;
-    virtual PanelControlChannel activeRequested() const = 0;
+    virtual void requestActive(INavigationControl* control = nullptr, bool enableHighlight = false,
+                               INavigation::ActivationType activationType = INavigation::ActivationType::None) = 0;
 };
+
+using OnActiveRequested = std::function<void (INavigationSection* sec, INavigationPanel* panel, INavigationControl* ctrl,
+                                              bool enableHighlight, INavigation::ActivationType activationType)>;
 
 class INavigationSection : public INavigation
 {
@@ -149,8 +163,11 @@ public:
     virtual Type type() const = 0;
     virtual const std::set<INavigationPanel*>& panels() const = 0;
     virtual async::Notification panelsListChanged() const = 0;
-    virtual SectionPanelControlChannel activeRequested() const = 0;
+
+    virtual void setOnActiveRequested(const OnActiveRequested& func) = 0;
+    virtual void requestActive(INavigationPanel* panel = nullptr, INavigationControl* control = nullptr, bool enableHighlight = false,
+                               INavigation::ActivationType activationType = INavigation::ActivationType::None) = 0;
 };
 }
 
-#endif // MU_UI_INAVIGATION_H
+#endif // MUSE_UI_INAVIGATION_H

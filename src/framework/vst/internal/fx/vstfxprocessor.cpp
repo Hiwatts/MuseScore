@@ -22,12 +22,13 @@
 
 #include "vstfxprocessor.h"
 
-using namespace mu;
-using namespace mu::vst;
-using namespace mu::audio;
+using namespace muse;
+using namespace muse::vst;
+using namespace muse::audio;
+using namespace muse::audioplugins;
 
-VstFxProcessor::VstFxProcessor(VstPluginPtr&& pluginPtr, const AudioFxParams& params)
-    : m_pluginPtr(pluginPtr),
+VstFxProcessor::VstFxProcessor(IVstPluginInstancePtr&& instance, const AudioFxParams& params)
+    : m_pluginPtr(instance),
     m_vstAudioClient(std::make_unique<VstAudioClient>()),
     m_params(params)
 {
@@ -35,17 +36,23 @@ VstFxProcessor::VstFxProcessor(VstPluginPtr&& pluginPtr, const AudioFxParams& pa
 
 void VstFxProcessor::init()
 {
-    m_vstAudioClient->init(VstPluginType::Fx, m_pluginPtr);
+    m_vstAudioClient->init(AudioPluginType::Fx, m_pluginPtr);
+
+    const samples_t blockSize = config()->samplesToPreallocate();
+
+    auto onPluginLoaded = [this, blockSize]() {
+        m_pluginPtr->updatePluginConfig(m_params.configuration);
+        m_vstAudioClient->setMaxSamplesPerBlock(blockSize);
+        m_inited = true;
+    };
 
     if (m_pluginPtr->isLoaded()) {
-        m_pluginPtr->updatePluginConfig(m_params.configuration);
+        onPluginLoaded();
     } else {
-        m_pluginPtr->loadingCompleted().onNotify(this, [this]() {
-            m_pluginPtr->updatePluginConfig(m_params.configuration);
-        });
+        m_pluginPtr->loadingCompleted().onNotify(this, onPluginLoaded);
     }
 
-    m_pluginPtr->pluginSettingsChanged().onReceive(this, [this](const audio::AudioUnitConfig& newConfig) {
+    m_pluginPtr->pluginSettingsChanged().onReceive(this, [this](const muse::audio::AudioUnitConfig& newConfig) {
         if (m_params.configuration == newConfig) {
             return;
         }
@@ -57,7 +64,7 @@ void VstFxProcessor::init()
 
 AudioFxType VstFxProcessor::type() const
 {
-    return audio::AudioFxType::VstFx;
+    return muse::audio::AudioFxType::VstFx;
 }
 
 const AudioFxParams& VstFxProcessor::params() const
@@ -87,10 +94,9 @@ void VstFxProcessor::setActive(bool active)
 
 void VstFxProcessor::process(float* buffer, unsigned int sampleCount)
 {
-    if (!buffer) {
+    if (!buffer || !m_inited) {
         return;
     }
 
-    m_vstAudioClient->setBlockSize(sampleCount);
     m_vstAudioClient->process(buffer, sampleCount);
 }

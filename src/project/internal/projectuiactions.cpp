@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,74 +21,117 @@
  */
 #include "projectuiactions.h"
 
+#include "types/translatablestring.h"
+#include "context/shortcutcontext.h"
+
 using namespace mu::project;
-using namespace mu::ui;
+using namespace muse;
+using namespace muse::ui;
+using namespace muse::actions;
 
 const UiActionList ProjectUiActions::m_actions = {
     UiAction("file-open",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Open…"),
-             QT_TRANSLATE_NOOP("action", "Load score from file")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Open…"),
+             TranslatableString("action", "Open…"),
+             IconCode::Code::OPEN_FILE
              ),
     UiAction("file-new",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "New…"),
-             QT_TRANSLATE_NOOP("action", "Create new score")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&New…"),
+             TranslatableString("action", "New…"),
+             IconCode::Code::NEW_FILE
              ),
     UiAction("file-close",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Close"),
-             QT_TRANSLATE_NOOP("action", "Close current score")
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Close"),
+             TranslatableString("action", "Close")
              ),
     UiAction("file-save",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Save"),
-             QT_TRANSLATE_NOOP("action", "Save score to file")
-             ),
-    UiAction("file-save-online",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Upload to MuseScore.com"),
-             QT_TRANSLATE_NOOP("action", "Save score on MuseScore.com"),
-             IconCode::Code::CLOUD_FILE
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Save"),
+             TranslatableString("action", "Save"),
+             IconCode::Code::SAVE
              ),
     UiAction("file-save-as",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Save as…"),
-             QT_TRANSLATE_NOOP("action", "Save score under a new file name")
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Save &as…"),
+             TranslatableString("action", "Save as…")
              ),
     UiAction("file-save-a-copy",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Save a copy…"),
-             QT_TRANSLATE_NOOP("action", "Save a copy of the score in addition to the current file")
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Save a cop&y…"),
+             TranslatableString("action", "Save a copy…")
              ),
     UiAction("file-save-selection",
-             mu::context::UiCtxNotationFocused,
-             QT_TRANSLATE_NOOP("action", "Save selection…"),
-             QT_TRANSLATE_NOOP("action", "Save current selection as new score")
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Save se&lection…"),
+             TranslatableString("action", "Save selection…")
+             ),
+    UiAction("file-save-to-cloud",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Save to clo&ud…"),
+             TranslatableString("action", "Save to cloud…"),
+             IconCode::Code::CLOUD_FILE
+             ),
+    UiAction("file-publish",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Pu&blish to MuseScore.com…"),
+             TranslatableString("action", "Publish to MuseScore.com…"),
+             IconCode::Code::CLOUD_FILE
+             ),
+    UiAction("file-share-audio",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Share on Audio.com…"),
+             TranslatableString("action", "Share on Audio.com…"),
+             IconCode::Code::SHARE_AUDIO
              ),
     UiAction("file-export",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Export"),
-             QT_TRANSLATE_NOOP("action", "Save a copy of the score in various formats"),
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Export…"),
+             TranslatableString("action", "Export…"),
              IconCode::Code::SHARE_FILE
              ),
     UiAction("file-import-pdf",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Import PDF…"),
-             QT_TRANSLATE_NOOP("action", "Import a PDF file with an experimental service on musescore.com")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Import P&DF…"),
+             TranslatableString("action", "Import PDF…"),
+             IconCode::Code::IMPORT
+             ),
+    UiAction("project-properties",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Project propert&ies…"),
+             TranslatableString("action", "Project properties…")
              ),
     UiAction("print",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Print…"),
-             QT_TRANSLATE_NOOP("action", "Print score/part")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Print…"),
+             TranslatableString("action", "Print…"),
+             IconCode::Code::PRINT
              ),
     UiAction("clear-recent",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Clear recent files")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Clear recent files"),
+             TranslatableString("action", "Clear recent files")
              )
 };
 
-ProjectUiActions::ProjectUiActions(std::shared_ptr<ProjectFilesController> controller)
+ProjectUiActions::ProjectUiActions(std::shared_ptr<ProjectActionsController> controller)
     : m_controller(controller)
 {
 }
@@ -112,12 +155,12 @@ bool ProjectUiActions::actionChecked(const UiAction&) const
     return false;
 }
 
-mu::async::Channel<mu::actions::ActionCodeList> ProjectUiActions::actionEnabledChanged() const
+muse::async::Channel<ActionCodeList> ProjectUiActions::actionEnabledChanged() const
 {
     return m_actionEnabledChanged;
 }
 
-mu::async::Channel<mu::actions::ActionCodeList> ProjectUiActions::actionCheckedChanged() const
+muse::async::Channel<ActionCodeList> ProjectUiActions::actionCheckedChanged() const
 {
     return m_actionCheckedChanged;
 }

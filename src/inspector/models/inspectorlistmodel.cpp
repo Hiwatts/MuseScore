@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,7 +22,9 @@
 #include "inspectorlistmodel.h"
 
 #include "general/generalsettingsmodel.h"
+#include "measures/measuressettingsmodel.h"
 #include "notation/notationsettingsproxymodel.h"
+#include "parts/partssettingsmodel.h"
 #include "text/textsettingsmodel.h"
 #include "score/scoredisplaysettingsmodel.h"
 #include "score/scoreappearancesettingsmodel.h"
@@ -30,76 +32,82 @@
 
 #include "internal/services/elementrepositoryservice.h"
 
+#include "log.h"
+
 using namespace mu::inspector;
 using namespace mu::notation;
-
-namespace mu::inspector {
-inline uint qHash(AbstractInspectorModel::InspectorSectionType key)
-{
-    return ::qHash(QString::number(static_cast<int>(key)));
-}
-}
 
 InspectorListModel::InspectorListModel(QObject* parent)
     : QAbstractListModel(parent)
 {
-    m_roleNames.insert(InspectorDataRole, "inspectorData");
-
     m_repository = new ElementRepositoryService(this);
 
-    subscribeOnSelectionChanges();
+    listenSelectionChanged();
+    context()->currentNotationChanged().onNotify(this, [this]() {
+        listenSelectionChanged();
+
+        notifyModelsAboutNotationChanged();
+    });
 }
 
-void InspectorListModel::buildModelsForSelectedElements(const ElementKeySet& selectedElementKeySet)
+void InspectorListModel::buildModelsForSelectedElements(const ElementKeySet& selectedElementKeySet, bool isRangeSelection,
+                                                        const QList<mu::engraving::EngravingItem*>& selectedElementList)
 {
-    static QList<AbstractInspectorModel::InspectorSectionType> persistentSectionList
-        = { AbstractInspectorModel::InspectorSectionType::SECTION_GENERAL };
+    removeUnusedModels(selectedElementKeySet, isRangeSelection, selectedElementList);
 
-    removeUnusedModels(selectedElementKeySet, persistentSectionList);
+    InspectorSectionTypeSet buildingSectionTypeSet = AbstractInspectorModel::sectionTypesByElementKeys(selectedElementKeySet,
+                                                                                                       isRangeSelection,
+                                                                                                       selectedElementList);
 
-    QSet<AbstractInspectorModel::InspectorSectionType> buildingSectionTypeSet(persistentSectionList.begin(), persistentSectionList.end());
-    for (const ElementKey& elementKey : selectedElementKeySet) {
-        QList<AbstractInspectorModel::InspectorSectionType> sections = AbstractInspectorModel::sectionTypesByElementKey(elementKey);
-
-        for (AbstractInspectorModel::InspectorSectionType sectionType : sections) {
-            buildingSectionTypeSet << sectionType;
-        }
-    }
-
-    createModelsBySectionType(buildingSectionTypeSet.values(), selectedElementKeySet);
+    createModelsBySectionType(buildingSectionTypeSet, selectedElementKeySet);
 
     sortModels();
 }
 
-void InspectorListModel::buildModelsForEmptySelection(const ElementKeySet& selectedElementKeySet)
+void InspectorListModel::buildModelsForEmptySelection()
 {
-    static QList<AbstractInspectorModel::InspectorSectionType> persistentSectionList {
-        AbstractInspectorModel::InspectorSectionType::SECTION_SCORE_DISPLAY,
-        AbstractInspectorModel::InspectorSectionType::SECTION_SCORE_APPEARANCE
+    if (context()->currentNotation() == nullptr) {
+        removeUnusedModels({}, false /*isRangeSelection*/, {});
+        return;
+    }
+
+    static const InspectorSectionTypeSet persistentSections {
+        InspectorSectionType::SECTION_SCORE_DISPLAY,
+        InspectorSectionType::SECTION_SCORE_APPEARANCE
     };
 
-    removeUnusedModels(selectedElementKeySet, persistentSectionList);
+    removeUnusedModels({}, false /*isRangeSelection*/, {}, persistentSections);
 
-    createModelsBySectionType(persistentSectionList);
+    createModelsBySectionType(persistentSections);
 }
 
-void InspectorListModel::setElementList(const QList<Ms::EngravingItem*>& selectedElementList)
+void InspectorListModel::setElementList(const QList<mu::engraving::EngravingItem*>& selectedElementList, SelectionState selectionState)
 {
-    ElementKeySet newElementKeySet;
+    TRACEFUNC;
 
-    for (const Ms::EngravingItem* element : selectedElementList) {
-        newElementKeySet << ElementKey(element->type(), element->subtype());
+    if (!m_modelList.isEmpty()) {
+        if (context()->currentNotation() == nullptr) {
+            buildModelsForEmptySelection();
+        }
+
+        if (!m_repository->needUpdateElementList(selectedElementList, selectionState)) {
+            return;
+        }
     }
 
     if (selectedElementList.isEmpty()) {
-        buildModelsForEmptySelection(newElementKeySet);
+        buildModelsForEmptySelection();
     } else {
-        buildModelsForSelectedElements(newElementKeySet);
+        ElementKeySet newElementKeySet;
+
+        for (const mu::engraving::EngravingItem* element : selectedElementList) {
+            newElementKeySet << AbstractInspectorModel::makeKey(element);
+        }
+
+        buildModelsForSelectedElements(newElementKeySet, selectionState == SelectionState::RANGE, selectedElementList);
     }
 
-    m_repository->updateElementList(selectedElementList);
-
-    emit modelChanged();
+    m_repository->updateElementList(selectedElementList, selectionState);
 }
 
 int InspectorListModel::rowCount(const QModelIndex&) const
@@ -107,9 +115,9 @@ int InspectorListModel::rowCount(const QModelIndex&) const
     return m_modelList.count();
 }
 
-QVariant InspectorListModel::data(const QModelIndex& index, int) const
+QVariant InspectorListModel::data(const QModelIndex& index, int role) const
 {
-    if (!index.isValid() || index.row() >= rowCount() || m_modelList.isEmpty()) {
+    if (!index.isValid() || index.row() >= rowCount() || m_modelList.isEmpty() || role != InspectorSectionModelRole) {
         return QVariant();
     }
 
@@ -122,7 +130,9 @@ QVariant InspectorListModel::data(const QModelIndex& index, int) const
 
 QHash<int, QByteArray> InspectorListModel::roleNames() const
 {
-    return m_roleNames;
+    return {
+        { InspectorSectionModelRole, "inspectorSectionModel" }
+    };
 }
 
 int InspectorListModel::columnCount(const QModelIndex&) const
@@ -130,40 +140,71 @@ int InspectorListModel::columnCount(const QModelIndex&) const
     return 1;
 }
 
-void InspectorListModel::createModelsBySectionType(const QList<AbstractInspectorModel::InspectorSectionType>& sectionTypeList,
+void InspectorListModel::setInspectorVisible(bool visible)
+{
+    if (m_inspectorVisible == visible) {
+        return;
+    }
+
+    m_inspectorVisible = visible;
+
+    if (visible) {
+        updateElementList();
+    }
+}
+
+void InspectorListModel::createModelsBySectionType(const InspectorSectionTypeSet& sectionTypes,
                                                    const ElementKeySet& selectedElementKeySet)
 {
-    using SectionType = AbstractInspectorModel::InspectorSectionType;
-
-    for (const SectionType sectionType : sectionTypeList) {
-        if (sectionType == SectionType::SECTION_UNDEFINED) {
+    for (InspectorSectionType sectionType : sectionTypes) {
+        if (sectionType == InspectorSectionType::SECTION_UNDEFINED) {
             continue;
         }
 
-        if (isModelAlreadyExists(sectionType)) {
+        AbstractInspectorModel* model = modelBySectionType(sectionType);
+
+        if (model) {
+            if (auto proxyModel = dynamic_cast<AbstractInspectorProxyModel*>(model)) {
+                proxyModel->updateModels(selectedElementKeySet);
+            }
+
             continue;
         }
 
-        beginInsertRows(QModelIndex(), rowCount(), rowCount());
+        int rows = rowCount();
+        beginInsertRows(QModelIndex(), rows, rows);
+
+        AbstractInspectorModel* newModel = nullptr;
 
         switch (sectionType) {
-        case AbstractInspectorModel::InspectorSectionType::SECTION_GENERAL:
-            m_modelList << new GeneralSettingsModel(this, m_repository);
+        case InspectorSectionType::SECTION_GENERAL:
+            newModel = new GeneralSettingsModel(this, m_repository);
             break;
-        case AbstractInspectorModel::InspectorSectionType::SECTION_TEXT:
-            m_modelList << new TextSettingsModel(this, m_repository);
+        case InspectorSectionType::SECTION_MEASURES:
+            newModel = new MeasuresSettingsModel(this, m_repository);
             break;
-        case AbstractInspectorModel::InspectorSectionType::SECTION_NOTATION:
-            m_modelList << new NotationSettingsProxyModel(this, m_repository, selectedElementKeySet);
+        case InspectorSectionType::SECTION_NOTATION:
+            newModel = new NotationSettingsProxyModel(this, m_repository, selectedElementKeySet);
             break;
-        case AbstractInspectorModel::InspectorSectionType::SECTION_SCORE_DISPLAY:
-            m_modelList << new ScoreSettingsModel(this, m_repository);
+        case InspectorSectionType::SECTION_TEXT:
+            newModel = new TextSettingsModel(this, m_repository);
             break;
-        case AbstractInspectorModel::InspectorSectionType::SECTION_SCORE_APPEARANCE:
-            m_modelList << new ScoreAppearanceSettingsModel(this, m_repository);
+        case InspectorSectionType::SECTION_SCORE_DISPLAY:
+            newModel = new ScoreSettingsModel(this, m_repository);
             break;
-        default:
+        case InspectorSectionType::SECTION_SCORE_APPEARANCE:
+            newModel = new ScoreAppearanceSettingsModel(this, m_repository);
             break;
+        case InspectorSectionType::SECTION_PARTS:
+            newModel = new PartsSettingsModel(this, m_repository);
+            break;
+        case AbstractInspectorModel::InspectorSectionType::SECTION_UNDEFINED:
+            break;
+        }
+
+        if (newModel) {
+            newModel->init();
+            m_modelList << newModel;
         }
 
         endInsertRows();
@@ -171,58 +212,22 @@ void InspectorListModel::createModelsBySectionType(const QList<AbstractInspector
 }
 
 void InspectorListModel::removeUnusedModels(const ElementKeySet& newElementKeySet,
-                                            const QList<AbstractInspectorModel::InspectorSectionType>& exclusions)
+                                            bool isRangeSelection, const QList<engraving::EngravingItem*>& selectedElementList,
+                                            const InspectorSectionTypeSet& exclusions)
 {
     QList<AbstractInspectorModel*> modelsToRemove;
 
+    InspectorModelTypeSet allowedModelTypes = AbstractInspectorModel::modelTypesByElementKeys(newElementKeySet);
+    InspectorSectionTypeSet allowedSectionTypes = AbstractInspectorModel::sectionTypesByElementKeys(newElementKeySet, isRangeSelection,
+                                                                                                    selectedElementList);
+
     for (AbstractInspectorModel* model : m_modelList) {
-        if (exclusions.contains(model->sectionType())) {
+        if (muse::contains(exclusions, model->sectionType())) {
             continue;
         }
 
-        QList<Ms::ElementType> supportedElementTypes;
-        AbstractInspectorProxyModel* proxyModel = dynamic_cast<AbstractInspectorProxyModel*>(model);
-        if (proxyModel) {
-            ElementKeyList proxyElementKeys;
-            for (const QVariant& modelVar : proxyModel->models()) {
-                AbstractInspectorModel* prModel = qobject_cast<AbstractInspectorModel*>(modelVar.value<QObject*>());
-                if (prModel) {
-                    proxyElementKeys << AbstractInspectorModel::elementTypeByModelType(prModel->modelType());
-                }
-            }
-
-            bool needRemove = false;
-            for (const ElementKey& elementKey: proxyElementKeys) {
-                if (!newElementKeySet.contains(elementKey)) {
-                    needRemove = true;
-                    break;
-                }
-            }
-
-            if (!needRemove) {
-                for (const ElementKey& elementKey: newElementKeySet) {
-                    if (!proxyModel->isElementSupported(elementKey)) {
-                        continue;
-                    }
-
-                    if (!proxyElementKeys.contains(elementKey)) {
-                        needRemove = true;
-                        break;
-                    }
-                }
-            }
-
-            if (needRemove) {
-                modelsToRemove << model;
-            }
-        } else {
-            supportedElementTypes = AbstractInspectorModel::supportedElementTypesBySectionType(model->sectionType());
-            ElementKeySet supportedElementKeySet(supportedElementTypes.begin(), supportedElementTypes.end());
-            supportedElementKeySet.intersect(newElementKeySet);
-
-            if (supportedElementKeySet.isEmpty()) {
-                modelsToRemove << model;
-            }
+        if (!isModelAllowed(model, allowedModelTypes, allowedSectionTypes)) {
+            modelsToRemove << model;
         }
     }
 
@@ -231,11 +236,36 @@ void InspectorListModel::removeUnusedModels(const ElementKeySet& newElementKeySe
 
         beginRemoveRows(QModelIndex(), index, index);
 
-        delete model;
         m_modelList.removeAt(index);
+
+        delete model;
+        model = nullptr;
 
         endRemoveRows();
     }
+}
+
+bool InspectorListModel::isModelAllowed(const AbstractInspectorModel* model, const InspectorModelTypeSet& allowedModelTypes,
+                                        const InspectorSectionTypeSet& allowedSectionTypes) const
+{
+    InspectorModelType modelType = model->modelType();
+
+    if (modelType != InspectorModelType::TYPE_UNDEFINED && muse::contains(allowedModelTypes, modelType)) {
+        return true;
+    }
+
+    auto proxyModel = dynamic_cast<const AbstractInspectorProxyModel*>(model);
+    if (!proxyModel) {
+        return muse::contains(allowedSectionTypes, model->sectionType());
+    }
+
+    for (auto subModel : proxyModel->modelList()) {
+        if (isModelAllowed(subModel, allowedModelTypes, allowedSectionTypes)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void InspectorListModel::sortModels()
@@ -247,59 +277,65 @@ void InspectorListModel::sortModels()
         return static_cast<int>(first->sectionType()) < static_cast<int>(second->sectionType());
     });
 
-    for (int i = 0; i < m_modelList.count(); ++i) {
-        if (m_modelList.at(i) != sortedModelList.at(i)) {
-            beginMoveRows(QModelIndex(), i, i, QModelIndex(), sortedModelList.indexOf(m_modelList.at(i)));
-        }
-    }
-
-    if (m_modelList == sortedModelList) {
+    if (sortedModelList == m_modelList) {
         return;
     }
 
-    m_modelList = sortedModelList;
-
-    endMoveRows();
+    for (int i = 0; i < m_modelList.count(); ++i) {
+        if (m_modelList[i] != sortedModelList[i]) {
+            m_modelList[i] = sortedModelList[i];
+            emit dataChanged(index(i, 0), index(i, 0));
+        }
+    }
 }
 
-bool InspectorListModel::isModelAlreadyExists(const AbstractInspectorModel::InspectorSectionType modelType) const
+AbstractInspectorModel* InspectorListModel::modelBySectionType(InspectorSectionType sectionType) const
 {
-    for (const AbstractInspectorModel* model : m_modelList) {
-        if (model->sectionType() == modelType) {
-            return true;
+    for (AbstractInspectorModel* model : m_modelList) {
+        if (model->sectionType() == sectionType) {
+            return model;
         }
     }
 
-    return false;
+    return nullptr;
 }
 
-void InspectorListModel::subscribeOnSelectionChanges()
+void InspectorListModel::notifyModelsAboutNotationChanged()
 {
-    if (!context() || !context()->currentNotation()) {
-        setElementList(QList<Ms::EngravingItem*>());
+    TRACEFUNC;
+
+    for (AbstractInspectorModel* model : m_modelList) {
+        model->onCurrentNotationChanged();
+    }
+}
+
+void InspectorListModel::listenSelectionChanged()
+{
+    updateElementList();
+
+    INotationPtr notation = context()->currentNotation();
+    if (!notation) {
+        return;
     }
 
-    context()->currentNotationChanged().onNotify(this, [this]() {
-        m_notation = context()->currentNotation();
-
-        if (!m_notation) {
-            setElementList(QList<Ms::EngravingItem*>());
-            return;
-        }
-
-        auto elements = m_notation->interaction()->selection()->elements();
-        setElementList(QList(elements.cbegin(), elements.cend()));
-
-        m_notation->interaction()->selectionChanged().onNotify(this, [this]() {
-            auto elements = m_notation->interaction()->selection()->elements();
-            setElementList(QList(elements.cbegin(), elements.cend()));
-        });
-
-        m_notation->interaction()->textEditingChanged().onNotify(this, [this]() {
-            auto element = m_notation->interaction()->selection()->element();
-            if (element != nullptr) {
-                setElementList(QList { element });
-            }
-        });
+    notation->interaction()->selectionChanged().onNotify(this, [this]() {
+        updateElementList();
     });
+}
+
+void InspectorListModel::updateElementList()
+{
+    if (!m_inspectorVisible) {
+        return;
+    }
+
+    INotationPtr notation = context()->currentNotation();
+    if (!notation) {
+        setElementList({});
+        return;
+    }
+
+    INotationSelectionPtr selection = notation->interaction()->selection();
+    const std::vector<EngravingItem*>& elements = selection->elements();
+    setElementList(QList(elements.cbegin(), elements.cend()), selection->state());
 }

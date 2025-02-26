@@ -18,7 +18,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-set(MODULE midi)
+declare_module(muse_midi)
+set(MODULE_ALIAS muse::midi)
 
 include(GetPlatformInfo)
 if (OS_IS_WIN)
@@ -29,6 +30,13 @@ if (OS_IS_WIN)
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmidiinport.h
     )
 elseif(OS_IS_LIN)
+    set(DRIVER_SRC
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidioutport.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidioutport.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidiinport.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidiinport.h
+    )
+elseif(OS_IS_FBSD)
     set(DRIVER_SRC
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidioutport.cpp
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidioutport.h
@@ -67,10 +75,6 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/devtools/midiportdevmodel.h
     )
 
-set(MODULE_LINK
-    qzip
-    )
-
 if (OS_IS_MAC)
     find_library(CoreMIDI NAMES CoreMIDI)
     find_library(CoreAudio NAMES CoreAudio)
@@ -79,7 +83,7 @@ elseif (OS_IS_WIN)
     set(MODULE_LINK ${MODULE_LINK} winmm)
 elseif (OS_IS_LIN)
     find_package(ALSA REQUIRED)
-    set(MODULE_INCLUDE ${MODULE_INCLUDE} ${ALSA_INCLUDE_DIRS} )
+    set(MODULE_INCLUDE_PRIVATE ${MODULE_INCLUDE_PRIVATE} ${ALSA_INCLUDE_DIRS} )
     set(MODULE_LINK ${MODULE_LINK} ${ALSA_LIBRARIES} pthread )
 endif()
 
@@ -87,4 +91,4 @@ set(MODULE_QRC midi.qrc)
 
 set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml )
 
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
+setup_module()

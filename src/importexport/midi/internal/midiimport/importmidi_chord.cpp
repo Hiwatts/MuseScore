@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,12 +25,14 @@
 #include "importmidi_clef.h"
 #include "importmidi_operations.h"
 #include "importmidi_quant.h"
-#include "libmscore/mscore.h"
-#include "libmscore/sig.h"
+#include "engraving/dom/mscore.h"
+#include "engraving/dom/sig.h"
 
 #include <set>
 
-namespace Ms {
+#include "log.h"
+
+namespace mu::iex::midi {
 namespace MChord {
 bool isGrandStaffProgram(int program)
 {
@@ -84,7 +86,7 @@ findFirstChordInRange(const std::multimap<ReducedFraction, MidiChord>& chords,
 
 const ReducedFraction& minAllowedDuration()
 {
-    const static auto minDuration = ReducedFraction::fromTicks(MScore::division) / 32;
+    const static auto minDuration = ReducedFraction::fromTicks(engraving::Constants::DIVISION) / 32;
     return minDuration;
 }
 
@@ -141,7 +143,7 @@ void removeOverlappingNotes(QList<MidiNote>& notes)
                     noteIt1->offTime = noteIt2->offTime;
                 }
                 noteIt2 = tempNotes.erase(noteIt2);
-                qDebug("Midi import: removeOverlappingNotes: note was removed");
+                LOGD() << "MIDI import: removeOverlappingNotes: note was removed";
                 continue;
             }
             ++noteIt2;
@@ -205,7 +207,7 @@ void removeOverlappingNotes(std::multimap<int, MTrack>& tracks)
                 }
                 if (note1.offTime - onTime1 < MChord::minAllowedDuration()) {
                     note1It = chord1.notes.erase(note1It);
-                    qDebug("Midi import: removeOverlappingNotes: note was removed");
+                    LOGD("MIDI import: removeOverlappingNotes: note was removed");
                     continue;
                 }
                 ++note1It;
@@ -412,7 +414,7 @@ void collectChords(
                 }
 
                 if (!hasNotesWithEqualPitch(chordAddTo->second, it->second)) {
-                    for (const auto& note: qAsConst(it->second.notes)) {
+                    for (const auto& note: std::as_const(it->second.notes)) {
                         chordAddTo->second.notes.push_back(note);
                     }
                     if (maxNoteOffTime > maxOffTime) {
@@ -640,7 +642,7 @@ void setBarIndexes(
     std::multimap<ReducedFraction, MidiChord>& chords,
     const ReducedFraction& basicQuant,
     const ReducedFraction& lastTick,
-    const TimeSigMap* sigmap)
+    const engraving::TimeSigMap* sigmap)
 {
     if (chords.empty()) {
         return;
@@ -676,4 +678,4 @@ void setBarIndexes(
 #endif
 }
 } // namespace MChord
-} // namespace Ms
+} // namespace mu::iex::midi

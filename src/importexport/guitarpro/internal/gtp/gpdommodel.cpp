@@ -1,4 +1,4 @@
 #include "gpdommodel.h"
 
-namespace Ms {
-}
+namespace mu::iex::guitarpro {
+} // namespace mu::engraving {

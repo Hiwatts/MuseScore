@@ -19,30 +19,74 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_FRAMEWORK_PROGRESS_H
-#define MU_FRAMEWORK_PROGRESS_H
-
-#include <string>
+#ifndef MUSE_GLOBAL_PROGRESS_H
+#define MUSE_GLOBAL_PROGRESS_H
 
 #include "async/channel.h"
+#include "async/notification.h"
 
-namespace mu::framework {
-struct Progress
+#include "types/retval.h"
+#include "types/val.h"
+
+namespace muse {
+using ProgressResult = RetVal<Val>;
+
+class Progress
 {
-    int64_t current = 0;
-    int64_t total = 0;
-    std::string status;
+public:
 
-    Progress(int64_t current, int64_t total)
-        : current(current), total(total) {}
+    // start
+    void start()
+    {
+        m_isCanceled = false;
+        m_isStarted = true;
+        m_started.notify();
+    }
 
-    Progress(int64_t current, int64_t total, std::string status)
-        : current(current), total(total), status(std::move(status)) {}
+    async::Notification& started() { return m_started; }
+    bool isStarted() const { return m_isStarted; }
 
-    Progress() = default;
+    // progress
+    void progress(int64_t current, int64_t total, const std::string& msg) { m_progressChanged.send(current, total, msg); }
+    async::Channel<int64_t /*current*/, int64_t /*total*/, std::string /*title*/>& progressChanged()
+    {
+        return m_progressChanged;
+    }
+
+    // finish or cancel
+    void finish(const ProgressResult& res)
+    {
+        m_isStarted = false;
+        m_finished.send(res);
+    }
+
+    async::Channel<ProgressResult>& finished() { return m_finished; }
+
+    void cancel()
+    {
+        m_isCanceled = true;
+        m_canceled.notify();
+        finish(make_ret(Ret::Code::Cancel));
+    }
+
+    async::Notification& canceled() { return m_canceled; }
+    bool isCanceled() const { return m_isCanceled; }
+
+private:
+    async::Notification m_started;
+    async::Channel<ProgressResult> m_finished;
+    async::Notification m_canceled;
+    bool m_isStarted = false;
+    bool m_isCanceled = false;
+
+    async::Channel<int64_t /*current*/, int64_t /*total*/, std::string /*title*/> m_progressChanged;
 };
 
-using ProgressChannel = async::Channel<Progress>;
+using ProgressPtr = std::shared_ptr<Progress>;
 }
 
-#endif // MU_FRAMEWORK_PROGRESS_H
+#ifndef NO_QT_SUPPORT
+Q_DECLARE_METATYPE(muse::Progress*)
+#endif
+
+#endif // MUSE_GLOBAL_PROGRESS_H

@@ -23,37 +23,68 @@
 
 #include "log.h"
 
-using namespace mu::shortcuts;
+using namespace muse::shortcuts;
 
 ShortcutsInstanceModel::ShortcutsInstanceModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
-void ShortcutsInstanceModel::load()
+void ShortcutsInstanceModel::init()
+{
+    shortcutsRegister()->shortcutsChanged().onNotify(this, [this](){
+        doLoadShortcuts();
+    });
+
+    shortcutsRegister()->activeChanged().onNotify(this, [this](){
+        emit activeChanged();
+    });
+
+    doLoadShortcuts();
+}
+
+QVariantMap ShortcutsInstanceModel::shortcuts() const
+{
+    return m_shortcuts;
+}
+
+bool ShortcutsInstanceModel::active() const
+{
+    return shortcutsRegister()->active();
+}
+
+void ShortcutsInstanceModel::activate(const QString& seq)
+{
+    doActivate(seq);
+}
+
+void ShortcutsInstanceModel::doLoadShortcuts()
 {
     m_shortcuts.clear();
 
     const ShortcutList& shortcuts = shortcutsRegister()->shortcuts();
     for (const Shortcut& sc : shortcuts) {
-        QString sequence = QString::fromStdString(sc.sequence);
+        for (const std::string& seq : sc.sequences) {
+            QString seqStr = QString::fromStdString(seq);
 
-        //! NOTE There may be several identical shortcuts for different contexts.
-        //! We only need a list of unique ones.
-        if (!m_shortcuts.contains(sequence)) {
-            m_shortcuts << sequence;
+            // RULE: If a sequence is used for several shortcuts but the values for autoRepeat vary depending on
+            // the context, then we should force autoRepeat to false for all shortcuts sharing the sequence in
+            // question. This prevents the creation of ambiguous shortcuts (see QShortcutEvent::isAmbiguous)
+            auto search = m_shortcuts.find(seqStr);
+            if (search == m_shortcuts.end()) {
+                // Sequence not found, add it...
+                m_shortcuts.insert(seqStr, QVariant(sc.autoRepeat));
+            } else if (search.value().toBool() && !sc.autoRepeat) {
+                // Sequence already exists, but we need to enforce the above rule...
+                search.value() = false;
+            }
         }
     }
 
     emit shortcutsChanged();
 }
 
-QStringList ShortcutsInstanceModel::shortcuts() const
+void ShortcutsInstanceModel::doActivate(const QString& seq)
 {
-    return m_shortcuts;
-}
-
-void ShortcutsInstanceModel::activate(const QString& key)
-{
-    controller()->activate(key.toStdString());
+    controller()->activate(seq.toStdString());
 }

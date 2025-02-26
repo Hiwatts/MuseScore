@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -30,7 +30,7 @@ using namespace mu::inspector;
 FermataPlaybackModel::FermataPlaybackModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
 {
-    setTitle(qtrc("inspector", "Fermatas"));
+    setTitle(muse::qtrc("inspector", "Fermatas"));
     setModelType(InspectorModelType::TYPE_FERMATA);
 
     createProperties();
@@ -38,20 +38,20 @@ FermataPlaybackModel::FermataPlaybackModel(QObject* parent, IElementRepositorySe
 
 void FermataPlaybackModel::createProperties()
 {
-    m_timeStretch = buildPropertyItem(Ms::Pid::TIME_STRETCH, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_timeStretch = buildPropertyItem(mu::engraving::Pid::TIME_STRETCH, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue.toDouble() / 100);
     });
 }
 
 void FermataPlaybackModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::FERMATA);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::FERMATA);
 }
 
 void FermataPlaybackModel::loadProperties()
 {
     loadPropertyItem(m_timeStretch, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble()) * 100;
+        return muse::DataFormatter::roundDouble(elementPropertyValue.toDouble()) * 100;
     });
 }
 

@@ -21,18 +21,24 @@
  */
 #include "navigationcontroller.h"
 
-#include <QCoreApplication>
 #include <algorithm>
 #include <limits>
-#include <utility>
 
+#include <QCoreApplication>
+#include <QWindow>
+#include <QTextStream>
+
+#include "global/defer.h"
+
+#include "muse_framework_config.h"
+
+#ifdef MUSE_MODULE_DIAGNOSTICS
 #include "diagnostics/diagnosticutils.h"
-#include "async/async.h"
+#endif
+
 #include "log.h"
 
-#include "config.h"
-
-//#define NAVIGATION_LOGGING_ENABLED
+// #define NAVIGATION_LOGGING_ENABLED
 
 #ifdef NAVIGATION_LOGGING_ENABLED
 #define MYLOG() LOGI()
@@ -40,12 +46,13 @@
 #define MYLOG() LOGN()
 #endif
 
-using namespace mu::ui;
+using namespace muse::ui;
 
-static const mu::UriQuery DEV_SHOW_CONTROLS_URI("musescore://devtools/keynav/controls?sync=false&modal=false");
+static const muse::UriQuery DEV_SHOW_CONTROLS_URI("muse://devtools/keynav/controls?sync=false&modal=false");
 
 using MoveDirection = NavigationController::MoveDirection;
 using Event = INavigation::Event;
+using ActivationType = INavigation::ActivationType;
 
 // algorithms
 template<class T>
@@ -268,26 +275,26 @@ static T* findByIndex(const std::set<T*>& set, const INavigation::Index& idx)
 
 void NavigationController::init()
 {
-    dispatcher()->reg(this, "nav-next-section", this, &NavigationController::goToNextSection);
-    dispatcher()->reg(this, "nav-prev-section", [this]() { goToPrevSection(false); });
-    dispatcher()->reg(this, "nav-next-panel", this, &NavigationController::goToNextPanel);
-    dispatcher()->reg(this, "nav-prev-panel", this, &NavigationController::goToPrevPanel);
+    dispatcher()->reg(this, "nav-next-section", [this]() { navigateTo(NavigationType::NextSection); });
+    dispatcher()->reg(this, "nav-prev-section", [this]() { navigateTo(NavigationType::PrevSection); });
+    dispatcher()->reg(this, "nav-next-panel", [this]() { navigateTo(NavigationType::NextPanel); });
+    dispatcher()->reg(this, "nav-prev-panel", [this]() { navigateTo(NavigationType::PrevPanel); });
     //! NOTE Same as panel at the moment
-    dispatcher()->reg(this, "nav-next-tab", this, &NavigationController::goToNextPanel);
-    dispatcher()->reg(this, "nav-prev-tab", this, &NavigationController::goToPrevPanel);
+    dispatcher()->reg(this, "nav-next-tab", [this]() { navigateTo(NavigationType::NextPanel); });
+    dispatcher()->reg(this, "nav-prev-tab", [this]() { navigateTo(NavigationType::PrevPanel); });
 
-    dispatcher()->reg(this, "nav-trigger-control", this, &NavigationController::doTriggerControl);
+    dispatcher()->reg(this, "nav-trigger-control", [this]() { doTriggerControl(); });
 
-    dispatcher()->reg(this, "nav-right", this, &NavigationController::onRight);
-    dispatcher()->reg(this, "nav-left", this, &NavigationController::onLeft);
-    dispatcher()->reg(this, "nav-up", this, &NavigationController::onUp);
-    dispatcher()->reg(this, "nav-down", this, &NavigationController::onDown);
-    dispatcher()->reg(this, "nav-escape", this, &NavigationController::onEscape);
+    dispatcher()->reg(this, "nav-right", [this]() { navigateTo(NavigationType::Right); });
+    dispatcher()->reg(this, "nav-left", [this]() { navigateTo(NavigationType::Left); });
+    dispatcher()->reg(this, "nav-up", [this]() { navigateTo(NavigationType::Up); });
+    dispatcher()->reg(this, "nav-down", [this]() { navigateTo(NavigationType::Down); });
+    dispatcher()->reg(this, "nav-escape", [this]() { onEscape(); });
 
-    dispatcher()->reg(this, "nav-first-control", this, &NavigationController::goToFirstControl);         // typically Home key
-    dispatcher()->reg(this, "nav-last-control", this, &NavigationController::goToLastControl);           // typically End key
-    dispatcher()->reg(this, "nav-nextrow-control", this, &NavigationController::goToNextRowControl);     // typically PageDown key
-    dispatcher()->reg(this, "nav-prevrow-control", this, &NavigationController::goToPrevRowControl);     // typically PageUp key
+    dispatcher()->reg(this, "nav-first-control", [this]() { navigateTo(NavigationType::FirstControl); });         // typically Home key
+    dispatcher()->reg(this, "nav-last-control", [this]() { navigateTo(NavigationType::LastControl); });           // typically End key
+    dispatcher()->reg(this, "nav-nextrow-control", [this]() { navigateTo(NavigationType::NextRowControl); });     // typically PageDown key
+    dispatcher()->reg(this, "nav-prevrow-control", [this]() { navigateTo(NavigationType::PrevRowControl); });     // typically PageUp key
 
     qApp->installEventFilter(this);
 }
@@ -297,8 +304,18 @@ void NavigationController::reg(INavigationSection* section)
     //! TODO add check on valid state
     TRACEFUNC;
     m_sections.insert(section);
+    section->setOnActiveRequested([this](INavigationSection* section, INavigationPanel* panel, INavigationControl* control,
+                                         bool enableHighlight, ActivationType activationType) {
+        if (control && activationType == ActivationType::ByMouse) {
+            if (section->type() != INavigationSection::Type::Exclusive) {
+                return;
+            }
+        }
 
-    section->activeRequested().onReceive(this, [this](INavigationSection* section, INavigationPanel* panel, INavigationControl* control) {
+        if (enableHighlight) {
+            setIsHighlight(true);
+        }
+
         onActiveRequested(section, panel, control);
     });
 }
@@ -307,7 +324,7 @@ void NavigationController::unreg(INavigationSection* section)
 {
     TRACEFUNC;
     m_sections.erase(section);
-    section->activeRequested().resetOnReceive(this);
+    section->setOnActiveRequested(nullptr);
 }
 
 const std::set<INavigationSection*>& NavigationController::sections() const
@@ -315,36 +332,108 @@ const std::set<INavigationSection*>& NavigationController::sections() const
     return m_sections;
 }
 
+bool NavigationController::isHighlight() const
+{
+    return m_isHighlight;
+}
+
+void NavigationController::setIsHighlight(bool isHighlight)
+{
+    if (m_isHighlight == isHighlight) {
+        return;
+    }
+
+    m_isHighlight = isHighlight;
+    m_highlightChanged.notify();
+}
+
+muse::async::Notification NavigationController::highlightChanged() const
+{
+    return m_highlightChanged;
+}
+
 void NavigationController::setIsResetOnMousePress(bool arg)
 {
     m_isResetOnMousePress = arg;
 }
 
-void NavigationController::resetActiveIfNeed(QObject* watched)
+void NavigationController::resetIfNeed(QObject* watched)
 {
     if (!m_isResetOnMousePress) {
         return;
     }
 
-#ifdef BUILD_DIAGNOSTICS
-    if (diagnostics::isDiagnosticHierarchy(watched)) {
+#ifdef MUSE_MODULE_DIAGNOSTICS
+    if (muse::diagnostics::isDiagnosticHierarchy(watched)) {
         return;
     }
 #endif
 
-    resetActive();
+    auto activeCtrl = activeControl();
+    if (activeCtrl && activeCtrl != m_defaultNavigationControl && watched == qApp) {
+        resetNavigation();
+    }
+
+    setIsHighlight(false);
 }
 
 bool NavigationController::eventFilter(QObject* watched, QEvent* event)
 {
     if (event->type() == QEvent::MouseButtonPress) {
-        resetActiveIfNeed(watched);
+        resetIfNeed(watched);
     }
 
     return QObject::eventFilter(watched, event);
 }
 
-void NavigationController::resetActive()
+void NavigationController::navigateTo(NavigationController::NavigationType type)
+{
+    switch (type) {
+    case NavigationType::NextSection:
+        goToNextSection();
+        break;
+    case NavigationType::PrevSection:
+        goToPrevSection(false);
+        break;
+    case NavigationType::PrevSectionActiveLastPanel:
+        goToPrevSection(true);
+        break;
+    case NavigationType::NextPanel:
+        goToNextPanel();
+        break;
+    case NavigationType::PrevPanel:
+        goToPrevPanel();
+        break;
+    case NavigationType::Left:
+        onLeft();
+        break;
+    case NavigationType::Right:
+        onRight();
+        break;
+    case NavigationType::Up:
+        onUp();
+        break;
+    case NavigationType::Down:
+        onDown();
+        break;
+    case NavigationType::FirstControl:
+        goToFirstControl();
+        break;
+    case NavigationType::LastControl:
+        goToLastControl();
+        break;
+    case NavigationType::NextRowControl:
+        goToNextRowControl();
+        break;
+    case NavigationType::PrevRowControl:
+        goToPrevRowControl();
+        break;
+    }
+
+    setIsHighlight(true);
+}
+
+void NavigationController::resetNavigation()
 {
     MYLOG() << "===";
     INavigationSection* activeSec = this->activeSection();
@@ -363,6 +452,17 @@ void NavigationController::resetActive()
     }
 
     activeSec->setActive(false);
+
+    if (m_defaultNavigationControl) {
+        INavigationPanel* panel = m_defaultNavigationControl->panel();
+        INavigationSection* section = panel ? panel->section() : nullptr;
+        if (section->enabled()) {
+            m_defaultNavigationControl->setActive(true);
+            m_navigationChanged.notify();
+        }
+    } else {
+        doActivateFirst();
+    }
 }
 
 void NavigationController::doActivateSection(INavigationSection* sect, bool isActivateLastPanel)
@@ -548,7 +648,22 @@ INavigationControl* NavigationController::activeControl() const
     return findActive(activePanel->controls());
 }
 
-mu::async::Notification NavigationController::navigationChanged() const
+const INavigationControl* NavigationController::findControl(const std::string& section, const std::string& panel,
+                                                            const std::string& controlName) const
+{
+    const INavigationSection* sec = findByName(m_sections, QString::fromStdString(section));
+    const INavigationPanel* pnl = sec ? findByName(sec->panels(), QString::fromStdString(panel)) : nullptr;
+    const INavigationControl* ctrl = pnl ? findByName(pnl->controls(), QString::fromStdString(controlName)) : nullptr;
+
+    return ctrl;
+}
+
+void NavigationController::setDefaultNavigationControl(INavigationControl* control)
+{
+    m_defaultNavigationControl = control;
+}
+
+muse::async::Notification NavigationController::navigationChanged() const
 {
     return m_navigationChanged;
 }
@@ -567,12 +682,27 @@ void NavigationController::goToNextSection()
         return;
     }
 
+    if (activeSec->type() == INavigationSection::Type::Exclusive) {
+        INavigationPanel* first = firstEnabled(activeSec->panels());
+        if (first) {
+            doActivatePanel(first);
+            m_navigationChanged.notify();
+        }
+        return;
+    }
+
     doDeactivateSection(activeSec);
 
     INavigationSection* nextSec = nextEnabled(m_sections, activeSec->index());
     if (!nextSec) { // active is last
         nextSec = firstEnabled(m_sections); // the first to be the next
     }
+    if (!nextSec) {
+        LOGI() << "no enabled sections!";
+        return;
+    }
+
+    LOGI() << "nextSec: " << nextSec->name() << ", enabled: " << nextSec->enabled();
 
     doActivateSection(nextSec);
 
@@ -590,6 +720,15 @@ void NavigationController::goToPrevSection(bool isActivateLastPanel)
     INavigationSection* activeSec = findActive(m_sections);
     if (!activeSec) { // no any active
         doActivateLast();
+        return;
+    }
+
+    if (activeSec->type() == INavigationSection::Type::Exclusive) {
+        INavigationPanel* first = firstEnabled(activeSec->panels());
+        if (first) {
+            doActivatePanel(first);
+            m_navigationChanged.notify();
+        }
         return;
     }
 
@@ -817,8 +956,19 @@ void NavigationController::onEscape()
     }
 
     INavigationControl* activeCtrl = findActive(activePanel->controls());
-    if (activeCtrl) {
-        activeCtrl->onEvent(e);
+    if (!activeCtrl) {
+        return;
+    }
+
+    activeCtrl->onEvent(e);
+    if (e->accepted) {
+        return;
+    }
+
+    activeCtrl->setActive(false);
+
+    if (m_defaultNavigationControl) {
+        doActivateControl(m_defaultNavigationControl);
     }
 }
 
@@ -1015,6 +1165,11 @@ void NavigationController::goToControl(MoveDirection direction, INavigationPanel
         return;
     }
 
+    //! NOTE Maybe just one control (or just one enabled control)
+    if (toControl == activeControl) {
+        return;
+    }
+
     if (activeControl) {
         MYLOG() << "current activated control: " << activeControl->name()
                 << ", row: " << activeControl->index().row
@@ -1086,24 +1241,54 @@ bool NavigationController::requestActivateByName(const std::string& sectName, co
     return true;
 }
 
+bool NavigationController::requestActivateByIndex(const std::string& sectName, const std::string& panelName,
+                                                  const INavigation::Index& controlIndex)
+{
+    INavigationSection* section = findByName(m_sections, QString::fromStdString(sectName));
+    if (!section) {
+        LOGE() << "not found section with name: " << sectName;
+        return false;
+    }
+
+    INavigationPanel* panel = findByName(section->panels(), QString::fromStdString(panelName));
+    if (!panel) {
+        LOGE() << "not found panel with name: " << panelName << ", section: " << sectName;
+        return false;
+    }
+
+    INavigationControl* control = findByIndex(panel->controls(), controlIndex);
+    if (!control) {
+        LOGE() << "not found control with index: " << controlIndex.to_string() << ", panel: " << panelName << ", section: " << sectName;
+        std::string has = "has:\n";
+        for (const INavigationControl* c : panel->controls()) {
+            has += c->index().to_string() + "\n";
+        }
+        LOGI() << has;
+        return false;
+    }
+
+    onActiveRequested(section, panel, control, true);
+    return true;
+}
+
 void NavigationController::onActiveRequested(INavigationSection* sect, INavigationPanel* panel, INavigationControl* ctrl, bool force)
 {
     TRACEFUNC;
+    UNUSED(force);
 
     if (m_sections.empty()) {
         return;
     }
 
-    INavigationSection* activeSec = findActive(m_sections);
-
-    //! NOTE If there is no active section,
-    //! we may not be using keyboard navigation, so ignore the request.
-    if (!force && !activeSec) {
-        return;
-    }
-
     bool isChanged = false;
 
+    DEFER {
+        if (isChanged) {
+            m_navigationChanged.notify();
+        }
+    };
+
+    INavigationSection* activeSec = findActive(m_sections);
     if (activeSec && activeSec != sect) {
         doDeactivateSection(activeSec);
     }
@@ -1114,9 +1299,17 @@ void NavigationController::onActiveRequested(INavigationSection* sect, INavigati
         MYLOG() << "activated section: " << sect->name() << ", order: " << sect->index().order();
     }
 
+    if (!panel) {
+        panel = firstEnabled(sect->panels());
+    }
+
     INavigationPanel* activePanel = findActive(sect->panels());
     if (activePanel && activePanel != panel) {
         doDeactivatePanel(activePanel);
+    }
+
+    if (!panel) {
+        return;
     }
 
     if (!panel->active()) {
@@ -1125,9 +1318,17 @@ void NavigationController::onActiveRequested(INavigationSection* sect, INavigati
         MYLOG() << "activated panel: " << panel->name() << ", order: " << panel->index().order();
     }
 
+    if (!ctrl) {
+        ctrl = firstEnabled(panel->controls());
+    }
+
     INavigationControl* activeCtrl = findActive(panel->controls());
     if (activeCtrl && activeCtrl != ctrl) {
         activeCtrl->setActive(false);
+    }
+
+    if (!ctrl) {
+        return;
     }
 
     if (!ctrl->active()) {
@@ -1135,8 +1336,44 @@ void NavigationController::onActiveRequested(INavigationSection* sect, INavigati
         isChanged = true;
         MYLOG() << "activated control: " << ctrl->name() << ", row: " << ctrl->index().row << ", column: " << ctrl->index().column;
     }
+}
 
-    if (isChanged) {
-        m_navigationChanged.notify();
+inline QTextStream& operator<<(QTextStream& s, const std::string& v)
+{
+    s << v.c_str();
+    return s;
+}
+
+void NavigationController::dump() const
+{
+    QString str;
+    QTextStream stream(&str);
+    stream << "Navigation Dump:" << Qt::endl;
+    for (const INavigationSection* sect : m_sections) {
+        stream << "section: " << sect->name()
+               << ", index: " << sect->index().to_string()
+               << ", enabled: " << sect->enabled()
+               << ", active: " << sect->active()
+               << Qt::endl;
+
+        for (const INavigationPanel* panel : sect->panels()) {
+            stream << "    panel: " << panel->name()
+                   << ", index: " << panel->index().to_string()
+                   << ", enabled: " << panel->enabled()
+                   << ", active: " << panel->active()
+                   << Qt::endl;
+
+            for (const INavigationControl* ctrl : panel->controls()) {
+                stream << "        control: " << ctrl->name()
+                       << ", index: " << ctrl->index().to_string()
+                       << ", enabled: " << ctrl->enabled()
+                       << ", active: " << ctrl->active()
+                       << Qt::endl;
+            }
+        }
     }
+
+    stream << Qt::endl;
+
+    std::cout << str.toStdString();
 }

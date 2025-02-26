@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,60 +21,75 @@
  */
 #include "engravingproject.h"
 
-#include <QFileInfo>
+#include "global/allocator.h"
 
 #include "style/defaultstyle.h"
-#include "rw/scorereader.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/part.h"
-#include "libmscore/undo.h"
+#include "rw/mscloader.h"
+#include "rw/mscsaver.h"
+#include "dom/masterscore.h"
+#include "dom/part.h"
 
 #include "log.h"
 
+using namespace muse;
+using namespace mu;
 using namespace mu::engraving;
 
-std::shared_ptr<EngravingProject> EngravingProject::create()
+std::shared_ptr<EngravingProject> EngravingProject::create(const modularity::ContextPtr& iocCtx)
 {
-    std::shared_ptr<EngravingProject> p = std::shared_ptr<EngravingProject>(new EngravingProject());
+    std::shared_ptr<EngravingProject> p = std::shared_ptr<EngravingProject>(new EngravingProject(iocCtx));
+    if (p->engravingElementsProvider()) {
+        p->engravingElementsProvider()->clearStatistic();
+    }
     p->init(DefaultStyle::defaultStyle());
     return p;
 }
 
-std::shared_ptr<EngravingProject> EngravingProject::create(const Ms::MStyle& style)
+std::shared_ptr<EngravingProject> EngravingProject::create(const MStyle& style, const modularity::ContextPtr& iocCtx)
 {
-    std::shared_ptr<EngravingProject> p = std::shared_ptr<EngravingProject>(new EngravingProject());
+    std::shared_ptr<EngravingProject> p = std::shared_ptr<EngravingProject>(new EngravingProject(iocCtx));
+    if (p->engravingElementsProvider()) {
+        p->engravingElementsProvider()->clearStatistic();
+    }
     p->init(style);
     return p;
+}
+
+EngravingProject::EngravingProject(const modularity::ContextPtr& iocCtx)
+    : muse::Injectable(iocCtx)
+{
+    muse::ObjectAllocator::used();
 }
 
 EngravingProject::~EngravingProject()
 {
     delete m_masterScore;
+
+    muse::ObjectAllocator::unused();
+
+    // muse::AllocatorsRegister::instance()->printStatistic("=== Destroy engraving project ===");
+    //! NOTE At the moment, the allocator is working as leak detector. No need to do cleanup, at the moment it can lead to crashes
+    // AllocatorsRegister::instance()->cleanupAll("engraving");
 }
 
-void EngravingProject::init(const Ms::MStyle& style)
+void EngravingProject::init(const MStyle& style)
 {
-    m_masterScore = new Ms::MasterScore(style, shared_from_this());
+    m_masterScore = new MasterScore(iocContext(), style, weak_from_this());
 }
 
-void EngravingProject::setPath(const QString& path)
+IFileInfoProviderPtr EngravingProject::fileInfoProvider() const
 {
-    QFileInfo fi(path);
-    m_masterScore->setName(fi.completeBaseName());
-    m_masterScore->setImportedFilePath(fi.filePath());
-    m_masterScore->setMetaTag("originalFormat", fi.suffix().toLower());
-
-    m_path = path;
+    return m_masterScore->fileInfo();
 }
 
-QString EngravingProject::path() const
+void EngravingProject::setFileInfoProvider(IFileInfoProviderPtr fileInfoProvider)
 {
-    return m_path;
+    m_masterScore->setFileInfoProvider(fileInfoProvider);
 }
 
-std::string EngravingProject::title() const
+String EngravingProject::appVersion() const
 {
-    return m_masterScore->title().toStdString();
+    return m_masterScore->mscoreVersion();
 }
 
 int EngravingProject::mscVersion() const
@@ -87,68 +102,68 @@ bool EngravingProject::readOnly() const
     return m_masterScore->readOnly();
 }
 
-Err EngravingProject::setupMasterScore()
+Ret EngravingProject::setupMasterScore(bool forceMode)
+{
+    return doSetupMasterScore(forceMode);
+}
+
+Ret EngravingProject::doSetupMasterScore(bool forceMode)
 {
     TRACEFUNC;
 
-    engravingElementsProvider()->clearStatistic();
-    Err err = doSetupMasterScore(m_masterScore);
-    engravingElementsProvider()->printStatistic("=== Update and Layout ===");
-    return err;
-}
+    m_masterScore->createPaddingTable();
+    m_masterScore->connectTies();
 
-Err EngravingProject::doSetupMasterScore(Ms::MasterScore* score)
-{
-    score->connectTies();
-
-    for (Ms::Part* p : score->parts()) {
+    for (Part* p : m_masterScore->parts()) {
         p->updateHarmonyChannels(false);
     }
-    score->rebuildMidiMapping();
-    score->setSoloMute();
-    for (Ms::Score* s : score->scoreList()) {
+
+    m_masterScore->rebuildMidiMapping();
+
+    for (Score* s : m_masterScore->scoreList()) {
         s->setPlaylistDirty();
-        s->addLayoutFlags(Ms::LayoutFlag::FIX_PITCH_VELO);
         s->setLayoutAll();
     }
-    score->updateChannel();
-    //score->updateExpressive(MuseScore::synthesizer("Fluid"));
-    score->setSaved(true);
-    score->setCreated(false);
-    score->update();
 
-    if (!score->sanityCheck(QString())) {
-        return Err::FileCorrupted;
-    }
+    m_masterScore->updateChannel();
+    m_masterScore->update();
 
-    return Err::NoError;
+    Ret ret = checkCorrupted();
+    m_isCorruptedUponLoading = !ret;
+
+    return forceMode ? muse::make_ok() : ret;
 }
 
-Ms::MasterScore* EngravingProject::masterScore() const
+MasterScore* EngravingProject::masterScore() const
 {
     return m_masterScore;
 }
 
-Err EngravingProject::loadMscz(const MscReader& msc, bool ignoreVersionError)
+Ret EngravingProject::loadMscz(const MscReader& msc, SettingsCompat& settingsCompat, bool ignoreVersionError)
 {
     TRACEFUNC;
 
-    engravingElementsProvider()->clearStatistic();
-    Ms::MScore::setError(Ms::MsError::MS_NO_ERROR);
-    ScoreReader scoreReader;
-    Err err = scoreReader.loadMscz(m_masterScore, msc, ignoreVersionError);
-    engravingElementsProvider()->printStatistic("=== Load ===");
-    return err;
+    MScore::setError(MsError::MS_NO_ERROR);
+    MscLoader loader;
+    return loader.loadMscz(m_masterScore, msc, settingsCompat, ignoreVersionError);
 }
 
-bool EngravingProject::writeMscz(mu::engraving::MscWriter& writer, bool onlySelection, bool createThumbnail)
+bool EngravingProject::writeMscz(MscWriter& writer, bool onlySelection, bool createThumbnail)
 {
-    bool ok = m_masterScore->writeMscz(writer, onlySelection, createThumbnail);
-    if (ok && !onlySelection) {
-        m_masterScore->undoStack()->setClean();
-        m_masterScore->setSaved(true);
-        m_masterScore->update();
-    }
+    TRACEFUNC;
 
-    return ok;
+    MscSaver saver(iocContext());
+    return saver.writeMscz(m_masterScore, writer, onlySelection, createThumbnail);
+}
+
+bool EngravingProject::isCorruptedUponLoading() const
+{
+    return m_isCorruptedUponLoading;
+}
+
+Ret EngravingProject::checkCorrupted() const
+{
+    TRACEFUNC;
+
+    return m_masterScore->sanityCheck();
 }

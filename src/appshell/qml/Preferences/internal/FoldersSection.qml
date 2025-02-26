@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,49 +22,46 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Folders")
+    title: qsTrc("appshell/preferences", "Folders")
 
     navigation.direction: NavigationPanel.Both
 
     property alias model: view.model
 
-    ListView {
+    StyledListView {
         id: view
 
-        anchors.left: parent.left
-        anchors.right: parent.right
-
+        width: parent.width
         height: contentHeight
 
         spacing: 4
+        interactive: false
 
         delegate: RowLayout {
             width: ListView.view.width
             height: 30
 
-            spacing: 20
+            spacing: root.columnSpacing
 
             StyledTextLabel {
                 id: titleLabel
-
-                Layout.alignment: Qt.AlignLeft
-
+                Layout.preferredWidth: root.columnWidth
                 text: model.title + ":"
+                horizontalAlignment: Text.AlignLeft
             }
 
             FilePicker {
-                Layout.alignment: Qt.AlignRight
-                Layout.preferredWidth: 380
+                Layout.fillWidth: true
 
-                pickerType: FilePicker.PickerType.Directory
-                dialogTitle: qsTrc("appshell", "Choose %1 folder").arg(model.title)
-                dir: model.path
+                pickerType: model.isMultiDirectories ? FilePicker.PickerType.MultipleDirectories : FilePicker.PickerType.Directory
+                dialogTitle: qsTrc("appshell/preferences", "Choose %1 folder").arg(model.title)
+                dir: model.dir
 
                 path: model.path
 
@@ -72,7 +69,7 @@ BaseSection {
                 navigationRowOrderStart: model.index
                 pathFieldTitle: titleLabel.text
 
-                onPathEdited: {
+                onPathEdited: function(newPath) {
                     model.path = newPath
                 }
             }

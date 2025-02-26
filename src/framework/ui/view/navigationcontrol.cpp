@@ -25,8 +25,9 @@
 
 #include "log.h"
 
-using namespace mu::ui;
-using namespace mu::accessibility;
+using namespace muse;
+using namespace muse::ui;
+using namespace muse::accessibility;
 
 NavigationControl::NavigationControl(QObject* parent)
     : AbstractNavigation(parent)
@@ -51,7 +52,12 @@ const INavigation::Index& NavigationControl::index() const
     return AbstractNavigation::index();
 }
 
-mu::async::Channel<INavigation::Index> NavigationControl::indexChanged() const
+void NavigationControl::setIndex(const Index& index)
+{
+    AbstractNavigation::setIndex(index);
+}
+
+async::Channel<INavigation::Index> NavigationControl::indexChanged() const
 {
     return AbstractNavigation::indexChanged();
 }
@@ -61,7 +67,7 @@ bool NavigationControl::enabled() const
     return AbstractNavigation::enabled();
 }
 
-mu::async::Channel<bool> NavigationControl::enabledChanged() const
+async::Channel<bool> NavigationControl::enabledChanged() const
 {
     return AbstractNavigation::enabledChanged();
 }
@@ -79,7 +85,7 @@ void NavigationControl::setActive(bool arg)
     }
 }
 
-mu::async::Channel<bool> NavigationControl::activeChanged() const
+async::Channel<bool> NavigationControl::activeChanged() const
 {
     return AbstractNavigation::activeChanged();
 }
@@ -89,19 +95,43 @@ void NavigationControl::onEvent(EventPtr e)
     AbstractNavigation::onEvent(e);
 }
 
+QWindow* NavigationControl::window() const
+{
+    return AbstractNavigation::window();
+}
+
+QQuickItem* muse::ui::NavigationControl::visualItem() const
+{
+    return AbstractNavigation::visualItem();
+}
+
 void NavigationControl::trigger()
 {
     emit triggered();
 }
 
-mu::async::Channel<INavigationControl*> NavigationControl::activeRequested() const
+async::Notification NavigationControl::triggered() const
 {
-    return m_forceActiveRequested;
+    return m_triggeed;
 }
 
-void NavigationControl::requestActive()
+void NavigationControl::requestActive(bool enableHighlight)
 {
-    m_forceActiveRequested.send(this);
+    if (m_panel) {
+        m_panel->requestActive(this, enableHighlight);
+    }
+}
+
+void NavigationControl::requestActiveByInteraction(bool enableHighlight)
+{
+    if (m_panel) {
+        m_panel->requestActive(this, enableHighlight, INavigation::ActivationType::ByMouse);
+    }
+}
+
+void NavigationControl::notifyAboutControlWasTriggered()
+{
+    m_triggeed.notify();
 }
 
 void NavigationControl::setPanel(NavigationPanel* panel)

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -26,13 +26,21 @@
 
 #include "modularity/ioc.h"
 #include "iappshellconfiguration.h"
+#include "update/iupdateconfiguration.h"
+#include "global/iglobalconfiguration.h"
+#include "global/iapplication.h"
+
+class QUrl;
 
 namespace mu::appshell {
-class AboutModel : public QObject
+class AboutModel : public QObject, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(appshell, IAppShellConfiguration, configuration)
+    Inject<IAppShellConfiguration> configuration = { this };
+    Inject<muse::update::IUpdateConfiguration> updateConfiguration = { this };
+    Inject<muse::IGlobalConfiguration> globalConfiguration = { this };
+    Inject<muse::IApplication> application = { this };
 
 public:
     explicit AboutModel(QObject* parent = nullptr);
@@ -42,14 +50,17 @@ public:
     Q_INVOKABLE QVariantMap museScoreUrl() const;
     Q_INVOKABLE QVariantMap museScoreForumUrl() const;
     Q_INVOKABLE QVariantMap museScoreContributionUrl() const;
+    Q_INVOKABLE QVariantMap museScorePrivacyPolicyUrl() const;
 
     Q_INVOKABLE QVariantMap musicXMLLicenseUrl() const;
     Q_INVOKABLE QVariantMap musicXMLLicenseDeedUrl() const;
 
     Q_INVOKABLE void copyRevisionToClipboard() const;
 
+    Q_INVOKABLE void toggleDevMode();
+
 private:
-    QVariantMap makeUrl(const QString& url, const QString& displayName) const;
+    QVariantMap makeUrl(const QUrl& url, bool showPath = true) const;
 };
 }
 

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,17 +24,12 @@
 #include <QGuiApplication>
 #include <QScreen>
 
-#include "log.h"
+#include "engraving/dom/masterscore.h"
 
-#include "libmscore/masterscore.h"
-#include "libmscore/scorefont.h"
-#include "libmscore/page.h"
-#include "libmscore/rendermidi.h"
-#include "engraving/paint/paint.h"
-
+#include "notationpainting.h"
+#include "notationviewstate.h"
+#include "notationsolomutestate.h"
 #include "notationinteraction.h"
-#include "masternotationmididata.h"
-#include "notationplayback.h"
 #include "notationundostack.h"
 #include "notationstyle.h"
 #include "notationelements.h"
@@ -42,20 +37,23 @@
 #include "notationmidiinput.h"
 #include "notationparts.h"
 #include "notationtypes.h"
-#include "draw/pen.h"
+
+#include "log.h"
 
 using namespace mu::notation;
+using namespace mu::engraving;
 
-Notation::Notation(Ms::Score* score)
+Notation::Notation(const muse::modularity::ContextPtr& iocCtx, mu::engraving::Score* score)
+    : muse::Injectable(iocCtx)
 {
-    m_opened.val = false;
-
+    m_painting = std::make_shared<NotationPainting>(this);
+    m_viewState = std::make_shared<NotationViewState>(this);
+    m_soloMuteState = std::make_shared<NotationSoloMuteState>();
     m_undoStack = std::make_shared<NotationUndoStack>(this, m_notationChanged);
     m_interaction = std::make_shared<NotationInteraction>(this, m_undoStack);
-    m_midiInput = std::make_shared<NotationMidiInput>(this, m_undoStack);
-    m_accessibility = std::make_shared<NotationAccessibility>(this, m_interaction->selectionChanged());
+    m_midiInput = std::make_shared<NotationMidiInput>(this, m_interaction, m_undoStack, iocContext());
+    m_accessibility = std::make_shared<NotationAccessibility>(this);
     m_parts = std::make_shared<NotationParts>(this, m_interaction, m_undoStack);
-    m_playback = std::make_shared<NotationPlayback>(this, m_notationChanged);
     m_style = std::make_shared<NotationStyle>(this, m_undoStack);
     m_elements = std::make_shared<NotationElements>(this);
 
@@ -75,7 +73,7 @@ Notation::Notation(Ms::Score* score)
         notifyAboutNotationChanged();
     });
 
-    m_midiInput->noteChanged().onNotify(this, [this]() {
+    m_midiInput->notesReceived().onReceive(this, [this](const std::vector<const Note*>&){
         notifyAboutNotationChanged();
     });
 
@@ -87,14 +85,13 @@ Notation::Notation(Ms::Score* score)
         notifyAboutNotationChanged();
     });
 
-    engravingConfiguration()->selectionColorChanged().onReceive(this, [this](int, const mu::draw::Color&) {
+    engravingConfiguration()->selectionColorChanged().onReceive(this, [this](int, const muse::draw::Color&) {
         notifyAboutNotationChanged();
     });
 
-    configuration()->canvasOrientation().ch.onReceive(this, [this](framework::Orientation) {
-        m_score->doLayout();
-        for (Ms::Score* score : m_score->scoreList()) {
-            score->doLayout();
+    configuration()->canvasOrientation().ch.onReceive(this, [this](muse::Orientation) {
+        if (m_score && m_score->autoLayoutEnabled()) {
+            m_score->doLayout();
         }
     });
 
@@ -103,173 +100,182 @@ Notation::Notation(Ms::Score* score)
 
 Notation::~Notation()
 {
-    //! Note Dereference internal pointers before the deallocation of Ms::Score* in order to prevent access to dereferenced object
-    //! Makes sense to use std::shared_ptr<Ms::Score*> ubiquitous instead of the raw pointers
+    //! Note Dereference internal pointers before the deallocation of mu::engraving::Score* in order to prevent access to dereferenced object
+    //! Makes sense to use std::shared_ptr<mu::engraving::Score*> ubiquitous instead of the raw pointers
     m_parts = nullptr;
-    m_playback = nullptr;
     m_undoStack = nullptr;
     m_interaction = nullptr;
     m_midiInput = nullptr;
     m_accessibility = nullptr;
     m_style = nullptr;
     m_elements = nullptr;
+    m_painting = nullptr;
 
-    delete m_score;
+    //! NOTE: The master score will be deleted later from ~EngravingProject()
+    //! Its excerpts will be deleted directly in ~MasterScore()
+    m_score = nullptr;
 }
 
-void Notation::init()
+void Notation::setScore(Score* score)
 {
-    Ms::MScore::pixelRatio = Ms::DPI / QGuiApplication::primaryScreen()->logicalDotsPerInch();
+    if (m_score == score) {
+        return;
+    }
 
-    bool isVertical = configuration()->canvasOrientation().val == framework::Orientation::Vertical;
-    Ms::MScore::setVerticalOrientation(isVertical);
-
-    Ms::MScore::playRepeats = configuration()->isPlayRepeatsEnabled();
-}
-
-void Notation::setScore(Ms::Score* score)
-{
     m_score = score;
-
-    if (score) {
-        static_cast<NotationInteraction*>(m_interaction.get())->init();
-        static_cast<NotationPlayback*>(m_playback.get())->init();
-    }
+    m_scoreInited.notify();
 }
 
-QString Notation::title() const
+muse::async::Notification Notation::scoreInited() const
 {
-    return m_score ? m_score->title() : QString();
+    return m_scoreInited;
 }
 
-void Notation::setViewMode(const ViewMode& viewMode)
+QString Notation::name() const
 {
-    if (!m_score) {
-        return;
-    }
-
-    score()->setLayoutMode(viewMode);
-    score()->doLayout();
-    notifyAboutNotationChanged();
+    return m_score ? m_score->name().toQString() : QString();
 }
 
-ViewMode Notation::viewMode() const
+QString Notation::projectName() const
+{
+    return m_score ? m_score->masterScore()->name().toQString() : QString();
+}
+
+QString Notation::projectNameAndPartName() const
 {
     if (!m_score) {
-        return ViewMode::PAGE;
+        return QString();
     }
 
-    return score()->layoutMode();
+    QString result = m_score->masterScore()->name();
+    if (!m_score->isMaster()) {
+        result += " - " + m_score->name().toQString();
+    }
+
+    return result;
 }
 
-void Notation::paint(mu::draw::Painter* painter, const RectF& frameRect)
+QString Notation::workTitle() const
 {
-    const QList<Ms::Page*>& pages = score()->pages();
-    if (pages.empty()) {
+    if (!m_score) {
+        return QString();
+    }
+
+    QString workTitle = m_score->metaTag(u"workTitle");
+    if (workTitle.isEmpty()) {
+        return m_score->masterScore()->name();
+    }
+
+    return workTitle;
+}
+
+QString Notation::projectWorkTitle() const
+{
+    if (!m_score) {
+        return QString();
+    }
+
+    QString workTitle = m_score->masterScore()->metaTag(u"workTitle");
+    if (workTitle.isEmpty()) {
+        return m_score->masterScore()->name();
+    }
+
+    return workTitle;
+}
+
+QString Notation::projectWorkTitleAndPartName() const
+{
+    if (!m_score) {
+        return QString();
+    }
+
+    QString result = projectWorkTitle();
+    if (!m_score->isMaster()) {
+        result += " - " + name();
+    }
+
+    return result;
+}
+
+bool Notation::isOpen() const
+{
+    const Score* s = score();
+    return s && s->isOpen();
+}
+
+void Notation::setIsOpen(bool open)
+{
+    if (isOpen() == open) {
         return;
     }
 
-    switch (score()->layoutMode()) {
-    case engraving::LayoutMode::LINE:
-    case engraving::LayoutMode::HORIZONTAL_FIXED:
-    case engraving::LayoutMode::SYSTEM: {
-        bool paintBorders = false;
-        paintPages(painter, frameRect, { pages.first() }, paintBorders);
-        break;
-    }
-    case engraving::LayoutMode::FLOAT:
-    case engraving::LayoutMode::PAGE: {
-        bool paintBorders = !score()->printing();
-        paintPages(painter, frameRect, pages, paintBorders);
-    }
+    Score* s = score();
+    IF_ASSERT_FAILED(s) {
+        return;
     }
 
-    static_cast<NotationInteraction*>(m_interaction.get())->paint(painter);
+    s->setIsOpen(open);
+    m_openChanged.notify();
 }
 
-void Notation::paintPages(draw::Painter* painter, const RectF& frameRect, const QList<Ms::Page*>& pages, bool paintBorders) const
+muse::async::Notification Notation::openChanged() const
 {
-    for (Ms::Page* page : pages) {
-        RectF pageRect(page->abbox().translated(page->pos()));
+    return m_openChanged;
+}
 
-        if (pageRect.right() < frameRect.left()) {
-            continue;
+bool Notation::hasVisibleParts() const
+{
+    if (!m_parts || !m_parts->hasParts()) {
+        return false;
+    }
+
+    for (const Part* part : m_parts->partList()) {
+        if (part->show()) {
+            return true;
         }
-
-        if (pageRect.left() > frameRect.right()) {
-            break;
-        }
-
-        if (paintBorders) {
-            paintPageBorder(painter, page);
-        }
-
-        PointF pagePosition(page->pos());
-        painter->translate(pagePosition);
-        paintForeground(painter, page->bbox());
-        painter->translate(-pagePosition);
-
-        engraving::Paint::paintPage(*painter, page, frameRect.translated(-page->pos()));
     }
+
+    return false;
 }
 
-void Notation::paintPageBorder(draw::Painter* painter, const Ms::Page* page) const
+bool Notation::isMaster() const
 {
-    using namespace mu::draw;
-    RectF boundingRect(page->canvasBoundingRect());
-
-    painter->setBrush(BrushStyle::NoBrush);
-    painter->setPen(Pen(configuration()->borderColor(), configuration()->borderWidth()));
-    painter->drawRect(boundingRect);
-
-    if (!score()->showPageborders()) {
-        return;
-    }
-
-    painter->setBrush(BrushStyle::NoBrush);
-    painter->setPen(engravingConfiguration()->formattingMarksColor());
-    boundingRect.adjust(page->lm(), page->tm(), -page->rm(), -page->bm());
-    painter->drawRect(boundingRect);
-
-    if (!page->isOdd()) {
-        painter->drawLine(boundingRect.right(), 0.0, boundingRect.right(), boundingRect.bottom());
-    }
-}
-
-void Notation::paintForeground(mu::draw::Painter* painter, const RectF& pageRect) const
-{
-    if (score()->printing()) {
-        painter->fillRect(pageRect, mu::draw::Color::white);
-        return;
-    }
-
-    QString wallpaperPath = configuration()->foregroundWallpaperPath().toQString();
-
-    if (configuration()->foregroundUseColor() || wallpaperPath.isEmpty()) {
-        painter->fillRect(pageRect, configuration()->foregroundColor());
-    } else {
-        QPixmap pixmap(wallpaperPath);
-        painter->drawTiledPixmap(pageRect, pixmap);
-    }
-}
-
-mu::ValCh<bool> Notation::opened() const
-{
-    return m_opened;
-}
-
-void Notation::setOpened(bool opened)
-{
-    if (m_opened.val == opened) {
-        return;
-    }
-
-    m_opened.set(opened);
+    return m_score->isMaster();
 }
 
 void Notation::notifyAboutNotationChanged()
 {
     m_notationChanged.notify();
+}
+
+void Notation::setViewMode(const ViewMode& viewMode)
+{
+    m_painting->setViewMode(viewMode);
+}
+
+muse::async::Notification Notation::viewModeChanged() const
+{
+    return m_painting->viewModeChanged();
+}
+
+ViewMode Notation::viewMode() const
+{
+    return m_painting->viewMode();
+}
+
+INotationPaintingPtr Notation::painting() const
+{
+    return m_painting;
+}
+
+INotationViewStatePtr Notation::viewState() const
+{
+    return m_viewState;
+}
+
+INotationSoloMuteStatePtr Notation::soloMuteState() const
+{
+    return m_soloMuteState;
 }
 
 INotationInteractionPtr Notation::interaction() const
@@ -297,12 +303,7 @@ INotationStylePtr Notation::style() const
     return m_style;
 }
 
-INotationPlaybackPtr Notation::playback() const
-{
-    return m_playback;
-}
-
-mu::async::Notification Notation::notationChanged() const
+muse::async::Notification Notation::notationChanged() const
 {
     return m_notationChanged;
 }
@@ -317,7 +318,7 @@ INotationPartsPtr Notation::parts() const
     return m_parts;
 }
 
-Ms::Score* Notation::score() const
+Score* Notation::score() const
 {
     return m_score;
 }

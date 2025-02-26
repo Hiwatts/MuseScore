@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,11 +22,72 @@
 #ifndef MU_ENGRAVING_PAGESTYLE_H
 #define MU_ENGRAVING_PAGESTYLE_H
 
-#include <QSet>
+#include <set>
+#include <memory>
+
 #include "styledef.h"
 
-namespace Ms {
-QSet<Sid> pageStyles();
+namespace mu::engraving {
+const std::set<Sid>& pageStyles();
+
+class MStyle;
+class PageSizeGetAccessor
+{
+public:
+
+    PageSizeGetAccessor(const MStyle& style);
+
+    double width() const;
+    double height() const;
+    double printableWidth() const;
+    double evenTopMargin() const;
+    double evenBottomMargin() const;
+    double evenLeftMargin() const;
+    double oddTopMargin() const;
+    double oddBottomMargin() const;
+    double oddLeftMargin() const;
+    double twosided() const;
+    double spatium() const;
+
+private:
+
+    const MStyle& m_style;
+};
+
+class PageSizeSetAccessor
+{
+public:
+
+    PageSizeSetAccessor(MStyle& style);
+
+    double width() const;
+    double height() const;
+    double printableWidth() const;
+    double evenTopMargin() const;
+    double evenBottomMargin() const;
+    double evenLeftMargin() const;
+    double oddTopMargin() const;
+    double oddBottomMargin() const;
+    double oddLeftMargin() const;
+    double twosided() const;
+    double spatium() const;
+
+    void setWidth(double v);
+    void setHeight(double v);
+    void setPrintableWidth(double v);
+    void setEvenTopMargin(double v);
+    void setEvenBottomMargin(double v);
+    void setEvenLeftMargin(double v);
+    void setOddTopMargin(double v);
+    void setOddBottomMargin(double v);
+    void setOddLeftMargin(double v);
+    void setTwosided(double v);
+    void setSpatium(double v);
+
+private:
+
+    MStyle& m_style;
+};
 }
 
 #endif // MU_ENGRAVING_PAGESTYLE_H

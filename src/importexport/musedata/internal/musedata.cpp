@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,92 +22,140 @@
 
 #include "musedata.h"
 
-#include "libmscore/factory.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/part.h"
-#include "libmscore/staff.h"
-#include "libmscore/barline.h"
-#include "libmscore/clef.h"
-#include "libmscore/key.h"
-#include "libmscore/note.h"
-#include "libmscore/chord.h"
-#include "libmscore/rest.h"
-#include "libmscore/text.h"
-#include "libmscore/bracket.h"
-#include "libmscore/tuplet.h"
-#include "libmscore/slur.h"
-#include "libmscore/dynamic.h"
-#include "libmscore/lyrics.h"
-#include "libmscore/articulation.h"
-#include "libmscore/sig.h"
-#include "libmscore/measure.h"
-#include "libmscore/timesig.h"
-#include "libmscore/segment.h"
-#include "libmscore/symid.h"
+#include <QFile>
 
+#include "engraving/dom/articulation.h"
+#include "engraving/dom/barline.h"
+#include "engraving/dom/bracket.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/clef.h"
+#include "engraving/dom/dynamic.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/key.h"
+#include "engraving/dom/lyrics.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/measure.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/rest.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/slur.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/timesig.h"
+#include "engraving/dom/tuplet.h"
+
+#include "log.h"
+
+using namespace mu::iex::musedata;
 using namespace mu::engraving;
 
-namespace Ms {
 //---------------------------------------------------------
 //   musicalAttribute
 //---------------------------------------------------------
 
-void MuseData::musicalAttribute(QString s, Part* part)
+void MuseData::musicalAttribute(QStringView s, Part* part)
 {
-    QStringList al = s.mid(3).split(" ", Qt::SkipEmptyParts);
-    foreach (QString item, al) {
-        if (item.startsWith("K:")) {
-            int key = item.midRef(2).toInt();
+    QList<QStringView> al = s.mid(2).split(u' ', Qt::SkipEmptyParts);
+    foreach (QStringView item, al) {
+        if (item.startsWith(u"K:")) {
+            Key key = Key(item.mid(2).toInt());
             KeySigEvent ke;
-            ke.setKey(Key(key));
-            for (Staff* staff : *(part->staves())) {
+            Interval v = part->instrument(curTick)->transpose();
+            ke.setConcertKey(key);
+            if (!v.isZero() && !score->style().styleB(Sid::concertPitch)) {
+                v.flip();
+                ke.setKey(transposeKey(key, v));
+            }
+            for (Staff* staff : part->staves()) {
                 staff->setKey(curTick, ke);
             }
-        } else if (item.startsWith("Q:")) {
-            _division = item.midRef(2).toInt();
-        } else if (item.startsWith("T:")) {
-            QStringList tl = item.mid(2).split("/");
+        } else if (item.startsWith(u"Q:")) {
+            _division = item.mid(2).toInt();
+        } else if (item.startsWith(u"T:")) {
+            QList<QStringView> tl = item.mid(2).split(u'/');
             if (tl.size() != 2) {
-                qDebug("bad time sig <%s>", qPrintable(item));
+                LOGD() << "bad time sig: " << item;
                 continue;
             }
             int z = tl[0].toInt();
             int n = tl[1].toInt();
             if ((z > 0) && (n > 0)) {
-//TODO                        score->sigmap()->add(curTick, Fraction(z, n));
                 Measure* mes = score->tick2measure(curTick);
                 Segment* seg = mes->getSegment(SegmentType::TimeSig, curTick);
                 TimeSig* ts = Factory::createTimeSig(seg);
                 Staff* staff = part->staff(0);
                 ts->setTrack(staff->idx() * VOICES);
+                ts->setSig(Fraction(z, n));
                 seg->add(ts);
             }
-        } else if (item.startsWith("X:")) {
+        } else if (item.startsWith(u"X:")) {
         } else if (item[0] == 'C') {
             int staffIdx = 1;
-//                  int col = 2;
+            int col = 2;
             if (item[1].isDigit()) {
-                staffIdx = item.midRef(1, 1).toInt();
-//                        col = 3;
+                staffIdx = item.mid(1, 1).toInt();
+                col = 3;
             }
             staffIdx -= 1;
-/*                  int clef = item.mid(col).toInt();
-                  ClefType mscoreClef = ClefType::G;
-                  switch(clef) {
-                        case 4:  mscoreClef = ClefType::G; break;
-                        case 22: mscoreClef = ClefType::F; break;
-                        case 13: mscoreClef = ClefType::C3; break;
-                        case 14: mscoreClef = ClefType::C2; break;
-                        case 15: mscoreClef = ClefType::C1; break;
-                        default:
-                              qDebug("unknown clef %d", clef);
-                              break;
-                        }
-                  */
-//                  Staff* staff = part->staff(staffIdx);
-//                  staff->setClef(curTick, mscoreClef);
+            int clefCode = item.mid(col).toInt();
+            ClefType clefType = ClefType::G;
+            switch (clefCode) {
+            // G clef
+            case 04: clefType = ClefType::G;
+                break;
+            case 05: clefType = ClefType::G_1;
+                break;
+
+            // C clef
+            case 11: clefType = ClefType::C5;
+                break;
+            case 12: clefType = ClefType::C4;
+                break;
+            case 13: clefType = ClefType::C3;
+                break;
+            case 14: clefType = ClefType::C2;
+                break;
+            case 15: clefType = ClefType::C1;
+                break;
+
+            // F clef
+            case 21: clefType = ClefType::F_C;
+                break;
+            case 22: clefType = ClefType::F;
+                break;
+            case 23: clefType = ClefType::F_B;
+                break;
+
+            // G clef 8vb
+            case 34: clefType = ClefType::G8_VB;
+                break;
+
+            // F clef 8vb
+            case 52: clefType = ClefType::F8_VB;
+                break;
+
+            // G clef 8va
+            case 64: clefType = ClefType::G8_VA;
+                break;
+
+            // F clef 8va
+            case 82: clefType = ClefType::F_8VA;
+                break;
+
+            default:
+                LOGD() << "unknown clef code: " << clefCode;
+                break;
+            }
+
+            Measure* mes = score->tick2measure(curTick);
+            Segment* seg = mes->getSegment(SegmentType::Clef, curTick);
+            Staff* staff = part->staff(staffIdx);
+            Clef* clef = Factory::createClef(seg);
+            clef->setTrack(staff->idx() * VOICES);
+            clef->setClefType(clefType);
+            seg->add(clef);
         } else {
-            qDebug("unknown $key <%s>", qPrintable(item));
+            LOGD() << "unknown $key: " << item;
         }
     }
 }
@@ -116,7 +164,7 @@ void MuseData::musicalAttribute(QString s, Part* part)
 //   readChord
 //---------------------------------------------------------
 
-void MuseData::readChord(Part*, const QString& s)
+void MuseData::readChord(Part*, QStringView s)
 {
     //                       a  b   c  d  e  f  g
     static int table[7]  = { 9, 11, 0, 2, 4, 5, 7 };
@@ -130,14 +178,14 @@ void MuseData::readChord(Part*, const QString& s)
         } else if (s[i] == 'f') {
             alter -= 1;
         } else if (s[i].isDigit()) {
-            octave = s.midRef(i, 1).toInt();
+            octave = s.mid(i, 1).toInt();
             break;
         }
     }
     int staffIdx = 0;
     if (s.size() >= 24) {
         if (s[23].isDigit()) {
-            staffIdx = s.midRef(23, 1).toInt() - 1;
+            staffIdx = s.mid(23, 1).toInt() - 1;
         }
     }
     int pitch = table[step] + alter + (octave + 1) * 12;
@@ -160,16 +208,17 @@ void MuseData::readChord(Part*, const QString& s)
 //   openSlur
 //---------------------------------------------------------
 
-void MuseData::openSlur(int idx, const Fraction& tick, Staff* staff, int voc)
+void MuseData::openSlur(int idx, const Fraction& tick, Staff* staff, int voc, EngravingItem* startChord)
 {
-    int staffIdx = staff->idx();
+    staff_idx_t staffIdx = staff->idx();
     if (slur[idx]) {
-        qDebug("%06d: slur %d already open", tick.ticks(), idx + 1);
+        LOGD("%06d: slur %d already open", tick.ticks(), idx + 1);
         return;
     }
     slur[idx] = Factory::createSlur(score->dummy());
     slur[idx]->setTick(tick);
     slur[idx]->setTrack(staffIdx * VOICES + voc);
+    slur[idx]->setStartElement(startChord);
     score->addElement(slur[idx]);
 }
 
@@ -177,15 +226,16 @@ void MuseData::openSlur(int idx, const Fraction& tick, Staff* staff, int voc)
 //   closeSlur
 //---------------------------------------------------------
 
-void MuseData::closeSlur(int idx, const Fraction& tick, Staff* staff, int voc)
+void MuseData::closeSlur(int idx, const Fraction& tick, Staff* staff, int voc, engraving::EngravingItem* endChord)
 {
-    int staffIdx = staff->idx();
+    staff_idx_t staffIdx = staff->idx();
     if (slur[idx]) {
         slur[idx]->setTick2(tick);
         slur[idx]->setTrack2(staffIdx * VOICES + voc);
+        slur[idx]->setEndElement(endChord);
         slur[idx] = 0;
     } else {
-        qDebug("%06d: slur %d not open", tick.ticks(), idx + 1);
+        LOGD("%06d: slur %d not open", tick.ticks(), idx + 1);
     }
 }
 
@@ -193,7 +243,7 @@ void MuseData::closeSlur(int idx, const Fraction& tick, Staff* staff, int voc)
 //   readNote
 //---------------------------------------------------------
 
-void MuseData::readNote(Part* part, const QString& s)
+void MuseData::readNote(Part* part, QStringView s)
 {
     //                       a  b   c  d  e  f  g
     static int table[7]  = { 9, 11, 0, 2, 4, 5, 7 };
@@ -207,27 +257,27 @@ void MuseData::readNote(Part* part, const QString& s)
         } else if (s[i] == 'f') {
             alter -= 1;
         } else if (s[i].isDigit()) {
-            octave = s.midRef(i, 1).toInt();
+            octave = s.mid(i, 1).toInt();
             break;
         }
     }
-    Direction dir = Direction::AUTO;
+    DirectionV dir = DirectionV::AUTO;
     if (s.size() >= 23) {
         if (s[22] == 'u') {
-            dir = Direction::UP;
+            dir = DirectionV::UP;
         } else if (s[22] == 'd') {
-            dir = Direction::DOWN;
+            dir = DirectionV::DOWN;
         }
     }
 
     int staffIdx = 0;
     if (s.size() >= 24) {
         if (s[23].isDigit()) {
-            staffIdx = s.midRef(23, 1).toInt() - 1;
+            staffIdx = s.mid(23, 1).toInt() - 1;
         }
     }
     Staff* staff = part->staff(staffIdx);
-    int gstaff   = staff->idx();
+    staff_idx_t gstaff = staff->idx();
 
     int pitch = table[step] + alter + (octave + 1) * 12;
     if (pitch < 0) {
@@ -236,7 +286,7 @@ void MuseData::readNote(Part* part, const QString& s)
     if (pitch > 127) {
         pitch = 127;
     }
-    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * MScore::division + _division / 2) / _division);
+    Fraction ticks = Fraction::fromTicks((s.mid(5, 3).toInt() * Constants::DIVISION + _division / 2) / _division);
     Fraction tick  = curTick;
     curTick  += ticks;
 
@@ -265,7 +315,7 @@ void MuseData::readNote(Part* part, const QString& s)
             }
         } else if (a == 1 && b == 1) {
         } else {
-            qDebug("unsupported tuple %d/%d", a, b);
+            LOGD("unsupported tuple %d/%d", a, b);
         }
     }
 
@@ -285,7 +335,7 @@ void MuseData::readNote(Part* part, const QString& s)
     Segment* segment = measure->getSegment(SegmentType::ChordRest, tick);
 
     voice = 0;
-    for (; voice < VOICES; ++voice) {
+    for (; voice < static_cast<int>(VOICES); ++voice) {
         EngravingItem* e = segment->element(gstaff * VOICES + voice);
         if (e == 0) {
             chord->setTrack(gstaff * VOICES + voice);
@@ -294,7 +344,7 @@ void MuseData::readNote(Part* part, const QString& s)
         }
     }
     if (voice == VOICES) {
-        qDebug("cannot allocate voice");
+        LOGD("cannot allocate voice");
         delete chord;
         return;
     }
@@ -305,24 +355,24 @@ void MuseData::readNote(Part* part, const QString& s)
     chord->add(note);
 
     QString dynamics;
-    QString an = s.mid(31, 11);
+    QStringView an = s.mid(31, 11);
     for (int i = 0; i < an.size(); ++i) {
         if (an[i] == '(') {
-            openSlur(0, tick, staff, voice);
+            openSlur(0, tick, staff, voice, chord);
         } else if (an[i] == ')') {
-            closeSlur(0, tick, staff, voice);
+            closeSlur(0, tick, staff, voice, chord);
         } else if (an[i] == '[') {
-            openSlur(1, tick, staff, voice);
+            openSlur(1, tick, staff, voice, chord);
         } else if (an[i] == ']') {
-            closeSlur(1, tick, staff, voice);
+            closeSlur(1, tick, staff, voice, chord);
         } else if (an[i] == '{') {
-            openSlur(2, tick, staff, voice);
+            openSlur(2, tick, staff, voice, chord);
         } else if (an[i] == '}') {
-            closeSlur(2, tick, staff, voice);
+            closeSlur(2, tick, staff, voice, chord);
         } else if (an[i] == 'z') {
-            openSlur(3, tick, staff, voice);
+            openSlur(3, tick, staff, voice, chord);
         } else if (an[i] == 'x') {
-            closeSlur(3, tick, staff, voice);
+            closeSlur(3, tick, staff, voice, chord);
         } else if (an[i] == '.') {
             Articulation* atr = Factory::createArticulation(chord);
             atr->setSymId(SymId::articStaccatoAbove);
@@ -357,7 +407,7 @@ void MuseData::readNote(Part* part, const QString& s)
             // Articulation* atr = new Articulation(score);
             // atr->setArticulationType(ArticulationType::Downbow);
             // chord->add(atr);
-            qDebug("%06d: open string '%c' not implemented", tick.ticks(), an[i].toLatin1());
+            LOGD("%06d: open string '%c' not implemented", tick.ticks(), an[i].toLatin1());
         } else if (an[i] == '&') {
             // skip editorial level
             if (i <= an.size() && an[i + 1].isDigit()) {
@@ -376,29 +426,27 @@ void MuseData::readNote(Part* part, const QString& s)
         } else if (an[i] == 'X') {        // ???
         } else if (an[i] == ' ') {
         } else {
-            qDebug("%06d: notation '%c' not implemented", tick.ticks(), an[i].toLatin1());
+            LOGD("%06d: notation '%c' not implemented", tick.ticks(), an[i].toLatin1());
         }
     }
     if (!dynamics.isEmpty()) {
         Segment* seg = measure->getSegment(SegmentType::ChordRest, tick);
-        Dynamic* dyn = new Dynamic(seg);
+        Dynamic* dyn = Factory::createDynamic(seg);
         dyn->setDynamicType(dynamics);
         dyn->setTrack(gstaff * VOICES);
         seg->add(dyn);
     }
 
-    QString txt = s.mid(43, 36);
+    QStringView txt = s.mid(43, 36);
     if (!txt.isEmpty()) {
-        QStringList sl = txt.split("|");
+        QList<QStringView> sl = txt.split(u'|');
         int no = 0;
-        foreach (QString w, sl) {
-            w = diacritical(w);
-            Segment* seg = measure->tick2segment(tick);
-            Lyrics* l = new Lyrics(seg);
-            l->setPlainText(w);
+        for (const QStringView w : sl) {
+            Lyrics* l = Factory::createLyrics(chord);
+            l->setPlainText(diacritical(w));
             l->setNo(no++);
             l->setTrack(gstaff * VOICES);
-            seg->add(l);
+            chord->add(l);
         }
     }
 }
@@ -408,7 +456,7 @@ void MuseData::readNote(Part* part, const QString& s)
 // TODO: not complete
 //---------------------------------------------------------
 
-QString MuseData::diacritical(QString s)
+QString MuseData::diacritical(QStringView s)
 {
     struct TAB {
         const char* a;
@@ -425,19 +473,21 @@ QString MuseData::diacritical(QString s)
         { "\\o3", "ö" },
         { "\\u3", "ü" },
     };
+
+    QString result = s.toString();
     for (unsigned int i = 0; i < sizeof(tab) / sizeof(*tab); ++i) {
-        s = s.replace(tab[i].a, QString::fromUtf8(tab[i].b));
+        result = result.replace(tab[i].a, QString::fromUtf8(tab[i].b));
     }
-    return s;
+    return result;
 }
 
 //---------------------------------------------------------
 //   readRest
 //---------------------------------------------------------
 
-void MuseData::readRest(Part* part, const QString& s)
+void MuseData::readRest(Part* part, QStringView s)
 {
-    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * MScore::division + _division / 2) / _division);
+    Fraction ticks = Fraction::fromTicks((s.mid(5, 3).toInt() * Constants::DIVISION + _division / 2) / _division);
 
     Fraction tick  = curTick;
     curTick  += ticks;
@@ -445,11 +495,11 @@ void MuseData::readRest(Part* part, const QString& s)
     int staffIdx = 0;
     if (s.size() >= 24) {
         if (s[23].isDigit()) {
-            staffIdx = s.midRef(23, 1).toInt() - 1;
+            staffIdx = s.mid(23, 1).toInt() - 1;
         }
     }
     Staff* staff = part->staff(staffIdx);
-    int gstaff   = staff->idx();
+    staff_idx_t gstaff = staff->idx();
 
     TDuration d;
     d.setVal(ticks.ticks());
@@ -460,7 +510,7 @@ void MuseData::readRest(Part* part, const QString& s)
     Segment* segment = measure->getSegment(SegmentType::ChordRest, tick);
 
     voice = 0;
-    for (; voice < VOICES; ++voice) {
+    for (; voice < static_cast<int>(VOICES); ++voice) {
         EngravingItem* e = segment->element(gstaff * VOICES + voice);
         if (e == 0) {
             rest->setTrack(gstaff * VOICES + voice);
@@ -469,7 +519,7 @@ void MuseData::readRest(Part* part, const QString& s)
         }
     }
     if (voice == VOICES) {
-        qDebug("cannot allocate voice");
+        LOGD("cannot allocate voice");
         delete rest;
         return;
     }
@@ -479,11 +529,11 @@ void MuseData::readRest(Part* part, const QString& s)
 //   readBackup
 //---------------------------------------------------------
 
-void MuseData::readBackup(const QString& s)
+void MuseData::readBackup(QStringView s)
 {
-    Fraction ticks = Fraction::fromTicks((s.midRef(5, 3).toInt() * MScore::division + _division / 2) / _division);
+    Fraction ticks = Fraction::fromTicks((s.mid(5, 3).toInt() * Constants::DIVISION + _division / 2) / _division);
     if (s[0] == 'b') {
-        curTick  -= ticks;
+        curTick -= ticks;
     } else {
         curTick += ticks;
     }
@@ -510,7 +560,7 @@ Measure* MuseData::createMeasure()
             break;
         }
         if (curTick < st + l) {
-            qDebug("cannot create measure at %d", curTick.ticks());
+            LOGD("cannot create measure at %d", curTick.ticks());
             return 0;
         }
     }
@@ -525,7 +575,7 @@ Measure* MuseData::createMeasure()
 //   readPart
 //---------------------------------------------------------
 
-void MuseData::readPart(QStringList sl, Part* part)
+void MuseData::readPart(const QStringList& sl, Part* part)
 {
     int line = 10;
     QString s;
@@ -536,7 +586,7 @@ void MuseData::readPart(QStringList sl, Part* part)
         }
     }
     if (line >= sl.size()) {
-        qDebug(" $ not found in part");
+        LOGD(" $ not found in part");
         return;
     }
     curTick = Fraction(0, 1);
@@ -548,7 +598,7 @@ void MuseData::readPart(QStringList sl, Part* part)
     measure = createMeasure();
     for (; line < sl.size(); ++line) {
         s = sl[line];
-// qDebug("%6d: <%s>", curTick.ticks(), qPrintable(s));
+// LOGD("%6d: <%s>", curTick.ticks(), qPrintable(s));
         char c = s[0].toLatin1();
         switch (c) {
         case 'A':
@@ -587,7 +637,7 @@ void MuseData::readPart(QStringList sl, Part* part)
             musicalAttribute(s, part);
             break;
         default:
-            qDebug("unknown record <%s>", qPrintable(s));
+            LOGD("unknown record <%s>", qPrintable(s));
             break;
         }
     }
@@ -601,7 +651,7 @@ int MuseData::countStaves(const QStringList& sl)
 {
     int staves = 1;
     for (int i = 10; i < sl.size(); ++i) {
-        QString s = sl[i];
+        QStringView s { sl[i] };
         char c = s[0].toLatin1();
         switch (c) {
         case 'A':
@@ -616,7 +666,7 @@ int MuseData::countStaves(const QStringList& sl)
             int staffIdx = 1;
             if (s.size() >= 24) {
                 if (s[23].isDigit()) {
-                    staffIdx = s.midRef(23, 1).toInt();
+                    staffIdx = s.mid(23, 1).toInt();
                 }
             }
             if (staffIdx > staves) {
@@ -638,7 +688,7 @@ bool MuseData::read(const QString& name)
 {
     QFile fp(name);
     if (!fp.open(QIODevice::ReadOnly)) {
-        qDebug("Cannot open file <%s>", qPrintable(name));
+        LOGD("Cannot open file <%s>", qPrintable(name));
         return false;
     }
     QTextStream ts(&fp);
@@ -687,7 +737,7 @@ bool MuseData::read(const QString& name)
             continue;
         }
         if (s[0] == 'a') {
-            part.back().append(s.midRef(1));
+            part.back().append(s.mid(1));
             continue;
         }
         part.append(s);
@@ -706,23 +756,4 @@ void MuseData::convert()
         Part* part = (score->parts())[pn];
         readPart(parts[pn], part);
     }
-}
-
-//---------------------------------------------------------
-//   importMuseData
-//    return true on success
-//---------------------------------------------------------
-
-Score::FileError importMuseData(MasterScore* score, const QString& name)
-{
-    if (!QFileInfo::exists(name)) {
-        return Score::FileError::FILE_NOT_FOUND;
-    }
-    MuseData md(score);
-    if (!md.read(name)) {
-        return Score::FileError::FILE_ERROR;
-    }
-    md.convert();
-    return Score::FileError::FILE_NO_ERROR;
-}
 }

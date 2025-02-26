@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,54 +25,79 @@
  Implementation of class Selection plus other selection related functions.
 */
 
-#include "libmscore/select.h"
 #include "selectnotedialog.h"
-#include "libmscore/engravingitem.h"
-#include "libmscore/system.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/chord.h"
-#include "libmscore/segment.h"
-#include "libmscore/note.h"
 
-#include "widgetstatestore.h"
+#include "translation.h"
+
+#include "engraving/types/typesconv.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/engravingitem.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/score.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/select.h"
+#include "engraving/dom/system.h"
+
+#include "ui/view/widgetstatestore.h"
+
+#include "log.h"
 
 using namespace mu::notation;
+using namespace mu::engraving;
+using namespace muse::ui;
 
 //---------------------------------------------------------
 //   SelectDialog
 //---------------------------------------------------------
 
 SelectNoteDialog::SelectNoteDialog(QWidget* parent)
-    : QDialog(parent)
+    : QDialog(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setObjectName("SelectNoteDialog");
     setupUi(this);
     setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
-    m_note = dynamic_cast<Ms::Note*>(globalContext()->currentNotation()->interaction()->selection()->element());
+    m_note = dynamic_cast<mu::engraving::Note*>(contextItem(globalContext()->currentNotation()->interaction()));
 
-    notehead->setText(Ms::NoteHead::group2userName(m_note->headGroup()));
+    IF_ASSERT_FAILED(m_note) {
+        return;
+    }
+
+    notehead->setText(TConv::translatedUserName(m_note->headGroup()));
+    sameNotehead->setAccessibleName(sameNotehead->text() + notehead->text());
+
     pitch->setText(m_note->tpcUserName());
+    samePitch->setAccessibleName(samePitch->text() + pitch->text());
+
     string->setText(QString::number(m_note->string() + 1));
+    sameString->setAccessibleName(sameString->text() + string->text());
+
     type->setText(m_note->noteTypeUserName());
-    durationType->setText(tr("%1 Note").arg(m_note->chord()->durationType().durationTypeUserName()));
+    sameType->setAccessibleName(sameType->text() + type->text());
+
+    //: %1 is a note duration. If your language does not have different terms for
+    //: "quarter note" and "quarter" (for example), or if the translations for the
+    //: durations as separate strings are not suitable to be used as adjectives here,
+    //: translate this string with "%1", so that just the duration will be shown.
+    durationType->setText(muse::qtrc("notation", "%1 note").arg(TConv::translatedUserName(m_note->chord()->durationType().type())));
+    sameDurationType->setAccessibleName(sameDurationType->text() + durationType->text());
+
     durationTicks->setText(m_note->chord()->durationUserName());
-    name->setText(tpc2name(m_note->tpc(), Ms::NoteSpellingType::STANDARD, Ms::NoteCaseType::AUTO, false));
-    inSelection->setEnabled(m_note->score()->selection().isRange());
+    sameDurationTicks->setAccessibleName(sameDurationTicks->text() + durationTicks->text());
+
+    name->setText(tpc2name(m_note->tpc(), mu::engraving::NoteSpellingType::STANDARD, mu::engraving::NoteCaseType::AUTO, false));
+    sameName->setAccessibleName(sameName->text() + name->text());
+
+    const auto isSingleSelection = m_note->score()->selection().isSingle();
+    inSelection->setCheckState(isSingleSelection ? Qt::CheckState::Unchecked : Qt::CheckState::Checked);
+    inSelection->setEnabled(!isSingleSelection);
 
     connect(buttonBox, &QDialogButtonBox::clicked, this, &SelectNoteDialog::buttonClicked);
 
     WidgetStateStore::restoreGeometry(this);
-}
 
-SelectNoteDialog::SelectNoteDialog(const SelectNoteDialog& other)
-    : QDialog(other.parentWidget())
-{
-}
-
-int SelectNoteDialog::metaTypeId()
-{
-    return QMetaType::type("SelectNoteDialog");
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 FilterNotesOptions SelectNoteDialog::noteOptions() const
@@ -101,21 +126,33 @@ FilterNotesOptions SelectNoteDialog::noteOptions() const
     if (sameDurationTicks->isChecked()) {
         options.durationTicks = m_note->chord()->actualTicks();
     } else {
-        options.durationTicks = Ms::Fraction(-1, 1);
+        options.durationTicks = mu::engraving::Fraction(-1, 1);
+    }
+
+    if (sameBeat->isChecked()) {
+        options.beat = m_note->beat();
+    } else {
+        options.beat = mu::engraving::Fraction(0, 0);
+    }
+
+    if (sameMeasure->isChecked()) {
+        options.measure = m_note->findMeasure();
+    } else {
+        options.measure = nullptr;
     }
 
     if (sameStaff->isChecked()) {
-        options.staffStart = m_note->staffIdx();
-        options.staffEnd = m_note->staffIdx() + 1;
+        options.staffStart = static_cast<int>(m_note->staffIdx());
+        options.staffEnd = static_cast<int>(m_note->staffIdx() + 1);
     } else if (inSelection->isChecked()) {
-        options.staffStart = m_note->score()->selection().staffStart();
-        options.staffEnd = m_note->score()->selection().staffEnd();
+        options.staffStart = static_cast<int>(m_note->score()->selection().staffStart());
+        options.staffEnd = static_cast<int>(m_note->score()->selection().staffEnd());
     } else {
         options.staffStart = -1;
         options.staffEnd = -1;
     }
 
-    options.voice = sameVoice->isChecked() ? m_note->voice() : -1;
+    options.voice = sameVoice->isChecked() ? static_cast<int>(m_note->voice()) : -1;
     options.system = nullptr;
     if (sameSystem->isChecked()) {
         options.system = m_note->chord()->segment()->system();
@@ -213,39 +250,38 @@ void SelectNoteDialog::apply() const
         return;
     }
 
-    EngravingItem* selectedElement = interaction->selection()->element();
+    EngravingItem* selectedElement = contextItem(interaction);
     if (!selectedElement) {
         return;
     }
 
-    FilterElementsOptions options = noteOptions();
+    FilterNotesOptions options = noteOptions();
 
     std::vector<EngravingItem*> elements = notationElements->elements(options);
     if (elements.empty()) {
         return;
+    }
+    if (isInSelection()) {
+        const auto& selectedElements = interaction->selection()->elements();
+        elements.erase(std::remove_if(elements.begin(), elements.end(), [selectedElements](const auto& e) {
+            return std::find(selectedElements.begin(), selectedElements.end(), e) == selectedElements.end();
+        }), elements.end());
     }
 
     if (doReplace()) {
         interaction->clearSelection();
         interaction->select(elements, SelectType::ADD);
     } else if (doSubtract()) {
-        std::vector<EngravingItem*> selesctionElements = interaction->selection()->elements();
+        std::vector<EngravingItem*> selectionElements = interaction->selection()->elements();
         for (EngravingItem* element: elements) {
-            selesctionElements.erase(std::remove(selesctionElements.begin(), selesctionElements.end(), element), selesctionElements.end());
+            selectionElements.erase(std::remove(selectionElements.begin(), selectionElements.end(), element), selectionElements.end());
         }
 
         interaction->clearSelection();
-        interaction->select(selesctionElements, SelectType::ADD);
+        interaction->select(selectionElements, SelectType::ADD);
     } else if (doAdd()) {
-        std::vector<EngravingItem*> selesctionElements = interaction->selection()->elements();
-
-        std::vector<EngravingItem*> elementsToSelect;
-        for (EngravingItem* element: elements) {
-            if (std::find(selesctionElements.begin(), selesctionElements.end(), element) == selesctionElements.end()) {
-                elementsToSelect.push_back(element);
-            }
-        }
-
-        interaction->select(elementsToSelect, SelectType::ADD);
+        std::vector<EngravingItem*> selectionElements = interaction->selection()->elements();
+        std::copy(selectionElements.begin(), selectionElements.end(), back_inserter(elements));
+        interaction->select(elements, SelectType::ADD);
     }
 }

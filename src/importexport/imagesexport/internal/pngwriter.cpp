@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,84 +24,60 @@
 
 #include <cmath>
 #include <QImage>
-
-#include "libmscore/masterscore.h"
-#include "libmscore/page.h"
-#include "engraving/paint/paint.h"
+#include <QBuffer>
 
 #include "log.h"
 
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
-using namespace mu::io;
+using namespace muse;
+using namespace muse::io;
 
 std::vector<INotationWriter::UnitType> PngWriter::supportedUnitTypes() const
 {
     return { UnitType::PER_PAGE };
 }
 
-mu::Ret PngWriter::write(INotationPtr notation, Device& destinationDevice, const Options& options)
+Ret PngWriter::write(INotationPtr notation, io::IODevice& destinationDevice, const Options& options)
 {
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
     }
 
-    Ms::Score* score = notation->elements()->msScore();
-    IF_ASSERT_FAILED(score) {
-        return make_ret(Ret::Code::UnknownError);
-    }
-
-    score->setPrinting(true); // don’t print page break symbols etc.
-
-    double pixelRatioBackup = Ms::MScore::pixelRatio;
-
-    const int PAGE_NUMBER = options.value(OptionKey::PAGE_NUMBER, Val(0)).toInt();
-    const QList<Ms::Page*>& pages = score->pages();
-
-    if (PAGE_NUMBER < 0 || PAGE_NUMBER >= pages.size()) {
-        return false;
-    }
-
-    Ms::Page* page = pages[PAGE_NUMBER];
-
-    const int TRIM_MARGIN_SIZE = configuration()->trimMarginPixelSize();
-    RectF pageRect = page->abbox();
-
-    if (TRIM_MARGIN_SIZE >= 0) {
-        QMarginsF margins(TRIM_MARGIN_SIZE, TRIM_MARGIN_SIZE, TRIM_MARGIN_SIZE, TRIM_MARGIN_SIZE);
-        pageRect = page->tbbox().toQRectF() + margins;
-    }
-
     const float CANVAS_DPI = configuration()->exportPngDpiResolution();
-    int width = std::lrint(pageRect.width() * CANVAS_DPI / Ms::DPI);
-    int height = std::lrint(pageRect.height() * CANVAS_DPI / Ms::DPI);
+
+    INotationPainting::Options opt;
+    opt.fromPage = muse::value(options, OptionKey::PAGE_NUMBER, Val(0)).toInt();
+    opt.toPage = opt.fromPage;
+    opt.trimMarginPixelSize = configuration()->trimMarginPixelSize();
+    opt.deviceDpi = CANVAS_DPI;
+    opt.printPageBackground = false; // Printed by us using image.fill
+
+    const SizeF pageSizeInch = notation->painting()->pageSizeInch(opt);
+
+    int width = std::lrint(pageSizeInch.width() * CANVAS_DPI);
+    int height = std::lrint(pageSizeInch.height() * CANVAS_DPI);
 
     QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
-    image.setDotsPerMeterX(std::lrint((CANVAS_DPI * 1000) / Ms::INCH));
-    image.setDotsPerMeterY(std::lrint((CANVAS_DPI * 1000) / Ms::INCH));
+    image.setDotsPerMeterX(std::lrint((CANVAS_DPI * 1000) / mu::engraving::INCH));
+    image.setDotsPerMeterY(std::lrint((CANVAS_DPI * 1000) / mu::engraving::INCH));
 
-    const bool TRANSPARENT_BACKGROUND = options.value(OptionKey::TRANSPARENT_BACKGROUND, Val(false)).toBool();
-    image.fill(TRANSPARENT_BACKGROUND ? 0 : Qt::white);
+    const bool TRANSPARENT_BACKGROUND = muse::value(options, OptionKey::TRANSPARENT_BACKGROUND,
+                                                    Val(configuration()->exportPngWithTransparentBackground())).toBool();
+    image.fill(TRANSPARENT_BACKGROUND ? Qt::transparent : Qt::white);
 
-    double scaling = CANVAS_DPI / Ms::DPI;
-    Ms::MScore::pixelRatio = 1.0 / scaling;
+    muse::draw::Painter painter(&image, "pngwriter");
 
-    mu::draw::Painter painter(&image, "pngwriter");
-    painter.setAntialiasing(true);
-    painter.scale(scaling, scaling);
-    if (TRIM_MARGIN_SIZE >= 0) {
-        painter.translate(-pageRect.topLeft());
-    }
+    notation->painting()->paintPng(&painter, opt);
 
-    QList<Ms::EngravingItem*> elements = page->elements();
-    std::stable_sort(elements.begin(), elements.end(), Ms::elementLessThan);
+    QByteArray qdata;
+    QBuffer buf(&qdata);
+    buf.open(QIODevice::WriteOnly);
+    image.save(&buf, "png");
 
-    engraving::Paint::paintElements(painter, elements);
-    image.save(&destinationDevice, "png");
-
-    score->setPrinting(false);
-    Ms::MScore::pixelRatio = pixelRatioBackup;
+    ByteArray data = ByteArray::fromQByteArrayNoCopy(qdata);
+    destinationDevice.write(data);
 
     return true;
 }

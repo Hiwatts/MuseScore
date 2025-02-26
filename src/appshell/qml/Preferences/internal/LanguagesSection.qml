@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,57 +22,74 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Languages")
+    title: qsTrc("appshell/preferences", "Languages")
 
     navigation.direction: NavigationPanel.Horizontal
 
     property alias languages: dropdown.model
     property string currentLanguageCode: ""
+    property bool isNeedRestart: false
 
     signal languageSelected(string languageCode)
-    signal updateTranslationsRequested()
+    signal checkForUpdateRequested()
+
+    function setUpdateProgress(current, total, status) {
+        progressBtn.to = total
+        progressBtn.value = current
+        progressBtn.progressStatus = status
+    }
 
     Row {
         spacing: 12
 
-        Dropdown {
+        StyledDropdown {
             id: dropdown
 
-            width: 208
+            width: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
             textRole: "name"
             valueRole: "code"
 
+            popupItemsCount: 11
             currentIndex: dropdown.indexOfValue(root.currentLanguageCode)
 
             navigation.name: "LanguagesBox"
             navigation.panel: root.navigation
             navigation.column: 1
 
-            onCurrentValueChanged: {
-                root.languageSelected(dropdown.currentValue)
+            indeterminateText: ""
+
+            onActivated: function(index, value) {
+                root.languageSelected(value)
             }
         }
 
-        FlatButton {
+        ProgressButton {
+            id: progressBtn
+
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Update translations")
+            text: qsTrc("appshell/preferences", "Check for language updates")
 
-            navigation.name: "UpdateTranslations"
-            navigation.panel: root.navigation
-            navigation.column: 2
+            navigationName: "CheckForUpdate"
+            navigationPanel: root.navigation
+            navigationColumn: 2
 
             onClicked: {
-                root.updateTranslationsRequested()
+                root.checkForUpdateRequested()
             }
         }
+    }
+
+    StyledTextLabel {
+        text: qsTrc("appshell/preferences", "Restart required")
+        visible: root.isNeedRestart
     }
 }

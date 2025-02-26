@@ -20,12 +20,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UI_UIMODULE_H
-#define MU_UI_UIMODULE_H
+#ifndef MUSE_UI_UIMODULE_H
+#define MUSE_UI_UIMODULE_H
 
-#include "framework/global/modularity/imodulesetup.h"
+#include "modularity/imodulesetup.h"
+#include <QtGlobal>
 
-namespace mu::ui {
+namespace muse::ui {
+class UiEngine;
+class UiConfiguration;
+class UiActionsRegister;
+class NavigationController;
+class NavigationUiActions;
+
+#ifdef Q_OS_MAC
+class MacOSPlatformTheme;
+#elif defined(Q_OS_WIN)
+class WindowsPlatformTheme;
+#elif defined(Q_OS_LINUX)
+class LinuxPlatformTheme;
+#else
+class StubPlatformTheme;
+#endif
+
 class UiModule : public modularity::IModuleSetup
 {
 public:
@@ -33,12 +50,31 @@ public:
 
     void registerExports() override;
     void resolveImports() override;
+    void registerApi() override;
     void registerResources() override;
     void registerUiTypes() override;
-    void onInit(const framework::IApplication::RunMode& mode) override;
-    void onAllInited(const framework::IApplication::RunMode& mode) override;
+    void onPreInit(const IApplication::RunMode& mode) override;
+    void onInit(const IApplication::RunMode& mode) override;
+    void onAllInited(const IApplication::RunMode& mode) override;
     void onDeinit() override;
+
+private:
+    std::shared_ptr<UiEngine> m_uiengine;
+    std::shared_ptr<UiConfiguration> m_configuration;
+    std::shared_ptr<UiActionsRegister> m_uiactionsRegister;
+    std::shared_ptr<NavigationController> m_keyNavigationController;
+    std::shared_ptr<NavigationUiActions> m_keyNavigationUiActions;
+
+    #ifdef Q_OS_MAC
+    std::shared_ptr<MacOSPlatformTheme> m_platformTheme;
+    #elif defined(Q_OS_WIN)
+    std::shared_ptr<WindowsPlatformTheme> m_platformTheme;
+    #elif defined(Q_OS_LINUX)
+    std::shared_ptr<LinuxPlatformTheme> m_platformTheme;
+    #else
+    std::shared_ptr<StubPlatformTheme> m_platformTheme;
+    #endif
 };
 }
 
-#endif // MU_UI_UIMODULE_H
+#endif // MUSE_UI_UIMODULE_H

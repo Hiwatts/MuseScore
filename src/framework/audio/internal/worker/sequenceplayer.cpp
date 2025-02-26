@@ -22,21 +22,23 @@
 
 #include "sequenceplayer.h"
 
-#include "log.h"
-
 #include "internal/audiosanitizer.h"
 
-using namespace mu;
-using namespace mu::audio;
-using namespace mu::async;
+#include "log.h"
 
-SequencePlayer::SequencePlayer(IGetTracks* getTracks, IClockPtr clock)
-    : m_getTracks(getTracks), m_clock(clock)
+using namespace muse;
+using namespace muse::audio;
+using namespace muse::async;
+
+SequencePlayer::SequencePlayer(IGetTracks* getTracks, IClockPtr clock, const modularity::ContextPtr& iocCtx)
+    : Injectable(iocCtx), m_getTracks(getTracks), m_clock(clock)
 {
     m_clock->seekOccurred().onNotify(this, [this]() {
-        for (auto& pair : tracks()) {
-            pair.second->inputHandler->seek(m_clock->currentTime());
-        }
+        seekAllTracks(m_clock->currentTime());
+    });
+
+    m_clock->statusChanged().onReceive(this, [this](const PlaybackStatus status) {
+        audioEngine()->mixer()->setIsActive(status == PlaybackStatus::Running);
     });
 }
 
@@ -44,69 +46,70 @@ void SequencePlayer::play()
 {
     ONLY_AUDIO_WORKER_THREAD;
 
+    audioEngine()->setMode(RenderMode::RealTimeMode);
     m_clock->start();
-
-    for (auto& pair : tracks()) {
-        pair.second->inputHandler->setIsActive(true);
-    }
+    audioEngine()->mixer()->setIsActive(true);
 }
 
-void SequencePlayer::seek(const msecs_t newPositionMsecs)
+void SequencePlayer::seek(const secs_t newPosition)
 {
     ONLY_AUDIO_WORKER_THREAD;
 
-    m_clock->seek(newPositionMsecs);
-
-    for (auto& pair : tracks()) {
-        pair.second->inputHandler->seek(newPositionMsecs);
-    }
+    msecs_t newPos = secsToMicrosecs(newPosition);
+    m_clock->seek(newPos);
+    seekAllTracks(newPos);
 }
 
 void SequencePlayer::stop()
 {
     ONLY_AUDIO_WORKER_THREAD;
 
+    audioEngine()->setMode(RenderMode::IdleMode);
     m_clock->stop();
-
-    for (auto& pair : tracks()) {
-        pair.second->inputHandler->setIsActive(false);
-    }
+    audioEngine()->mixer()->setIsActive(false);
 }
 
 void SequencePlayer::pause()
 {
     ONLY_AUDIO_WORKER_THREAD;
 
+    audioEngine()->setMode(RenderMode::IdleMode);
     m_clock->pause();
-
-    for (auto& pair : tracks()) {
-        pair.second->inputHandler->setIsActive(false);
-    }
+    audioEngine()->mixer()->setIsActive(false);
 }
 
 void SequencePlayer::resume()
 {
     ONLY_AUDIO_WORKER_THREAD;
 
+    audioEngine()->setMode(RenderMode::RealTimeMode);
     m_clock->resume();
+    audioEngine()->mixer()->setIsActive(true);
+}
 
-    for (auto& pair : tracks()) {
-        pair.second->inputHandler->setIsActive(true);
+msecs_t SequencePlayer::duration() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    if (!m_clock) {
+        return 0;
     }
+
+    return m_clock->timeDuration();
 }
 
 void SequencePlayer::setDuration(const msecs_t duration)
 {
     ONLY_AUDIO_WORKER_THREAD;
 
-    m_clock->setTimeDuration(duration);
+    m_clock->setTimeDuration(duration * 1000);
 }
 
 Ret SequencePlayer::setLoop(const msecs_t fromMsec, const msecs_t toMsec)
 {
     ONLY_AUDIO_WORKER_THREAD;
 
-    return m_clock->setTimeLoop(fromMsec, toMsec);
+    return m_clock->setTimeLoop(fromMsec * 1000, toMsec * 1000);
 }
 
 void SequencePlayer::resetLoop()
@@ -116,11 +119,25 @@ void SequencePlayer::resetLoop()
     m_clock->resetTimeLoop();
 }
 
-Channel<msecs_t> SequencePlayer::playbackPositionMSecs() const
+secs_t SequencePlayer::playbackPosition() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return microsecsToSecs(m_clock->currentTime());
+}
+
+Channel<secs_t> SequencePlayer::playbackPositionChanged() const
 {
     ONLY_AUDIO_WORKER_THREAD;
 
     return m_clock->timeChanged();
+}
+
+PlaybackStatus SequencePlayer::playbackStatus() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return m_clock->status();
 }
 
 Channel<PlaybackStatus> SequencePlayer::playbackStatusChanged() const
@@ -130,11 +147,15 @@ Channel<PlaybackStatus> SequencePlayer::playbackStatusChanged() const
     return m_clock->statusChanged();
 }
 
-TracksMap SequencePlayer::tracks() const
+void SequencePlayer::seekAllTracks(const msecs_t newPositionMsecs)
 {
     IF_ASSERT_FAILED(m_getTracks) {
-        return {};
+        return;
     }
 
-    return m_getTracks->allTracks();
+    for (const auto& pair : m_getTracks->allTracks()) {
+        if (pair.second->inputHandler) {
+            pair.second->inputHandler->seek(newPositionMsecs);
+        }
+    }
 }

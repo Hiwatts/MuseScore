@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,30 +24,29 @@
 
 #include "ui_specialcharactersdialog.h"
 
-#include "engraving/infrastructure/draw/font.h"
+#include "draw/types/font.h"
+#include "uicomponents/view/topleveldialog.h"
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 
 class QListWidget;
 
-namespace mu::palette {
-class PaletteWidget;
+namespace mu::engraving {
+class TextBase;
 }
 
-namespace Ms {
-class TextBase;
-class SpecialCharactersDialog : public QDialog, public Ui::SpecialCharactersDialog
+namespace mu::palette {
+class PaletteWidget;
+
+class SpecialCharactersDialog : public muse::uicomponents::TopLevelDialog, public Ui::SpecialCharactersDialog
 {
     Q_OBJECT
 
-    INJECT(Ms, mu::context::IGlobalContext, globalContext)
+    INJECT(mu::context::IGlobalContext, globalContext)
 
 public:
     SpecialCharactersDialog(QWidget* parent = nullptr);
-    SpecialCharactersDialog(const SpecialCharactersDialog& other);
-
-    static int static_metaTypeId();
 
 private slots:
     void populateSmufl();
@@ -56,18 +55,16 @@ private slots:
 private:
     void hideEvent(QHideEvent*) override;
 
-    void setFont(const mu::draw::Font& font);
+    void setFont(const muse::draw::Font& font);
     void populateCommon();
 
-    mu::draw::Font m_font;
-    mu::palette::PaletteWidget* m_pCommon = nullptr;
-    mu::palette::PaletteWidget* m_pSmufl = nullptr;
-    mu::palette::PaletteWidget* m_pUnicode = nullptr;
+    muse::draw::Font m_font;
+    PaletteWidget* m_pCommon = nullptr;
+    PaletteWidget* m_pSmufl = nullptr;
+    PaletteWidget* m_pUnicode = nullptr;
     QListWidget* m_lws = nullptr;
     QListWidget* m_lwu = nullptr;
 };
 }
-
-Q_DECLARE_METATYPE(Ms::SpecialCharactersDialog)
 
 #endif // MU_PALETTE_SPECIALCHARACTERSDIALOG_H

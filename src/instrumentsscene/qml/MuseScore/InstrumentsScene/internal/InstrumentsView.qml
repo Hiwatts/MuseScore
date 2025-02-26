@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,15 +23,17 @@ import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 Item {
     id: root
 
     property var instrumentsModel
-    property alias navigation: navPanel
+    property alias navigation: instrumentsView.navigation
+
+    property alias searching: searchField.hasText
 
     signal addSelectedInstrumentsToScoreRequested()
 
@@ -41,27 +43,6 @@ Item {
 
     function focusInstrument(instrumentIndex) {
         instrumentsView.positionViewAtIndex(instrumentIndex, ListView.Beginning)
-    }
-
-    QtObject {
-        id: prv
-
-        property var currentItemNavigationIndex: []
-    }
-
-    NavigationPanel {
-        id: navPanel
-        name: "InstrumentsView"
-        direction: NavigationPanel.Vertical
-        enabled: root.visible
-
-        onNavigationEvent: {
-            if (event.type === NavigationEvent.AboutActive) {
-                event.setData("controlIndex", prv.currentItemNavigationIndex)
-                //! NOTE If we changed family, then control with saved index maybe not
-                event.setData("controlOptional", true)
-            }
-        }
     }
 
     StyledTextLabel {
@@ -83,21 +64,16 @@ Item {
         anchors.right: parent.right
 
         navigation.name: "SearchInstruments"
-        navigation.panel: navPanel
+        navigation.panel: instrumentsView.navigation
         navigation.row: 1
-
-        onFocusChanged: {
-            if (activeFocus) {
-                prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-            }
-        }
+        navigation.column: 0
 
         onSearchTextChanged: {
             root.instrumentsModel.setSearchText(searchText)
         }
     }
 
-    ListView {
+    StyledListView {
         id: instrumentsView
 
         anchors.top: searchField.bottom
@@ -106,35 +82,26 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        boundsBehavior: ListView.StopAtBounds
-        clip: true
-
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
-        }
-
         model: root.instrumentsModel
+
+        accessible.name: instrumentsLabel.text
 
         delegate: ListItemBlank {
             id: item
 
-            navigation.name: model.name
-            navigation.panel: navPanel
-            navigation.row: 2 + model.index
-            navigation.accessible.name: itemTitleLabel.text
+            isSelected: model.isSelected
 
-            onNavigationActived: {
-                prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-                root.instrumentsModel.selectInstrument(model.index)
-            }
+            navigation.name: model.name
+            navigation.panel: instrumentsView.navigation
+            navigation.row: 2 + model.index
+            navigation.column: 0
+            navigation.accessible.name: itemTitleLabel.text
+            navigation.accessible.description: model.description
+            navigation.accessible.row: model.index
 
             onNavigationTriggered: {
                 root.addSelectedInstrumentsToScoreRequested()
             }
-
-            isSelected: model.isSelected
 
             StyledTextLabel {
                 id: itemTitleLabel
@@ -159,8 +126,15 @@ Item {
 
             property var itemModel: model
 
-            Dropdown {
+            StyledDropdown {
                 id: traitsBox
+
+                navigation.name: "TraitsBox"
+                navigation.panel: instrumentsView.navigation
+                navigation.row: item.navigation.row
+                navigation.column: 1
+                navigation.accessible.name: itemTitleLabel.text + " " + qsTrc("instruments", "traits")
+                navigation.accessible.row: item.itemModel.index
 
                 anchors.right: parent.right
                 anchors.rightMargin: 4
@@ -177,8 +151,8 @@ Item {
                 model: item.itemModel.traits
                 currentIndex: item.itemModel.currentTraitIndex
 
-                onActivated: {
-                    item.itemModel.currentTraitIndex = currentIndex
+                onActivated: function(index, value) {
+                    item.itemModel.currentTraitIndex = index
                 }
             }
         }

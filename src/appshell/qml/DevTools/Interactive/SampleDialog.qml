@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,8 +20,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 StyledDialogView {
 
@@ -50,7 +50,7 @@ StyledDialogView {
 
                 property string value: ""
                 width: 150
-                onCurrentTextEdited: input.value = newTextValue
+                onTextChanged: input.value = newTextValue
             }
 
             StyledTextLabel {
@@ -87,7 +87,7 @@ StyledDialogView {
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.RightButton
-            onClicked: {
+            onClicked: function(mouse) {
                 var items = [
                             {id: "undo", title: "Undo", shortcut: "Ctrl+Z", icon: IconCode.UNDO},
                             {id: "redo", title: "Redo", shortcut: "Shift+Ctrl+Z", enabled: false, icon: IconCode.REDO},
@@ -98,14 +98,14 @@ StyledDialogView {
                             {id: "checkable", title: "Checkable", checkable: true, checked: false}
                         ]
 
-                menuLoader.toggleOpened(items, mouseX, mouseY)
+                menuLoader.toggleOpened(items, mouse.x, mouse.y)
             }
         }
 
         StyledMenuLoader {
             id: menuLoader
 
-            onHandleMenuItem: {
+            onHandleMenuItem: function(itemId) {
                 console.log("selected " + itemId)
             }
         }

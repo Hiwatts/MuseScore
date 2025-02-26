@@ -1,10 +1,12 @@
-#ifndef GPTRACK_H
-#define GPTRACK_H
+#ifndef MU_IMPORTEXPORT_GPTRACK_H
+#define MU_IMPORTEXPORT_GPTRACK_H
 
 #include <unordered_map>
 #include <string>
 
-namespace Ms {
+#include "types/string.h"
+
+namespace mu::iex::guitarpro {
 class GPTrack
 {
 public:
@@ -21,16 +23,18 @@ public:
         int fretCount{ 24 };
         int capoFret{ 0 };
         std::vector<int> tunning;
+        bool useFlats{ false };
+        bool ignoreFlats{ false };
     };
 
-    struct String {
+    struct InstrumentString {
         int num{ 0 };
         int tunning{ 0 };
     };
 
     struct Diagram {
         int id{ 0 };
-        QString name;
+        muse::String name;
         int stringCount{ 0 };
         int fretCount{ 0 };
         int baseFret{ 0 };
@@ -39,18 +43,34 @@ public:
         // which cant be used in MU
     };
 
+    struct Sound {
+        int programm{ 0 };
+        muse::String name;
+        muse::String label;
+        muse::String path;
+        muse::String role;
+    };
+
+    struct SoundAutomation {
+        muse::String type;
+        muse::String value;
+        int bar = 0;
+        bool linear = 0;
+        float position = 0;
+    };
+
     GPTrack(int idx)
         : _idx(idx) {}
     virtual ~GPTrack() = default;
 
-    void setName(const QString& n) { _name = n; }
-    QString name() const { return _name; }
+    void setName(const muse::String& n) { _name = n; }
+    muse::String name() const { return _name; }
 
-    void setShortName(const QString& s) { _shortName = s; }
-    QString shortName() const { return _shortName; }
+    void setShortName(const muse::String& s) { _shortName = s; }
+    muse::String shortName() const { return _shortName; }
 
-    void setInstrument(const QString& s) { _instrument = s; }
-    QString instrument() const { return _instrument; }
+    void setInstrument(const muse::String& s) { _instrument = s; }
+    muse::String instrument() const { return _instrument; }
 
     void setRSE(const RSE& r) { _rse = r; }
     const RSE& rse() const { return _rse; }
@@ -67,9 +87,22 @@ public:
     void addStaffProperty(const StaffProperty& st) { _staffProperty.push_back(st); }
     const std::vector<StaffProperty>& staffProperty() const { return _staffProperty; }
 
-    std::vector<String> strings() const
+    void addSound(Sound sound);
+
+    struct SoundAutomationPos {
+        int bar = 0;
+        float pos = 0;
+
+        bool operator<(const SoundAutomationPos& other) const { return std::tie(bar, pos) < std::tie(other.bar, other.pos); }
+    };
+
+    void addSoundAutomation(SoundAutomation val) { _automations.insert({ { val.bar, val.position }, val }); }
+    const std::unordered_map<muse::String, Sound>& sounds() { return _sounds; }
+    const std::map<SoundAutomationPos, SoundAutomation>& soundAutomations() { return _automations; }
+
+    std::vector<InstrumentString> strings() const
     {
-        std::vector<String> ss;
+        std::vector<InstrumentString> ss;
         if (_staffProperty.empty()) {
             return ss;
         }
@@ -85,8 +118,8 @@ public:
     void setStaffCount(size_t n) { _staffCount = n; }
     size_t staffCount() const { return _staffCount; }
 
-    void setTransponce(int t) { _transponce = t; }
-    int transponce() const { return _transponce; }
+    void setTranspose(int t) { _transpose = t; }
+    int transpose() const { return _transpose; }
 
     void addDiagram(std::pair<int, Diagram>&& d) { _diagrams.insert(d); }
     const std::unordered_map<int, Diagram>& diagram() const { return _diagrams; }
@@ -97,15 +130,16 @@ public:
     void setLyricsOffset(int n) { _lyricsOffset = n; }
     int lyricsOffset() const { return _lyricsOffset; }
 
+    void setLineCount(int n) { _lineCount = n; }
+    int lineCount() const { return _lineCount; }
+
     int idx() const { return _idx; }
 
 protected:
 
-    friend class GP67DomFixer;
-
-    QString _name;
-    QString _shortName;
-    QString _instrument;
+    muse::String _name;
+    muse::String _shortName;
+    muse::String _instrument;
     RSE _rse;
     int _programm{ 0 };
     int _midiChannel{ 0 };
@@ -113,10 +147,13 @@ protected:
     int _idx{ -1 };
     size_t _staffCount{ 1 };
     std::vector<StaffProperty> _staffProperty;
-    int _transponce{ 0 };
+    std::unordered_map<muse::String, Sound> _sounds;
+    std::map<SoundAutomationPos, SoundAutomation> _automations;
+    int _transpose{ 0 };
     std::unordered_map<int, Diagram> _diagrams;
     std::string _lyrics;
     int _lyricsOffset = { 0 };
+    int _lineCount{ 5 }; // for percussion lines
 };
 
 class GP6Track : public GPTrack
@@ -136,5 +173,5 @@ public:
 
 private:
 };
-}
-#endif // GPTRACK_H
+} // namespace mu::iex::guitarpro
+#endif // MU_IMPORTEXPORT_GPTRACK_H

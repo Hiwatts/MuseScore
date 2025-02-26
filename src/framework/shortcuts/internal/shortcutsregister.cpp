@@ -23,21 +23,24 @@
 
 #include <QKeySequence>
 
-#include "log.h"
-
-#include "global/xmlreader.h"
-#include "global/xmlwriter.h"
+#include "global/deprecated/xmlreader.h"
+#include "global/deprecated/xmlwriter.h"
 #include "multiinstances/resourcelockguard.h"
 
-using namespace mu::shortcuts;
-using namespace mu::framework;
-using namespace mu::async;
+#include "log.h"
 
-constexpr std::string_view SHORTCUTS_TAG("Shortcuts");
-constexpr std::string_view SHORTCUT_TAG("SC");
-constexpr std::string_view ACTION_CODE_TAG("key");
-constexpr std::string_view STANDARD_KEY_TAG("std");
-constexpr std::string_view SEQUENCE_TAG("seq");
+using namespace muse;
+using namespace muse::shortcuts;
+using namespace muse::async;
+
+static constexpr std::string_view SHORTCUTS_TAG("Shortcuts");
+static constexpr std::string_view SHORTCUT_TAG("SC");
+static constexpr std::string_view ACTION_CODE_TAG("key");
+static constexpr std::string_view STANDARD_KEY_TAG("std");
+static constexpr std::string_view SEQUENCE_TAG("seq");
+static constexpr std::string_view AUTOREPEAT_TAG("autorepeat");
+
+static const std::string SHORTCUTS_RESOURCE_NAME("SHORTCUTS");
 
 static const Shortcut& findShortcut(const ShortcutList& shortcuts, const std::string& actionCode)
 {
@@ -51,45 +54,85 @@ static const Shortcut& findShortcut(const ShortcutList& shortcuts, const std::st
     return null;
 }
 
-void ShortcutsRegister::load()
+void ShortcutsRegister::init()
 {
-    m_shortcuts.clear();
+    multiInstancesProvider()->resourceChanged().onReceive(this, [this](const std::string& resourceName) {
+        if (resourceName == SHORTCUTS_RESOURCE_NAME) {
+            reload();
+        }
+    });
 
-    io::path defPath = configuration()->shortcutsAppDataPath();
-    io::path userPath = configuration()->shortcutsUserAppDataPath();
+    reload();
+}
+
+void ShortcutsRegister::reload(bool onlyDef)
+{
+    TRACEFUNC;
+
+    m_shortcuts.clear();
+    m_defaultShortcuts.clear();
+
+    io::path_t defPath = configuration()->shortcutsAppDataPath();
+    io::path_t userPath = configuration()->shortcutsUserAppDataPath();
 
     bool ok = readFromFile(m_defaultShortcuts, defPath);
 
     if (ok) {
-        {
+        expandStandardKeys(m_defaultShortcuts);
+
+        if (!onlyDef) {
             //! NOTE The user shortcut file may change, so we need to lock it
-            mi::ResourceLockGuard(multiInstancesProvider(), "shortcuts");
+            mi::ReadResourceLockGuard(multiInstancesProvider(), SHORTCUTS_RESOURCE_NAME);
             ok = readFromFile(m_shortcuts, userPath);
+        } else {
+            ok = false;
         }
+
         if (!ok) {
             m_shortcuts = m_defaultShortcuts;
         } else {
             mergeShortcuts(m_shortcuts, m_defaultShortcuts);
+            mergeAdditionalShortcuts(m_shortcuts);
         }
+
         ok = true;
     }
 
     if (ok) {
         expandStandardKeys(m_shortcuts);
+        makeUnique(m_shortcuts);
         m_shortcutsChanged.notify();
     }
 }
 
 void ShortcutsRegister::mergeShortcuts(ShortcutList& shortcuts, const ShortcutList& defaultShortcuts) const
 {
-    ShortcutList needadd;
-    for (const Shortcut& sh : defaultShortcuts) {
-        auto it = std::find_if(shortcuts.begin(), shortcuts.end(), [sh](const Shortcut& i) {
-            return i.action == sh.action;
-        });
+    TRACEFUNC;
 
-        if (it == shortcuts.end()) {
-            needadd.push_back(sh);
+    ShortcutList needadd;
+    for (const Shortcut& defSc : defaultShortcuts) {
+        Shortcut scForAdd = defSc;
+        bool found = false;
+
+        for (Shortcut& sc : shortcuts) {
+            //! NOTE If a user shortcut is found, set context & auto repeat (always use default values)
+            if (sc.action == defSc.action) {
+                sc.context = defSc.context;
+                sc.autoRepeat = defSc.autoRepeat;
+                found = true;
+            } else if (sc.context == defSc.context) {
+                for (const std::string& seq : sc.sequences) {
+                    //! NOTE If user shortcut has sequence from default shortcut, remove the sequence from default shortcut
+                    muse::remove_if(scForAdd.sequences, [&seq](const std::string& cmp){
+                        return cmp == seq;
+                    });
+                }
+            }
+        }
+
+        //! NOTE If no default shortcut is found in user shortcuts add def
+        if (!found) {
+            needadd.push_back(scForAdd);
         }
     }
 
@@ -98,25 +141,62 @@ void ShortcutsRegister::mergeShortcuts(ShortcutList& shortcuts, const ShortcutLi
     }
 }
 
+void ShortcutsRegister::mergeAdditionalShortcuts(ShortcutList& shortcuts)
+{
+    for (const auto& [context, additionalShortcuts] : m_additionalShortcutsMap) {
+        mergeShortcuts(shortcuts, additionalShortcuts);
+    }
+}
+
+void ShortcutsRegister::makeUnique(ShortcutList& shortcuts)
+{
+    TRACEFUNC;
+
+    const ShortcutList all = shortcuts;
+
+    shortcuts.clear();
+
+    for (const Shortcut& sc : all) {
+        const std::string& action = sc.action;
+
+        auto it = std::find_if(shortcuts.begin(), shortcuts.end(), [action](const Shortcut& s) {
+            return s.action == action;
+        });
+
+        if (it == shortcuts.end()) {
+            shortcuts.push_back(sc);
+            continue;
+        }
+
+        Shortcut& foundSc = *it;
+
+        IF_ASSERT_FAILED(foundSc.context == sc.context) {
+        }
+
+        foundSc.sequences.insert(foundSc.sequences.end(), sc.sequences.begin(), sc.sequences.end());
+    }
+}
+
 void ShortcutsRegister::expandStandardKeys(ShortcutList& shortcuts) const
 {
+    TRACEFUNC;
+
     ShortcutList expanded;
     ShortcutList notbonded;
 
     for (Shortcut& shortcut : shortcuts) {
-        if (!shortcut.sequence.empty()) {
+        if (!shortcut.sequences.empty()) {
             continue;
         }
 
         QList<QKeySequence> kslist = QKeySequence::keyBindings(shortcut.standardKey);
         if (kslist.isEmpty()) {
-            LOGW() << "not bind key sequence for standard key: " << shortcut.standardKey;
             notbonded.push_back(shortcut);
             continue;
         }
 
         const QKeySequence& first = kslist.first();
-        shortcut.sequence = first.toString().toStdString();
+        shortcut.sequences.push_back(first.toString().toStdString());
         //LOGD() << "for standard key: " << sc.standardKey << ", sequence: " << sc.sequence;
 
         //! NOTE If the keyBindings contains more than one result,
@@ -124,7 +204,7 @@ void ShortcutsRegister::expandStandardKeys(ShortcutList& shortcuts) const
         for (int i = 1; i < kslist.count(); ++i) {
             const QKeySequence& seq = kslist.at(i);
             Shortcut esc = shortcut;
-            esc.sequence = seq.toString().toStdString();
+            esc.sequences = { seq.toString().toStdString() };
             //LOGD() << "for standard key: " << esc.standardKey << ", alternative sequence: " << esc.sequence;
             expanded.push_back(esc);
         }
@@ -144,11 +224,28 @@ void ShortcutsRegister::expandStandardKeys(ShortcutList& shortcuts) const
     }
 }
 
-bool ShortcutsRegister::readFromFile(ShortcutList& shortcuts, const io::path& path) const
+ShortcutList ShortcutsRegister::filterAndUpdateAdditionalShortcuts(const ShortcutList& shortcuts)
+{
+    ShortcutList noAdditionalShortcuts = shortcuts;
+
+    for (auto& [context, additionalShortcuts] : m_additionalShortcutsMap) {
+        for (Shortcut& shortcut : additionalShortcuts) {
+            auto it = std::find(shortcuts.begin(), shortcuts.end(), shortcut.action);
+            if (it != shortcuts.end()) {
+                shortcut = *it;
+                noAdditionalShortcuts.remove(shortcut);
+            }
+        }
+    }
+
+    return noAdditionalShortcuts;
+}
+
+bool ShortcutsRegister::readFromFile(ShortcutList& shortcuts, const io::path_t& path) const
 {
     TRACEFUNC;
 
-    XmlReader reader(path);
+    deprecated::XmlReader reader(path);
 
     reader.readNextStartElement();
     if (reader.tagName() != SHORTCUTS_TAG) {
@@ -163,15 +260,7 @@ bool ShortcutsRegister::readFromFile(ShortcutList& shortcuts, const io::path& pa
 
         Shortcut shortcut = readShortcut(reader);
         if (shortcut.isValid()) {
-            if (shortcut.sequence.empty()) {
-                shortcuts.push_back(shortcut);
-            } else {
-                auto seqList = QString::fromStdString(shortcut.sequence).split("\n", Qt::SkipEmptyParts);
-                for (QString seq : seqList) {
-                    shortcut.sequence = seq.toStdString();
-                    shortcuts.push_back(shortcut);
-                }
-            }
+            shortcuts.push_back(shortcut);
         }
     }
 
@@ -182,7 +271,7 @@ bool ShortcutsRegister::readFromFile(ShortcutList& shortcuts, const io::path& pa
     return reader.success();
 }
 
-Shortcut ShortcutsRegister::readShortcut(framework::XmlReader& reader) const
+Shortcut ShortcutsRegister::readShortcut(deprecated::XmlReader& reader) const
 {
     Shortcut shortcut;
 
@@ -194,11 +283,15 @@ Shortcut ShortcutsRegister::readShortcut(framework::XmlReader& reader) const
         } else if (tag == STANDARD_KEY_TAG) {
             shortcut.standardKey = QKeySequence::StandardKey(reader.readInt());
         } else if (tag == SEQUENCE_TAG) {
-            shortcut.sequence += reader.readString() + "\n";
+            shortcut.sequences.push_back(reader.readString());
+        } else if (tag == AUTOREPEAT_TAG) {
+            shortcut.autoRepeat = reader.readInt();
         } else {
             reader.skipCurrentElement();
         }
     }
+
+    shortcut.context = uiactionsRegister()->action(shortcut.action).scCtx;
 
     return shortcut;
 }
@@ -208,30 +301,43 @@ const ShortcutList& ShortcutsRegister::shortcuts() const
     return m_shortcuts;
 }
 
-mu::Ret ShortcutsRegister::setShortcuts(const ShortcutList& shortcuts)
+Ret ShortcutsRegister::setShortcuts(const ShortcutList& shortcuts)
 {
+    TRACEFUNC;
+
     if (shortcuts == m_shortcuts) {
         return true;
     }
 
-    bool ok = writeToFile(shortcuts, configuration()->shortcutsUserAppDataPath());
+    ShortcutList needToWrite = filterAndUpdateAdditionalShortcuts(shortcuts);
+
+    bool ok = writeToFile(needToWrite, configuration()->shortcutsUserAppDataPath());
 
     if (ok) {
-        m_shortcuts = shortcuts;
+        m_shortcuts = needToWrite;
         mergeShortcuts(m_shortcuts, m_defaultShortcuts);
+        mergeAdditionalShortcuts(m_shortcuts);
         m_shortcutsChanged.notify();
     }
 
     return ok;
 }
 
-bool ShortcutsRegister::writeToFile(const ShortcutList& shortcuts, const io::path& path) const
+void ShortcutsRegister::resetShortcuts()
+{
+    mi::WriteResourceLockGuard(multiInstancesProvider(), SHORTCUTS_RESOURCE_NAME);
+    fileSystem()->remove(configuration()->shortcutsUserAppDataPath());
+
+    reload();
+}
+
+bool ShortcutsRegister::writeToFile(const ShortcutList& shortcuts, const io::path_t& path) const
 {
     TRACEFUNC;
 
-    mi::ResourceLockGuard(multiInstancesProvider(), "shortcuts");
+    mi::WriteResourceLockGuard(multiInstancesProvider(), SHORTCUTS_RESOURCE_NAME);
 
-    XmlWriter writer(path);
+    deprecated::XmlWriter writer(path);
 
     writer.writeStartDocument();
     writer.writeStartElement(SHORTCUTS_TAG);
@@ -246,7 +352,7 @@ bool ShortcutsRegister::writeToFile(const ShortcutList& shortcuts, const io::pat
     return writer.success();
 }
 
-void ShortcutsRegister::writeShortcut(framework::XmlWriter& writer, const Shortcut& shortcut) const
+void ShortcutsRegister::writeShortcut(deprecated::XmlWriter& writer, const Shortcut& shortcut) const
 {
     writer.writeStartElement(SHORTCUT_TAG);
     writer.writeTextElement(ACTION_CODE_TAG, shortcut.action);
@@ -255,13 +361,26 @@ void ShortcutsRegister::writeShortcut(framework::XmlWriter& writer, const Shortc
         writer.writeTextElement(STANDARD_KEY_TAG, QString("%1").arg(shortcut.standardKey).toStdString());
     }
 
-    writer.writeTextElement(SEQUENCE_TAG, shortcut.sequence);
+    for (const std::string& seq : shortcut.sequences) {
+        writer.writeTextElement(SEQUENCE_TAG, seq);
+    }
+
     writer.writeEndElement();
 }
 
 Notification ShortcutsRegister::shortcutsChanged() const
 {
     return m_shortcutsChanged;
+}
+
+Ret ShortcutsRegister::setAdditionalShortcuts(const std::string& context, const ShortcutList& shortcuts)
+{
+    m_additionalShortcutsMap[context] = shortcuts;
+
+    mergeShortcuts(m_shortcuts, m_additionalShortcutsMap[context]);
+    m_shortcutsChanged.notify();
+
+    return muse::make_ok();
 }
 
 const Shortcut& ShortcutsRegister::shortcut(const std::string& actionCode) const
@@ -274,20 +393,32 @@ const Shortcut& ShortcutsRegister::defaultShortcut(const std::string& actionCode
     return findShortcut(m_defaultShortcuts, actionCode);
 }
 
+bool ShortcutsRegister::isRegistered(const std::string& sequence) const
+{
+    for (const Shortcut& sh : m_shortcuts) {
+        auto it = std::find(sh.sequences.cbegin(), sh.sequences.cend(), sequence);
+        if (it != sh.sequences.cend()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 ShortcutList ShortcutsRegister::shortcutsForSequence(const std::string& sequence) const
 {
     ShortcutList list;
     for (const Shortcut& sh : m_shortcuts) {
-        if (sh.sequence == sequence) {
+        auto it = std::find(sh.sequences.cbegin(), sh.sequences.cend(), sequence);
+        if (it != sh.sequences.cend()) {
             list.push_back(sh);
         }
     }
     return list;
 }
 
-mu::Ret ShortcutsRegister::importFromFile(const io::path& filePath)
+Ret ShortcutsRegister::importFromFile(const io::path_t& filePath)
 {
-    mi::ResourceLockGuard(multiInstancesProvider(), "shortcuts");
+    mi::ReadResourceLockGuard(multiInstancesProvider(), SHORTCUTS_RESOURCE_NAME);
 
     Ret ret = fileSystem()->copy(filePath, configuration()->shortcutsUserAppDataPath(), true);
     if (!ret) {
@@ -295,12 +426,32 @@ mu::Ret ShortcutsRegister::importFromFile(const io::path& filePath)
         return ret;
     }
 
-    load();
+    reload();
 
     return make_ret(Ret::Code::Ok);
 }
 
-mu::Ret ShortcutsRegister::exportToFile(const io::path& filePath) const
+Ret ShortcutsRegister::exportToFile(const io::path_t& filePath) const
 {
     return writeToFile(m_shortcuts, filePath);
+}
+
+bool ShortcutsRegister::active()
+{
+    return m_isActive;
+}
+
+void ShortcutsRegister::setActive(bool active)
+{
+    if (m_isActive == active) {
+        return;
+    }
+
+    m_isActive = active;
+    m_activeChanged.notify();
+}
+
+Notification ShortcutsRegister::activeChanged() const
+{
+    return m_activeChanged;
 }

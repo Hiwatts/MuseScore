@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,36 +22,44 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 FlatRadioButton {
     id: root
 
     property bool needSave: false
+    property bool isCloud: false
+
+    property alias contextMenuItems: contextMenuLoader.items
+
+    signal contextMenuItemsRequested()
+    signal handleContextMenuItem(string itemId)
 
     signal closeRequested()
 
-    width: 200 // TODO: Math.min(200, contentItem.implicitWidth)
-    radius: 0
-
-    checkedColor: ui.theme.backgroundPrimaryColor
+    width: Math.min(200, implicitContentWidth)
 
     RowLayout {
         id: contentRow
         anchors.fill: parent
-        anchors.leftMargin: 12
         spacing: 4
 
         StyledTextLabel {
             Layout.alignment: Qt.AlignLeft
-            Layout.fillHeight: true
-            Layout.fillWidth: true
+            Layout.fillWidth: root.implicitContentWidth > 200
             Layout.preferredWidth: implicitWidth
+            Layout.leftMargin: 12
 
             horizontalAlignment: Text.AlignLeft
 
-            text: root.text + (root.needSave ? "*" : "")
+            text: (root.needSave ? "*" : "") + root.text
+        }
+
+        StyledIconLabel {
+            visible: root.isCloud
+
+            iconCode: IconCode.CLOUD
         }
 
         FlatButton {
@@ -61,9 +69,101 @@ FlatRadioButton {
 
             transparent: true
             icon: IconCode.CLOSE_X_ROUNDED
-            onClicked: root.closeRequested()
+            iconFont {
+                family: ui.theme.iconsFont.family
+                pixelSize: 12
+            }
+
+            navigation.name: "Close" + root.navigation.name
+            navigation.panel: root.navigation.panel
+            navigation.row: root.navigation.row + 1
+            accessible.name: qsTrc("global", "Close")
+
+            onClicked: {
+                root.closeRequested()
+            }
         }
 
         SeparatorLine { orientation: Qt.Vertical }
+    }
+
+    background: Rectangle {
+        id: background
+        anchors.fill: parent
+
+        color: ui.theme.backgroundSecondaryColor
+
+        Rectangle {
+            id: backgroundInner
+            anchors.fill: parent
+
+            visible: false
+            color: "white"
+            opacity: 0.05
+        }
+
+        NavigationFocusBorder {
+            navigationCtrl: root.navigation
+            drawOutsideParent: false
+            anchors.rightMargin: 1 // for separator
+        }
+
+
+        MouseArea {
+            id: rightClickArea
+            anchors.fill: parent
+
+            acceptedButtons: Qt.RightButton
+
+            onClicked: function(mouse) {
+                contextMenuItemsRequested()
+                contextMenuLoader.show(Qt.point(mouse.x, mouse.y))
+            }
+
+            ContextMenuLoader {
+                id: contextMenuLoader
+
+                onHandleMenuItem: function(itemId) {
+                    root.handleContextMenuItem(itemId)
+                }
+            }
+        }
+
+        states: [
+            State {
+                name: "SELECTED"
+                when: root.checked
+
+                PropertyChanges {
+                    target: background
+                    color: ui.theme.popupBackgroundColor
+                }
+
+                PropertyChanges {
+                    target: backgroundInner
+                    visible: true
+                }
+            },
+
+            State {
+                name: "HOVERED"
+                when: root.hovered && !root.pressed
+
+                PropertyChanges {
+                    target: background
+                    color: Utils.colorWithAlpha(ui.theme.buttonColor, ui.theme.buttonOpacityHover)
+                }
+            },
+
+            State {
+                name: "PRESSED"
+                when: root.pressed
+
+                PropertyChanges {
+                    target: background
+                    color: Utils.colorWithAlpha(ui.theme.buttonColor, ui.theme.buttonOpacityHit)
+                }
+            }
+        ]
     }
 }

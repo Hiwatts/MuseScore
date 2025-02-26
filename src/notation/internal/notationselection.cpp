@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,14 +21,18 @@
  */
 #include "notationselection.h"
 
-#include "libmscore/masterscore.h"
-#include "libmscore/segment.h"
-#include "libmscore/measure.h"
+#include <QMimeData>
+
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/measure.h"
 
 #include "notationselectionrange.h"
+#include "notationerrors.h"
 
 #include "log.h"
 
+using namespace muse;
 using namespace mu::notation;
 
 NotationSelection::NotationSelection(IGetScore* getScore)
@@ -47,9 +51,22 @@ bool NotationSelection::isRange() const
     return score()->selection().isRange();
 }
 
-bool NotationSelection::canCopy() const
+SelectionState NotationSelection::state() const
 {
-    return score()->selection().canCopy();
+    return score()->selection().state();
+}
+
+Ret NotationSelection::canCopy() const
+{
+    if (isNone()) {
+        return make_ret(Err::EmptySelection);
+    }
+
+    if (!score()->selection().canCopy()) {
+        return make_ret(Err::SelectCompleteTupletOrTremolo);
+    }
+
+    return muse::make_ok();
 }
 
 QMimeData* NotationSelection::mimeData() const
@@ -60,7 +77,7 @@ QMimeData* NotationSelection::mimeData() const
     }
 
     QMimeData* mimeData = new QMimeData();
-    mimeData->setData(mimeType, score()->selection().mimeData());
+    mimeData->setData(mimeType, score()->selection().mimeData().toQByteArray());
 
     return mimeData;
 }
@@ -70,15 +87,9 @@ EngravingItem* NotationSelection::element() const
     return score()->selection().element();
 }
 
-std::vector<EngravingItem*> NotationSelection::elements() const
+const std::vector<EngravingItem*>& NotationSelection::elements() const
 {
-    std::vector<EngravingItem*> els;
-    QList<Ms::EngravingItem*> list = score()->selection().elements();
-    els.reserve(list.count());
-    for (Ms::EngravingItem* e : list) {
-        els.push_back(e);
-    }
-    return els;
+    return score()->selection().elements();
 }
 
 std::vector<Note*> NotationSelection::notes(NoteFilter filter) const
@@ -95,33 +106,23 @@ std::vector<Note*> NotationSelection::notes(NoteFilter filter) const
     return {};
 }
 
-QRectF NotationSelection::canvasBoundingRect() const
+muse::RectF NotationSelection::canvasBoundingRect() const
 {
     if (isNone()) {
-        return QRectF();
+        return RectF();
     }
 
-    Ms::EngravingItem* el = score()->selection().element();
-    if (el) {
-        return el->canvasBoundingRect().toQRectF();
+    if (const mu::engraving::EngravingItem* element = score()->selection().element()) {
+        return element->canvasBoundingRect();
     }
 
-    QList<Ms::EngravingItem*> els = score()->selection().elements();
-    if (els.isEmpty()) {
-        LOGW() << "selection not none, but no elements";
-        return QRectF();
+    RectF result;
+
+    for (const RectF& rect : range()->boundingArea()) {
+        result = result.united(rect);
     }
 
-    RectF rect;
-    for (const Ms::EngravingItem* elm: els) {
-        if (rect.isNull()) {
-            rect = elm->canvasBoundingRect();
-        } else {
-            rect = rect.united(elm->canvasBoundingRect());
-        }
-    }
-
-    return rect.toQRectF();
+    return result;
 }
 
 INotationSelectionRangePtr NotationSelection::range() const
@@ -129,7 +130,17 @@ INotationSelectionRangePtr NotationSelection::range() const
     return m_range;
 }
 
-Ms::Score* NotationSelection::score() const
+mu::engraving::Score* NotationSelection::score() const
 {
     return m_getScore->score();
+}
+
+void NotationSelection::onElementHit(EngravingItem* el)
+{
+    m_lastElementHit = el;
+}
+
+EngravingItem* NotationSelection::lastElementHit() const
+{
+    return m_lastElementHit;
 }

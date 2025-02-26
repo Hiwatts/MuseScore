@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,14 +32,14 @@ TremoloBarSettingsModel::TremoloBarSettingsModel(QObject* parent, IElementReposi
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_TREMOLOBAR);
-    setTitle(qtrc("inspector", "Tremolo bar"));
-    setIcon(ui::IconCode::Code::GUITAR_TREMOLO_BAR);
+    setTitle(muse::qtrc("inspector", "Tremolo bar"));
+    setIcon(muse::ui::IconCode::Code::GUITAR_TREMOLO_BAR);
     createProperties();
 }
 
 void TremoloBarSettingsModel::createProperties()
 {
-    m_type = buildPropertyItem(Ms::Pid::TREMOLOBAR_TYPE, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_type = buildPropertyItem(mu::engraving::Pid::TREMOLOBAR_TYPE, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         if (newValue.toInt() != static_cast<int>(TremoloBarTypes::TremoloBarType::TYPE_CUSTOM)) {
@@ -47,19 +47,19 @@ void TremoloBarSettingsModel::createProperties()
         }
     });
 
-    m_curve = buildPropertyItem(Ms::Pid::TREMOLOBAR_CURVE, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_curve = buildPropertyItem(mu::engraving::Pid::TREMOLOBAR_CURVE, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         emit requestReloadPropertyItems();
     });
 
-    m_lineThickness = buildPropertyItem(Ms::Pid::LINE_WIDTH);
-    m_scale = buildPropertyItem(Ms::Pid::MAG);
+    m_lineThickness = buildPropertyItem(mu::engraving::Pid::LINE_WIDTH);
+    m_scale = buildPropertyItem(mu::engraving::Pid::MAG);
 }
 
 void TremoloBarSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::TREMOLOBAR);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::TREMOLOBAR);
 
     emit areSettingsAvailableChanged(areSettingsAvailable());
 }
@@ -68,13 +68,8 @@ void TremoloBarSettingsModel::loadProperties()
 {
     loadPropertyItem(m_type);
     loadPropertyItem(m_curve);
-    loadPropertyItem(m_lineThickness, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
-
-    loadPropertyItem(m_scale, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
+    loadPropertyItem(m_lineThickness, formatDoubleFunc);
+    loadPropertyItem(m_scale, formatDoubleFunc);
 }
 
 void TremoloBarSettingsModel::resetProperties()

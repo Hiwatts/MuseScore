@@ -20,86 +20,111 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_AUDIO_FLUIDSYNTH_H
-#define MU_AUDIO_FLUIDSYNTH_H
+#ifndef MUSE_AUDIO_FLUIDSYNTH_H
+#define MUSE_AUDIO_FLUIDSYNTH_H
 
 #include <memory>
+#include <optional>
 #include <vector>
-#include <cstdint>
-#include <functional>
 
-#include "modularity/ioc.h"
+#include "global/modularity/ioc.h"
+#include "midi/imidioutport.h"
 
-#include "isynthesizer.h"
+#include "../../abstractsynthesizer.h"
+#include "fluidsequencer.h"
 
-namespace mu::audio::synth {
+namespace muse::audio::synth {
 struct Fluid;
-class FluidSynth : public ISynthesizer
+class FluidSynth : public AbstractSynthesizer
 {
-public:
-    FluidSynth(const audio::AudioSourceParams& params);
+    Inject<midi::IMidiOutPort> midiOutPort = { this };
 
-    bool isValid() const override;
+public:
+    FluidSynth(const audio::AudioSourceParams& params, const modularity::ContextPtr& iocCtx);
+
+    Ret addSoundFonts(const std::vector<io::path_t>& sfonts);
+    void setPreset(const std::optional<midi::Program>& preset);
 
     std::string name() const override;
     AudioSourceType type() const override;
-    const audio::AudioInputParams& params() const override;
-    async::Channel<audio::AudioInputParams> paramsChanged() const override;
-    SoundFontFormats soundFontFormats() const override;
 
-    Ret init() override;
-    void setSampleRate(unsigned int sampleRate) override;
-    Ret addSoundFonts(const std::vector<io::path>& sfonts) override;
-    Ret removeSoundFonts() override;
+    void setupSound(const mpe::PlaybackSetupData& setupData) override;
+    void setupEvents(const mpe::PlaybackData& playbackData) override;
+    const mpe::PlaybackData& playbackData() const override;
 
-    bool isActive() const override;
-    void setIsActive(bool arg) override;
-
-    Ret setupMidiChannels(const std::vector<midi::Event>& events) override;
-    bool handleEvent(const midi::Event& e) override;
-
-    void allSoundsOff() override; // all channels
     void flushSound() override;
 
-    void midiChannelSoundsOff(midi::channel_t chan) override;
-    bool midiChannelVolume(midi::channel_t chan, float val) override;  // 0. - 1.
-    bool midiChannelBalance(midi::channel_t chan, float val) override; // -1. - 1.
-    bool midiChannelPitch(midi::channel_t chan, int16_t pitch) override; // -12 - 12
+    bool isActive() const override;
+    void setIsActive(const bool isActive) override;
+
+    msecs_t playbackPosition() const override;
+    void setPlaybackPosition(const msecs_t newPosition) override;
+
+    void revokePlayingNotes() override; // all channels
 
     unsigned int audioChannelsCount() const override;
     samples_t process(float* buffer, samples_t samplesPerChannel) override;
     async::Channel<unsigned int> audioChannelsCountChanged() const override;
+    void setSampleRate(unsigned int sampleRate) override;
+
+    bool isValid() const override;
 
 private:
+    struct KeyTuning {
+        std::vector<int> keys;
+        std::vector<double> pitches;
 
-    enum midi_control
-    {
-        BANK_SELECT_MSB = 0x00,
-        VOLUME_MSB      = 0x07,
-        BALANCE_MSB     = 0x08,
-        PAN_MSB         = 0x0A
+        void add(int key, double tuning)
+        {
+            keys.push_back(key);
+            pitches.push_back((key * 100.0) + tuning);
+        }
+
+        int size() const
+        {
+            return static_cast<int>(keys.size());
+        }
+
+        void reset()
+        {
+            keys.clear();
+            pitches.clear();
+        }
+
+        bool isEmpty() const
+        {
+            return keys.empty() && pitches.empty();
+        }
     };
 
-    struct SoundFont {
-        int id = -1;
-        io::path path;
-    };
+    Ret init();
+    void createFluidInstance();
+
+    void allNotesOff();
+
+    bool processSequence(const FluidSequencer::EventSequence& sequence, const samples_t samples, float* buffer);
+    bool handleEvent(const midi::Event& event);
+
+    void toggleExpressionController();
+
+    int setExpressionLevel(int level);
+    int setControllerValue(int channel, int ctrl, int value);
+    int setPitchBend(int channel, int pitchBend);
 
     std::shared_ptr<Fluid> m_fluid = nullptr;
-    std::vector<SoundFont> m_soundFonts;
 
-    bool m_isLoggingSynthEvents = false;
-
-    std::vector<float> m_preallocated; // used to flush a sound
-    bool m_isActive = false;
-
-    unsigned int m_sampleRate = 0;
-    audio::AudioInputParams m_params;
-    async::Channel<audio::AudioInputParams> m_paramsChanges;
     async::Channel<unsigned int> m_streamsCountChanged;
+
+    FluidSequencer m_sequencer;
+    std::set<io::path_t> m_sfontPaths;
+    std::optional<midi::Program> m_preset;
+
+    KeyTuning m_tuning;
+
+    bool m_allNotesOffRequested = false;
 };
 
 using FluidSynthPtr = std::shared_ptr<FluidSynth>;
 }
 
-#endif //MU_AUDIO_FLUIDSYNTH_H
+#endif //MUSE_AUDIO_FLUIDSYNTH_H

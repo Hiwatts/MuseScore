@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,18 +32,21 @@ class INotationStyle
 public:
     virtual ~INotationStyle() = default;
 
-    virtual QVariant styleValue(const StyleId& styleId) const = 0;
-    virtual QVariant defaultStyleValue(const StyleId& styleId) const = 0;
-    virtual void setStyleValue(const StyleId& styleId, const QVariant& newValue) = 0;
+    virtual PropertyValue styleValue(const StyleId& styleId) const = 0;
+    virtual PropertyValue defaultStyleValue(const StyleId& styleId) const = 0;
+    virtual void setStyleValue(const StyleId& styleId, const PropertyValue& newValue) = 0;
     virtual void resetStyleValue(const StyleId& styleId) = 0;
+    virtual void resetStyleValues(const std::vector<StyleId>& styleIds) = 0;
 
     virtual bool canApplyToAllParts() const = 0;
     virtual void applyToAllParts() = 0;
 
-    virtual async::Notification styleChanged() const = 0;
+    virtual void resetAllStyleValues(const StyleIdSet& exceptTheseOnes = {}) = 0;
 
-    virtual bool loadStyle(const mu::io::path&, bool allowAnyVersion) = 0;
-    virtual bool saveStyle(const mu::io::path&) = 0;
+    virtual muse::async::Notification styleChanged() const = 0;
+
+    virtual bool loadStyle(const muse::io::path_t&, bool allowAnyVersion) = 0;
+    virtual bool saveStyle(const muse::io::path_t&) = 0;
 };
 
 using INotationStylePtr = std::shared_ptr<INotationStyle>;

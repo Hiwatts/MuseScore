@@ -23,10 +23,14 @@
 
 #include "log.h"
 
-using namespace mu::midi;
+using namespace muse::midi;
 
 MidiPortDevModel::MidiPortDevModel(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), Injectable(muse::iocCtxForQmlObject(this))
+{
+}
+
+void MidiPortDevModel::init()
 {
     midiInPort()->eventReceived().onReceive(this, [this](tick_t tick, const Event& event) {
         QString str = "tick: " + QString::number(tick) + " " + QString::fromStdString(event.to_string());
@@ -35,12 +39,20 @@ MidiPortDevModel::MidiPortDevModel(QObject* parent)
         m_inputEvents.prepend(str);
         emit inputEventsChanged();
     });
+
+    midiInPort()->availableDevicesChanged().onNotify(this, [this]() {
+        emit inputDevicesChanged();
+    });
+
+    midiOutPort()->availableDevicesChanged().onNotify(this, [this]() {
+        emit outputDevicesChanged();
+    });
 }
 
 QVariantList MidiPortDevModel::outputDevices() const
 {
     QVariantList list;
-    std::vector<MidiDevice> devs = midiOutPort()->devices();
+    std::vector<MidiDevice> devs = midiOutPort()->availableDevices();
     for (const MidiDevice& d : devs) {
         QVariantMap item;
         item["id"] = QString::fromStdString(d.id);
@@ -76,7 +88,7 @@ void MidiPortDevModel::outputDeviceAction(const QString& deviceID, const QString
 QVariantList MidiPortDevModel::inputDevices() const
 {
     QVariantList list;
-    std::vector<MidiDevice> devs = midiInPort()->devices();
+    std::vector<MidiDevice> devs = midiInPort()->availableDevices();
     for (const MidiDevice& d : devs) {
         QVariantMap item;
         item["id"] = QString::fromStdString(d.id);
@@ -186,6 +198,8 @@ void MidiPortDevModel::generateMIDI20()
             e.setData(++data);
         }
 
+        midiOutPort()->sendEvent(e);
+
         QString str = QString::fromStdString(e.to_string());
         QString str2 = "";
 
@@ -199,9 +213,4 @@ void MidiPortDevModel::generateMIDI20()
         m_inputEvents.prepend(str);
     }
     emit inputEventsChanged();
-}
-
-bool MidiPortDevModel::isInputConnected() const
-{
-    return midiInPort()->isConnected();
 }

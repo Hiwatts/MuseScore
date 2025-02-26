@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<museScore version="4.00">
+<museScore version="1.14">
   <Style>
     <pageWidth>8.27</pageWidth>
     <pageHeight>11.69</pageHeight>
@@ -17,6 +17,7 @@
     <akkoladeDistance>6.5</akkoladeDistance>
     <minSystemDistance>8.5</minSystemDistance>
     <maxSystemDistance>15</maxSystemDistance>
+    <enableVerticalSpread>0</enableVerticalSpread>
     <enableIndentationOnFirstSystem>0</enableIndentationOnFirstSystem>
     <lyricsPlacement>1</lyricsPlacement>
     <lyricsPosAbove x="0" y="-2"/>
@@ -75,7 +76,6 @@
     <startBarlineSingle>0</startBarlineSingle>
     <startBarlineMultiple>1</startBarlineMultiple>
     <bracketWidth>0.35</bracketWidth>
-    <bracketDistance>0.25</bracketDistance>
     <akkoladeWidth>1.6</akkoladeWidth>
     <akkoladeBarDistance>0.4</akkoladeBarDistance>
     <dividerLeft>0</dividerLeft>
@@ -103,7 +103,6 @@
     <timesigBarlineDistance>0.5</timesigBarlineDistance>
     <stemWidth>0.13</stemWidth>
     <shortenStem>1</shortenStem>
-    <shortStemProgression>0.25</shortStemProgression>
     <shortestStem>2.25</shortestStem>
     <beginRepeatLeftMargin>1</beginRepeatLeftMargin>
     <minNoteDistance>0.4</minNoteDistance>
@@ -111,7 +110,7 @@
     <barAccidentalDistance>0.3</barAccidentalDistance>
     <multiMeasureRestMargin>1.2</multiMeasureRestMargin>
     <noteBarDistance>1</noteBarDistance>
-    <measureSpacing>1.2</measureSpacing>
+    <measureSpacing>1.5</measureSpacing>
     <staffLineWidth>0.08</staffLineWidth>
     <ledgerLineWidth>0.12</ledgerLineWidth>
     <ledgerLineLength>0.38</ledgerLineLength>
@@ -125,9 +124,9 @@
     <dotNoteDistance>0.35</dotNoteDistance>
     <dotRestDistance>0.25</dotRestDistance>
     <dotDotDistance>0.5</dotDotDistance>
-    <propertyDistanceHead>1</propertyDistanceHead>
+    <propertyDistanceHead>0.5</propertyDistanceHead>
     <propertyDistanceStem>0.5</propertyDistanceStem>
-    <propertyDistance>1</propertyDistance>
+    <propertyDistance>0.5</propertyDistance>
     <articulationMag>1</articulationMag>
     <articulationPosAbove x="0" y="0"/>
     <articulationAnchorDefault>2</articulationAnchorDefault>
@@ -192,7 +191,6 @@
     <harmonyPlacement>0</harmonyPlacement>
     <romanNumeralPlacement>1</romanNumeralPlacement>
     <nashvilleNumberPlacement>0</nashvilleNumberPlacement>
-    <harmonyPlay>1</harmonyPlay>
     <harmonyVoiceLiteral>1</harmonyVoiceLiteral>
     <harmonyVoicing>0</harmonyVoicing>
     <harmonyDuration>0</harmonyDuration>
@@ -304,7 +302,7 @@
     <createMultiMeasureRests>0</createMultiMeasureRests>
     <minEmptyMeasures>2</minEmptyMeasures>
     <minMMRestWidth>4</minMMRestWidth>
-    <mmRestNumberPos>-1.5</mmRestNumberPos>
+    <mmRestNumberPos>-0.5</mmRestNumberPos>
     <hideEmptyStaves>0</hideEmptyStaves>
     <dontHidStavesInFirstSystm>1</dontHidStavesInFirstSystm>
     <alwaysShowBracketsWhenEmptyStavesAreHidden>0</alwaysShowBracketsWhenEmptyStavesAreHidden>
@@ -836,6 +834,31 @@
     <footerFrameRound>0</footerFrameRound>
     <footerFrameFgColor r="0" g="0" b="0" a="255"/>
     <footerFrameBgColor r="255" g="255" b="255" a="0"/>
+    <copyrightFontFace>FreeSerif</copyrightFontFace>
+    <copyrightFontSize>8</copyrightFontSize>
+    <copyrightFontSpatiumDependent>0</copyrightFontSpatiumDependent>
+    <copyrightFontStyle>0</copyrightFontStyle>
+    <copyrightColor r="0" g="0" b="0" a="255"/>
+    <copyrightOffset x="0" y="5"/>
+    <copyrightFrameType>0</copyrightFrameType>
+    <copyrightFramePadding>0.2</copyrightFramePadding>
+    <copyrightFrameWidth>0.1</copyrightFrameWidth>
+    <copyrightFrameRound>0</copyrightFrameRound>
+    <copyrightFrameFgColor r="0" g="0" b="0" a="255"/>
+    <copyrightFrameBgColor r="255" g="255" b="255" a="0"/>
+    <pageNumberFontFace>FreeSerif</pageNumberFontFace>
+    <pageNumberFontSize>8</pageNumberFontSize>
+    <pageNumberFontSpatiumDependent>0</pageNumberFontSpatiumDependent>
+    <pageNumberFontStyle>0</pageNumberFontStyle>
+    <pageNumberAlign>center,bottom</pageNumberAlign>
+    <pageNumberColor r="0" g="0" b="0" a="255"/>
+    <pageNumberOffset x="0" y="5"/>
+    <pageNumberFrameType>0</pageNumberFrameType>
+    <pageNumberFramePadding>0.2</pageNumberFramePadding>
+    <pageNumberFrameWidth>0.1</pageNumberFrameWidth>
+    <pageNumberFrameRound>0</pageNumberFrameRound>
+    <pageNumberFrameFgColor r="0" g="0" b="0" a="255"/>
+    <pageNumberFrameBgColor r="255" g="255" b="255" a="0"/>
     <instrumentChangeFontFace>FreeSerif</instrumentChangeFontFace>
     <instrumentChangeFontSize>12</instrumentChangeFontSize>
     <instrumentChangeFontSpatiumDependent>1</instrumentChangeFontSpatiumDependent>

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# MuseScore-CLA-applies
+# MuseScore-Studio-CLA-applies
 #
-# MuseScore
+# MuseScore Studio
 # Music Composition & Notation
 #
-# Copyright (C) 2021 MuseScore BVBA and others
+# Copyright (C) 2021 MuseScore Limited
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -18,48 +18,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-add_subdirectory(framework)
+if (NOT MUE_BUILD_BRAILLE_MODULE)
+    add_subdirectory(braille)
+endif()
 
-if (NOT BUILD_LEARN_MODULE)
-    add_subdirectory(learn)
-endif (NOT BUILD_LEARN_MODULE)
-
-if (NOT BUILD_WORKSPACE_MODULE)
-    add_subdirectory(workspace)
-endif (NOT BUILD_WORKSPACE_MODULE)
-
-if (NOT BUILD_CLOUD_MODULE)
-    add_subdirectory(cloud)
-endif (NOT BUILD_CLOUD_MODULE)
-
-if (NOT BUILD_EXTENSIONS_MODULE)
-    add_subdirectory(extensions)
-endif (NOT BUILD_EXTENSIONS_MODULE)
-
-if (NOT BUILD_LANGUAGES_MODULE)
-    add_subdirectory(languages)
-endif (NOT BUILD_LANGUAGES_MODULE)
-
-if (NOT BUILD_PLUGINS_MODULE)
-    add_subdirectory(plugins)
-endif (NOT BUILD_PLUGINS_MODULE)
-
-if (NOT BUILD_PLAYBACK_MODULE)
-    add_subdirectory(playback)
-endif (NOT BUILD_PLAYBACK_MODULE)
-
-if (NOT BUILD_PALETTE_MODULE)
-    add_subdirectory(palette)
-endif (NOT BUILD_PALETTE_MODULE)
-
-if (NOT BUILD_INSTRUMENTSSCENE_MODULE)
-    add_subdirectory(instrumentsscene)
-endif (NOT BUILD_INSTRUMENTSSCENE_MODULE)
-
-if (NOT BUILD_INSPECTOR_MODULE)
+if (NOT MUE_BUILD_INSPECTOR_MODULE)
     add_subdirectory(inspector)
-endif (NOT BUILD_INSPECTOR_MODULE)
+endif()
 
-if (NOT BUILD_MULTIINSTANCES_MODULE)
-    add_subdirectory(multiinstances)
+if (NOT MUE_BUILD_INSTRUMENTSSCENE_MODULE)
+    add_subdirectory(instrumentsscene)
+endif()
+
+if (NOT MUE_BUILD_NOTATION_MODULE)
+    add_subdirectory(notation)
+endif()
+
+if (NOT MUE_BUILD_PALETTE_MODULE)
+    add_subdirectory(palette)
+endif()
+
+if (NOT MUE_BUILD_PLAYBACK_MODULE)
+    add_subdirectory(playback)
+endif()
+
+if (NOT MUE_BUILD_PROJECT_MODULE)
+    add_subdirectory(project)
+endif()
+
+if (NOT MUSE_MODULE_WORKSPACE)
+    add_subdirectory(workspacescene)
 endif()

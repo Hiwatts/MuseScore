@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -32,33 +32,24 @@
 #include "actions/iactionsdispatcher.h"
 
 namespace mu::palette {
-class PaletteRootModel : public QObject, public actions::Actionable, public async::Asyncable
+class PaletteRootModel : public QObject, public muse::actions::Actionable, public muse::async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(palette, IPaletteProvider, paletteProvider)
-    INJECT(palette, actions::IActionsDispatcher, dispatcher)
+    INJECT(IPaletteProvider, paletteProvider)
+    INJECT(muse::actions::IActionsDispatcher, dispatcher)
 
-    Q_PROPERTY(Ms::PaletteProvider* paletteProvider READ paletteProvider_property CONSTANT)
-
-    Q_PROPERTY(bool paletteEnabled READ paletteEnabled NOTIFY paletteEnabledChanged)
-    Q_PROPERTY(bool needShowShadowOverlay READ needShowShadowOverlay NOTIFY needShowShadowOverlayChanged)
+    Q_PROPERTY(mu::palette::PaletteProvider * paletteProvider READ paletteProvider_property CONSTANT)
 
 public:
     explicit PaletteRootModel(QObject* parent = nullptr);
+    ~PaletteRootModel() override;
 
-    Ms::PaletteProvider* paletteProvider_property() const;
-
-    bool paletteEnabled() const;
-    bool needShowShadowOverlay() const;
+    PaletteProvider* paletteProvider_property() const;
 
 signals:
     void paletteSearchRequested();
-    void paletteEnabledChanged();
-    void needShowShadowOverlayChanged();
-
-private:
-    bool m_needShowShadowOverlay = false;
+    void applyCurrentPaletteElementRequested();
 };
 }
 

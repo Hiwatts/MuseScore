@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,12 +21,12 @@
  */
 import QtQuick 2.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "MIDI")
+    title: qsTrc("appshell/preferences", "MIDI")
 
     property alias shortestNotes: shortestNotesBox.model
     property int currentShortestNote: 0
@@ -36,8 +36,8 @@ BaseSection {
     ComboBoxWithTitle {
         id: shortestNotesBox
 
-        title: qsTrc("appshell", "Shortest note:")
-        titleWidth: 220
+        title: qsTrc("appshell/preferences", "Shortest note:")
+        columnWidth: root.columnWidth
 
         currentIndex: control.indexOfValue(root.currentShortestNote)
 
@@ -48,7 +48,7 @@ BaseSection {
         navigation.panel: root.navigation
         navigation.row: 0
 
-        onValueEdited: {
+        onValueEdited: function(newIndex, newValue) {
             root.currentShortestNoteChangeRequested(newValue)
         }
     }

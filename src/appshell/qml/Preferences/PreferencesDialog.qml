@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Preferences 1.0
 
 import "internal"
@@ -31,17 +31,26 @@ import "internal"
 StyledDialogView {
     id: root
 
-    title: qsTrc("appshell", "Preferences")
+    title: qsTrc("appshell/preferences", "Preferences")
 
     contentWidth: 880
-    contentHeight: 600
+    contentHeight: 640
     resizable: true
 
     property string currentPageId: ""
+    property var params: null
 
-    property QtObject privatesProperties: QtObject {
+    property QtObject prv: QtObject {
         property var pagesObjects: (new Map())
-        property bool inited: false
+
+        function resolveStackCurrentIndex() {
+            var keys = Object.keys(root.prv.pagesObjects)
+            return keys.indexOf(preferencesModel.currentPageId)
+        }
+
+        function updateStackCurrentIndex() {
+            stack.currentIndex = resolveStackCurrentIndex()
+        }
     }
 
     Component.onCompleted: {
@@ -49,7 +58,7 @@ StyledDialogView {
 
         initPagesObjects()
 
-        root.privatesProperties.inited = true
+        prv.updateStackCurrentIndex()
     }
 
     function initPagesObjects() {
@@ -57,12 +66,23 @@ StyledDialogView {
         for (var i in pages) {
             var pageInfo = pages[i]
 
-            var pagePath = Boolean(pageInfo.path) ? pageInfo.path : "Preferences/StubPreferencesPage.qml"
-            var pageComponent = Qt.createComponent("../" + pagePath)
+            if (!Boolean(pageInfo.path)) {
+                continue
+            }
+
+            var pageComponent = Qt.createComponent("../" + pageInfo.path)
 
             var properties = {
                 navigationSection: root.navigationSection,
                 navigationOrderStart: (i + 1) * 100
+            }
+
+            if (root.currentPageId === pageInfo.id) {
+                var params = root.params
+                for (var key in params) {
+                    var value = params[key]
+                    properties[key] = value
+                }
             }
 
             var obj = pageComponent.createObject(stack, properties)
@@ -75,12 +95,16 @@ StyledDialogView {
                 root.hide()
             })
 
-            root.privatesProperties.pagesObjects[pageInfo.id] = obj
+            root.prv.pagesObjects[pageInfo.id] = obj
         }
     }
 
     PreferencesModel {
         id: preferencesModel
+
+        onCurrentPageIdChanged: function(currentPageId) {
+            prv.updateStackCurrentIndex()
+        }
     }
 
     ColumnLayout {
@@ -108,23 +132,8 @@ StyledDialogView {
 
             SeparatorLine { orientation: Qt.Vertical }
 
-            Rectangle {
-                Layout.fillHeight: true
-                Layout.fillWidth: true
-
-                color: ui.theme.backgroundSecondaryColor
-
-                StackLayout {
-                    id: stack
-
-                    anchors.fill: parent
-                    anchors.margins: 30
-
-                    currentIndex: {
-                        var keys = Object.keys(root.privatesProperties.pagesObjects)
-                        return keys.indexOf(preferencesModel.currentPageId)
-                    }
-                }
+            StackLayout {
+                id: stack
             }
         }
 
@@ -140,6 +149,18 @@ StyledDialogView {
             navigation.order: 100000
 
             onRevertFactorySettingsRequested: {
+                if (!preferencesModel.askForConfirmationOfPreferencesReset()) {
+                    return;
+                }
+
+                var pages = preferencesModel.availablePages()
+
+                for (var i in pages) {
+                    var page = pages[i]
+                    var obj = root.prv.pagesObjects[page.id]
+                    obj.reset()
+                }
+
                 preferencesModel.resetFactorySettings()
             }
 
@@ -156,7 +177,7 @@ StyledDialogView {
 
                 for (var i in pages) {
                     var page = pages[i]
-                    var obj = root.privatesProperties.pagesObjects[page.id]
+                    var obj = root.prv.pagesObjects[page.id]
                     ok &= obj.apply()
                 }
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
   <work>
     <work-number>MuseScore testfile</work-number>
     <work-title>Lines 4</work-title>
@@ -69,7 +69,7 @@
         </note>
       <direction placement="below">
         <direction-type>
-          <bracket type="stop" number="1" line-end="down" end-length="6"/>
+          <bracket type="stop" number="1" line-end="both" end-length="12"/>
           </direction-type>
         </direction>
       </measure>
@@ -94,7 +94,7 @@
         </note>
       <direction placement="below">
         <direction-type>
-          <bracket type="stop" number="1" line-end="down" end-length="6"/>
+          <bracket type="stop" number="1" line-end="both" end-length="12"/>
           </direction-type>
         </direction>
       </measure>

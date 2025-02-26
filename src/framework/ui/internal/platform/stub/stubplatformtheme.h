@@ -5,7 +5,7 @@
  * MuseScore
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2022 MuseScore BVBA and others
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,12 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UI_STUBPLATFORMTHEME_H
-#define MU_UI_STUBPLATFORMTHEME_H
+#ifndef MUSE_UI_STUBPLATFORMTHEME_H
+#define MUSE_UI_STUBPLATFORMTHEME_H
 
 #include "internal/iplatformtheme.h"
 
-namespace mu::ui {
+namespace muse::ui {
 class StubPlatformTheme : public IPlatformTheme
 {
 public:
@@ -34,15 +34,17 @@ public:
 
     bool isFollowSystemThemeAvailable() const override;
 
-    ThemeCode themeCode() const override;
-    async::Channel<ThemeCode> themeCodeChanged() const override;
+    bool isSystemThemeDark() const override;
+    async::Notification platformThemeChanged() const override;
 
-    void applyPlatformStyleOnAppForTheme(ThemeCode themeCode) override;
-    void applyPlatformStyleOnWindowForTheme(QWindow* window, ThemeCode themeCode) override;
+    bool isGlobalMenuAvailable() const override;
+
+    void applyPlatformStyleOnAppForTheme(const ThemeCode& themeCode) override;
+    void applyPlatformStyleOnWindowForTheme(QWindow* window, const ThemeCode& themeCode) override;
 
 private:
-    async::Channel<ThemeCode> m_channel;
+    async::Notification m_platformThemeChanged;
 };
 }
 
-#endif // MU_UI_STUBPLATFORMTHEME_H
+#endif // MUSE_UI_STUBPLATFORMTHEME_H

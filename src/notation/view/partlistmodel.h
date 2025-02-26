@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,27 +20,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_NOTATION_PARTLISTMODEL_H
-#define MU_NOTATION_PARTLISTMODEL_H
+#pragma once
+
+#include <QAbstractListModel>
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "iinteractive.h"
 
-namespace mu::uicomponents {
+namespace muse::uicomponents {
 class ItemMultiSelectionModel;
 }
 
 namespace mu::notation {
-class PartListModel : public QAbstractListModel
+class PartListModel : public QAbstractListModel, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(notation, context::IGlobalContext, context)
-    INJECT(notation, framework::IInteractive, interactive)
-
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    Q_PROPERTY(bool isRemovingAvailable READ isRemovingAvailable NOTIFY selectionChanged)
+
+    muse::Inject<context::IGlobalContext> context = { this };
+    muse::Inject<muse::IInteractive> interactive = { this };
 
 public:
     explicit PartListModel(QObject* parent = nullptr);
@@ -50,46 +50,48 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     bool hasSelection() const;
-    bool isRemovingAvailable() const;
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void createNewPart();
-    Q_INVOKABLE void removeSelectedParts();
     Q_INVOKABLE void openSelectedParts();
+    Q_INVOKABLE void openAllParts();
 
     Q_INVOKABLE void selectPart(int partIndex);
+    Q_INVOKABLE void resetPart(int partIndex);
     Q_INVOKABLE void removePart(int partIndex);
-    Q_INVOKABLE void setPartTitle(int partIndex, const QString& title);
-    Q_INVOKABLE void validatePartTitle(int partIndex);
     Q_INVOKABLE void copyPart(int partIndex);
+
+    Q_INVOKABLE QString validatePartTitle(int partIndex, const QString& title) const;
+    Q_INVOKABLE void setPartTitle(int partIndex, const QString& title);
 
 signals:
     void selectionChanged();
     void partAdded(int index);
 
 private:
-    void setTitle(INotationPtr notation, const QString& title);
+    void openExcerpts(const QList<int>& rows) const;
+
+    muse::Ret doValidatePartTitle(int partIndex, const QString& title) const;
 
     bool isExcerptIndexValid(int index) const;
 
-    bool userAgreesToRemoveParts(int partCount) const;
+    void doResetPart(int partIndex);
     void doRemovePart(int partIndex);
 
     IMasterNotationPtr masterNotation() const;
 
-    void insertExcerpt(int destinationIndex, IExcerptNotationPtr excerpt);
+    void insertNewExcerpt(int destinationIndex, IExcerptNotationPtr excerpt);
     void notifyAboutNotationChanged(int index);
 
     enum Roles {
         RoleTitle = Qt::UserRole + 1,
         RoleIsSelected,
-        RoleIsCreated
+        RoleIsInited,
+        RoleIsCustom
     };
 
-    uicomponents::ItemMultiSelectionModel* m_selectionModel = nullptr;
+    muse::uicomponents::ItemMultiSelectionModel* m_selectionModel = nullptr;
     QList<IExcerptNotationPtr> m_excerpts;
     INotationPtr m_currentNotation;
 };
 }
-
-#endif // MU_NOTATION_PARTLISTMODEL_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,22 +20,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_INSPECTOR_GRIDCANVAS_H
-#define MU_INSPECTOR_GRIDCANVAS_H
+#ifndef MU_INSPECTOR_COMPAT_GRIDCANVAS_H
+#define MU_INSPECTOR_COMPAT_GRIDCANVAS_H
 
-#include <QQuickPaintedItem>
 #include <QPainter>
 
+#include "uicomponents/view/quickpaintedview.h"
 #include "modularity/ioc.h"
 #include "ui/iuiconfiguration.h"
-#include "libmscore/pitchvalue.h"
+#include "engraving/types/pitchvalue.h"
 
 namespace mu::inspector {
-class GridCanvas : public QQuickPaintedItem
+class GridCanvas : public muse::uicomponents::QuickPaintedView
 {
     Q_OBJECT
 
-    INJECT(inspector, mu::ui::IUiConfiguration, uiConfig)
+    INJECT(muse::ui::IUiConfiguration, uiConfig)
 
     Q_PROPERTY(QVariant pointList READ pointList WRITE setPointList NOTIFY pointListChanged)
 
@@ -83,7 +83,7 @@ private:
     void paint(QPainter* painter) override;
     void mousePressEvent(QMouseEvent*) override;
 
-    QList<Ms::PitchValue> m_points;
+    mu::engraving::PitchValues m_points;
 
     /// The number of rows and columns.
     /// This is in fact the number of lines that are to be drawn.

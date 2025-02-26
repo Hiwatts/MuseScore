@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,6 +28,9 @@
 #include "audio/audiotypes.h"
 
 namespace mu::playback {
+static constexpr muse::audio::aux_channel_idx_t AUX_CHANNEL_NUM = 2;
+static constexpr muse::audio::aux_channel_idx_t REVERB_CHANNEL_IDX = 0;
+
 enum class PlaybackCursorType {
     SMOOTH,
     STEPPED
@@ -40,6 +43,8 @@ enum class MixerSectionType {
     AudioFX,
     Balance,
     Volume,
+    Fader,
+    MuteAndSolo,
     Title
 };
 
@@ -51,6 +56,8 @@ inline QList<MixerSectionType> allMixerSectionTypes()
         MixerSectionType::AudioFX,
         MixerSectionType::Balance,
         MixerSectionType::Volume,
+        MixerSectionType::Fader,
+        MixerSectionType::MuteAndSolo,
         MixerSectionType::Title
     };
 
@@ -59,26 +66,57 @@ inline QList<MixerSectionType> allMixerSectionTypes()
 
 static const QTime ZERO_TIME(0, 0, 0, 0);
 
-inline audio::msecs_t secondsToMilliseconds(float seconds)
+inline QTime timeFromSeconds(muse::audio::secs_t seconds)
 {
-    return seconds * 1000;
+    return ZERO_TIME.addMSecs(muse::audio::secsToMilisecs(seconds));
 }
 
-inline QTime timeFromMilliseconds(audio::msecs_t millisecons)
+inline muse::audio::secs_t timeToSeconds(const QTime& time)
 {
-    return ZERO_TIME.addMSecs(millisecons);
+    return muse::audio::milisecsToSecs(ZERO_TIME.msecsTo(time));
 }
 
-inline QTime timeFromSeconds(float seconds)
-{
-    uint64_t milliseconds = secondsToMilliseconds(seconds);
-    return timeFromMilliseconds(milliseconds);
-}
+enum class SoundProfileType {
+    Undefined = -1,
+    Basic,
+    Muse,
+    Custom
+};
 
-inline audio::msecs_t timeToMilliseconds(const QTime& time)
-{
-    return ZERO_TIME.msecsTo(time);
-}
+using SoundProfileName = muse::String;
+using SoundProfileData = std::map<muse::mpe::PlaybackSetupData, muse::audio::AudioResourceMeta>;
+
+struct SoundProfile {
+    SoundProfileType type = SoundProfileType::Undefined;
+    SoundProfileName name;
+
+    SoundProfileData data;
+
+    const muse::audio::AudioResourceMeta& findResource(const muse::mpe::PlaybackSetupData& key) const
+    {
+        auto search = data.find(key);
+        if (search != data.cend()) {
+            return search->second;
+        }
+
+        static muse::audio::AudioResourceMeta empty;
+        return empty;
+    }
+
+    bool isEnabled() const
+    {
+        return !data.empty();
+    }
+
+    bool isValid() const
+    {
+        return type != SoundProfileType::Undefined
+               && !name.isEmpty()
+               && isEnabled();
+    }
+};
+
+using SoundProfilesMap = std::map<SoundProfileName, SoundProfile>;
 }
 
 #endif // MU_PLAYBACK_PLAYBACKTYPES_H

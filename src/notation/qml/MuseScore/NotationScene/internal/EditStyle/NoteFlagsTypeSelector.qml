@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,21 +22,15 @@
 import QtQuick 2.15
 
 import MuseScore.NotationScene 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 Rectangle {
     anchors.fill: parent
     color: ui.theme.backgroundPrimaryColor
 
-    signal requestedUseStraightFlags(bool use)
-
-    NoteFlagsTypeSelectorModel {
-        id: selectorModel
-    }
-
-    Component.onCompleted: {
-        selectorModel.load()
+    NotesPageModel {
+        id: notesPageModel
     }
 
     RadioButtonGroup {
@@ -53,7 +47,7 @@ Rectangle {
             width: 106
             height: 70
 
-            checked: modelData.value === selectorModel.useStraightNoteFlags
+            checked: modelData.value === notesPageModel.useStraightNoteFlags.value
 
             Column {
                 anchors.centerIn: parent
@@ -73,7 +67,7 @@ Rectangle {
             }
 
             onToggled: {
-                selectorModel.useStraightNoteFlags = modelData.value
+                notesPageModel.useStraightNoteFlags.value = modelData.value
             }
         }
     }

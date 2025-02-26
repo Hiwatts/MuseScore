@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,24 +22,26 @@
 
 #include "noteGroups.h"
 
-#include "libmscore/chord.h"
-#include "libmscore/mcursor.h"
-#include "libmscore/timesig.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/part.h"
-#include "libmscore/key.h"
-#include "libmscore/actionicon.h"
-#include "libmscore/staff.h"
+#include "engraving/dom/chord.h"
+#include "engraving/dom/mcursor.h"
+#include "engraving/dom/timesig.h"
+#include "engraving/dom/masterscore.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/key.h"
+#include "engraving/dom/actionicon.h"
+#include "engraving/dom/staff.h"
 
 #include "translation.h"
 
-namespace Ms {
-Score* NoteGroups::createScore(int n, TDuration::DurationType t, std::vector<Chord*>* chords)
+using namespace mu::palette;
+using namespace mu::engraving;
+
+Score* NoteGroups::createScore(int n, DurationType t, std::vector<Chord*>* chords)
 {
     MCursor c;
     c.setTimeSig(_sig);
-    c.createScore("");
-    c.addPart("voice");
+    c.createScore(iocContext(), u"");
+    c.addPart(u"voice");
     c.move(0, Fraction(0, 1));
     c.addKeySig(Key::C);
 
@@ -52,14 +54,14 @@ Score* NoteGroups::createScore(int n, TDuration::DurationType t, std::vector<Cho
     }
     GroupNode node { 0, 0 };
     Groups ng;
-    ng.push_back(node);
+    ng.addNode(node);
     nts->setGroups(ng);
 
     for (int i = 0; i < n; ++i) {
         Chord* chord = c.addChord(77, t);
         Fraction tick = chord->rtick();
         chord->setBeamMode(_groups.beamMode(tick.ticks(), t));
-        chord->setStemDirection(Direction::UP);
+        chord->setStemDirection(DirectionV::UP);
         chords->push_back(chord);
     }
 
@@ -70,24 +72,24 @@ Score* NoteGroups::createScore(int n, TDuration::DurationType t, std::vector<Cho
     StaffType* st = c.score()->staff(0)->staffType(Fraction(0, 1));
     st->setLines(1);            // single line only
     st->setGenClef(false);      // no clef
-//      st->setGenTimesig(false); // don't display time sig since ExampleView is unable to reflect custom time sig text/symbols
+//    st->setGenTimesig(false); // don't display time sig since NoteGroupsExampleView is unable to reflect custom time sig text/symbols
 
     return c.score();
 }
 
 NoteGroups::NoteGroups(QWidget* parent)
-    : QGroupBox(parent)
+    : QGroupBox(parent), muse::Injectable(muse::iocCtxForQWidget(this))
 {
     setupUi(this);
 
-    iconPalette->setName(QT_TRANSLATE_NOOP("palette", "Beam properties"));
+    iconPalette->setName(QT_TRANSLATE_NOOP("palette", "Beam selector"));
     iconPalette->setGridSize(27, 40);
     iconPalette->setDrawGrid(true);
 
-    iconPalette->appendActionIcon(ActionIconType::BEAM_START, "beam-start");
-    iconPalette->appendActionIcon(ActionIconType::BEAM_MID, "beam-mid");
-    iconPalette->appendActionIcon(ActionIconType::BEAM_BEGIN_32, "beam32");
-    iconPalette->appendActionIcon(ActionIconType::BEAM_BEGIN_64, "beam64");
+    iconPalette->appendActionIcon(ActionIconType::BEAM_JOIN, "beam-join");
+    iconPalette->appendActionIcon(ActionIconType::BEAM_BREAK_LEFT, "beam-break-left");
+    iconPalette->appendActionIcon(ActionIconType::BEAM_BREAK_INNER_8TH, "beam-break-inner-8th");
+    iconPalette->appendActionIcon(ActionIconType::BEAM_BREAK_INNER_16TH, "beam-break-inner-16th");
 
     iconPalette->setReadOnly(true);
     iconPalette->setApplyingElementsDisabled(true);
@@ -98,13 +100,13 @@ NoteGroups::NoteGroups(QWidget* parent)
 
     connect(resetGroups, &QPushButton::clicked, this, &NoteGroups::resetClicked);
 
-    connect(view8, &ExampleView::noteClicked, this, &NoteGroups::noteClicked);
-    connect(view16, &ExampleView::noteClicked, this, &NoteGroups::noteClicked);
-    connect(view32, &ExampleView::noteClicked, this, &NoteGroups::noteClicked);
+    connect(view8, &NoteGroupsExampleView::noteClicked, this, &NoteGroups::noteClicked);
+    connect(view16, &NoteGroupsExampleView::noteClicked, this, &NoteGroups::noteClicked);
+    connect(view32, &NoteGroupsExampleView::noteClicked, this, &NoteGroups::noteClicked);
 
-    connect(view8, &ExampleView::beamPropertyDropped, this, &NoteGroups::beamPropertyDropped);
-    connect(view16, &ExampleView::beamPropertyDropped, this, &NoteGroups::beamPropertyDropped);
-    connect(view32, &ExampleView::beamPropertyDropped, this, &NoteGroups::beamPropertyDropped);
+    connect(view8, &NoteGroupsExampleView::beamPropertyDropped, this, &NoteGroups::beamPropertyDropped);
+    connect(view16, &NoteGroupsExampleView::beamPropertyDropped, this, &NoteGroups::beamPropertyDropped);
+    connect(view32, &NoteGroupsExampleView::beamPropertyDropped, this, &NoteGroups::beamPropertyDropped);
 }
 
 void NoteGroups::setSig(Fraction sig, const Groups& g, const QString& z, const QString& n)
@@ -118,14 +120,11 @@ void NoteGroups::setSig(Fraction sig, const Groups& g, const QString& z, const Q
     chords32.clear();
     Fraction f = _sig.reduced();
     int nn   = f.numerator() * (8 / f.denominator());
-    view8->setScore(createScore(nn, TDuration::DurationType::V_EIGHTH, &chords8));
+    view8->setScore(createScore(nn, DurationType::V_EIGHTH, &chords8));
     nn   = f.numerator() * (16 / f.denominator());
-    view16->setScore(createScore(nn, TDuration::DurationType::V_16TH, &chords16));
+    view16->setScore(createScore(nn, DurationType::V_16TH, &chords16));
     nn   = f.numerator() * (32 / f.denominator());
-    view32->setScore(createScore(nn, TDuration::DurationType::V_32ND, &chords32));
-    view8->resetMatrix();
-    view16->resetMatrix();
-    view32->resetMatrix();
+    view32->setScore(createScore(nn, DurationType::V_32ND, &chords32));
 }
 
 Groups NoteGroups::groups()
@@ -151,27 +150,27 @@ void NoteGroups::resetClicked()
 void NoteGroups::noteClicked(Note* note)
 {
     Chord* chord = note->chord();
-    if (chord->beamMode() == Beam::Mode::AUTO) {
-        updateBeams(chord, Beam::Mode::BEGIN);
-    } else if (chord->beamMode() == Beam::Mode::BEGIN) {
-        updateBeams(chord, Beam::Mode::AUTO);
+    if (chord->beamMode() == BeamMode::AUTO) {
+        updateBeams(chord, BeamMode::BEGIN);
+    } else {
+        updateBeams(chord, BeamMode::AUTO);
     }
 }
 
 void NoteGroups::beamPropertyDropped(Chord* chord, ActionIcon* icon)
 {
     switch (icon->actionType()) {
-    case ActionIconType::BEAM_START:
-        updateBeams(chord, Beam::Mode::BEGIN);
+    case ActionIconType::BEAM_JOIN:
+        updateBeams(chord, BeamMode::AUTO);
         break;
-    case ActionIconType::BEAM_MID:
-        updateBeams(chord, Beam::Mode::AUTO);
+    case ActionIconType::BEAM_BREAK_LEFT:
+        updateBeams(chord, BeamMode::BEGIN);
         break;
-    case ActionIconType::BEAM_BEGIN_32:
-        updateBeams(chord, Beam::Mode::BEGIN32);
+    case ActionIconType::BEAM_BREAK_INNER_8TH:
+        updateBeams(chord, BeamMode::BEGIN16);
         break;
-    case ActionIconType::BEAM_BEGIN_64:
-        updateBeams(chord, Beam::Mode::BEGIN64);
+    case ActionIconType::BEAM_BREAK_INNER_16TH:
+        updateBeams(chord, BeamMode::BEGIN32);
         break;
     default:
         break;
@@ -179,7 +178,7 @@ void NoteGroups::beamPropertyDropped(Chord* chord, ActionIcon* icon)
 }
 
 /// takes into account current state of changeShorterCheckBox to update smaller valued notes as well
-void NoteGroups::updateBeams(Chord* chord, Beam::Mode m)
+void NoteGroups::updateBeams(Chord* chord, BeamMode m)
 {
     chord->setBeamMode(m);
     chord->score()->doLayout();
@@ -219,5 +218,4 @@ void NoteGroups::updateBeams(Chord* chord, Beam::Mode m)
     view8->update();
     view16->update();
     view32->update();
-}
 }

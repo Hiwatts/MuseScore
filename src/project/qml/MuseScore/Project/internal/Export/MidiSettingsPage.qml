@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,14 +21,14 @@
  */
 import QtQuick 2.15
 
-import MuseScore.UiComponents 1.0
+import Muse.UiComponents 1.0
 
 ExportSettingsPage {
     id: root
 
     CheckBox {
         width: parent.width
-        text: qsTrc("project", "Expand repeats")
+        text: qsTrc("project/export", "Expand repeats")
 
         navigation.name: "ExpandRepeatsCheckbox"
         navigation.panel: root.navigationPanel
@@ -42,7 +42,7 @@ ExportSettingsPage {
 
     CheckBox {
         width: parent.width
-        text: qsTrc("project", "Export RPNs")
+        text: qsTrc("project/export", "Export RPNs")
 
         navigation.name: "ExportRpnsCheckbox"
         navigation.panel: root.navigationPanel
@@ -56,7 +56,7 @@ ExportSettingsPage {
 
     StyledTextLabel {
         width: parent.width
-        text: qsTrc("project", "Each selected part will be exported as a separate MIDI file.")
+        text: qsTrc("project/export", "Each selected part will be exported as a separate MIDI file.")
         horizontalAlignment: Text.AlignLeft
         wrapMode: Text.WordWrap
     }

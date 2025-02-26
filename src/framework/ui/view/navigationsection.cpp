@@ -21,11 +21,13 @@
  */
 #include "navigationsection.h"
 
-#include <algorithm>
+#include <QQuickWindow>
+#include <QApplication>
 
 #include "log.h"
 
-using namespace mu::ui;
+using namespace muse;
+using namespace muse::ui;
 
 NavigationSection::NavigationSection(QObject* parent)
     : AbstractNavigation(parent)
@@ -61,7 +63,12 @@ const INavigation::Index& NavigationSection::index() const
     return AbstractNavigation::index();
 }
 
-mu::async::Channel<INavigation::Index> NavigationSection::indexChanged() const
+void NavigationSection::setIndex(const Index& index)
+{
+    AbstractNavigation::setIndex(index);
+}
+
+async::Channel<INavigation::Index> NavigationSection::indexChanged() const
 {
     return AbstractNavigation::indexChanged();
 }
@@ -79,10 +86,11 @@ bool NavigationSection::enabled() const
             break;
         }
     }
+
     return enbl;
 }
 
-mu::async::Channel<bool> NavigationSection::enabledChanged() const
+async::Channel<bool> NavigationSection::enabledChanged() const
 {
     return AbstractNavigation::enabledChanged();
 }
@@ -97,7 +105,7 @@ void NavigationSection::setActive(bool arg)
     AbstractNavigation::setActive(arg);
 }
 
-mu::async::Channel<bool> NavigationSection::activeChanged() const
+async::Channel<bool> NavigationSection::activeChanged() const
 {
     return AbstractNavigation::activeChanged();
 }
@@ -105,6 +113,16 @@ mu::async::Channel<bool> NavigationSection::activeChanged() const
 void NavigationSection::onEvent(EventPtr e)
 {
     AbstractNavigation::onEvent(e);
+}
+
+QWindow* NavigationSection::window() const
+{
+    return AbstractNavigation::window();
+}
+
+QQuickItem* muse::ui::NavigationSection::visualItem() const
+{
+    return AbstractNavigation::visualItem();
 }
 
 void NavigationSection::addPanel(NavigationPanel* panel)
@@ -116,18 +134,9 @@ void NavigationSection::addPanel(NavigationPanel* panel)
 
     m_panels.insert(panel);
 
-    panel->activeRequested().onReceive(this, [this](INavigationPanel* panel, INavigationControl* control) {
-        m_forceActiveRequested.send(this, panel, control);
-    });
-
     if (m_panelsListChanged.isConnected()) {
         m_panelsListChanged.notify();
     }
-}
-
-SectionPanelControlChannel NavigationSection::activeRequested() const
-{
-    return m_forceActiveRequested;
 }
 
 void NavigationSection::removePanel(NavigationPanel* panel)
@@ -138,10 +147,22 @@ void NavigationSection::removePanel(NavigationPanel* panel)
     }
 
     m_panels.erase(panel);
-    panel->activeRequested().resetOnReceive(this);
 
     if (m_panelsListChanged.isConnected()) {
         m_panelsListChanged.notify();
+    }
+}
+
+void NavigationSection::setOnActiveRequested(const OnActiveRequested& func)
+{
+    m_onActiveRequested = func;
+}
+
+void NavigationSection::requestActive(INavigationPanel* panel, INavigationControl* control, bool enableHighlight,
+                                      INavigation::ActivationType activationType)
+{
+    if (m_onActiveRequested) {
+        m_onActiveRequested(this, panel, control, enableHighlight, activationType);
     }
 }
 
@@ -170,7 +191,7 @@ const std::set<INavigationPanel*>& NavigationSection::panels() const
     return m_panels;
 }
 
-mu::async::Notification NavigationSection::panelsListChanged() const
+async::Notification NavigationSection::panelsListChanged() const
 {
     return m_panelsListChanged;
 }

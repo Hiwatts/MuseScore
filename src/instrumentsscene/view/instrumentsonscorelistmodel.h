@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,12 +29,12 @@
 #include "notation/iinstrumentsrepository.h"
 
 namespace mu::instrumentsscene {
-class InstrumentsOnScoreListModel : public uicomponents::SelectableItemListModel
+class InstrumentsOnScoreListModel : public muse::uicomponents::SelectableItemListModel
 {
     Q_OBJECT
 
-    INJECT(instrumentsscene, context::IGlobalContext, context)
-    INJECT(instrumentsscene, notation::IInstrumentsRepository, repository)
+    INJECT(context::IGlobalContext, context)
+    INJECT(notation::IInstrumentsRepository, repository)
 
     Q_PROPERTY(QStringList orders READ orders NOTIFY ordersChanged)
     Q_PROPERTY(int currentOrderIndex READ currentOrderIndex WRITE setCurrentOrderIndex NOTIFY currentOrderChanged)
@@ -50,7 +50,7 @@ public:
     int currentOrderIndex() const;
 
     Q_INVOKABLE void load();
-    Q_INVOKABLE void addInstruments(const QVariantList& instruments);
+    Q_INVOKABLE void addInstruments(const QStringList& instrumentIdList);
 
     Q_INVOKABLE QVariant currentOrder() const;
     Q_INVOKABLE QVariantList instruments() const;
@@ -67,20 +67,27 @@ private:
 
     enum Roles {
         RoleName = SelectableItemListModel::UserRole + 1,
+        RoleDescription,
         RoleIsSoloist
     };
 
     void loadOrders();
 
+    int resolveInstrumentSequenceNumber(const muse::String& instrumentId) const;
     void updateInstrumentsOrder();
     void sortInstruments(ItemList& instruments);
-    int sortInstrumentsIndex(const notation::ScoreOrder& order, const InstrumentItem& instrument) const;
+    void insertInstrument(ItemList& instruments, InstrumentItem* newInstrument);
 
     InstrumentItem* modelIndexToItem(const QModelIndex& index) const;
     const notation::ScoreOrder& currentScoreOrder() const;
 
     void onRowsMoved() override;
+    void onRowsRemoved() override;
     void doSetCurrentOrderIndex(int index);
+    bool matchesScoreOrder() const;
+    void verifyScoreOrder();
+    int createCustomizedScoreOrder(const notation::ScoreOrder& order);
+    void removeCustomizedScoreOrder(const notation::ScoreOrder& order);
 
     notation::ScoreOrderList m_scoreOrders;
     int m_currentOrderIndex = 0;

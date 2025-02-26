@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -35,33 +35,41 @@ public:
 
     QObject* getQObject() override;
 
-    void updateElementList(const QList<Ms::EngravingItem*>& newRawElementList) override;
-    QList<Ms::EngravingItem*> findElementsByType(const Ms::ElementType elementType) const override;
-    QList<Ms::EngravingItem*> findElementsByType(const Ms::ElementType elementType,
-                                                 std::function<bool(const Ms::EngravingItem*)> filterFunc) const override;
-    QList<Ms::EngravingItem*> takeAllElements() const override;
+    bool needUpdateElementList(const QList<mu::engraving::EngravingItem*>& newRawElementList,
+                               engraving::SelState selectionState) const override;
+    void updateElementList(const QList<mu::engraving::EngravingItem*>& newRawElementList, engraving::SelState selectionState) override;
+
+    QList<mu::engraving::EngravingItem*> findElementsByType(const mu::engraving::ElementType elementType) const override;
+    QList<mu::engraving::EngravingItem*> findElementsByType(const mu::engraving::ElementType elementType,
+                                                            std::function<bool(const mu::engraving::EngravingItem*)> filterFunc) const
+    override;
+    QList<mu::engraving::EngravingItem*> takeAllElements() const override;
 
 signals:
-    void elementsUpdated() override;
+    void elementsUpdated(const QList<mu::engraving::EngravingItem*>& newRawElementList) override;
 
 private:
-    QList<Ms::EngravingItem*> exposeRawElements(const QList<Ms::EngravingItem*>& rawElementList) const;
+    QList<mu::engraving::EngravingItem*> exposeRawElements(const QList<mu::engraving::EngravingItem*>& rawElementList) const;
 
-    QList<Ms::EngravingItem*> findChords() const;
-    QList<Ms::EngravingItem*> findNotes() const;
-    QList<Ms::EngravingItem*> findNoteHeads() const;
-    QList<Ms::EngravingItem*> findStems() const;
-    QList<Ms::EngravingItem*> findHooks() const;
-    QList<Ms::EngravingItem*> findBeams() const;
-    QList<Ms::EngravingItem*> findStaffs() const;
-    QList<Ms::EngravingItem*> findSectionBreaks() const;
-    QList<Ms::EngravingItem*> findPairedClefs() const;
-    QList<Ms::EngravingItem*> findTexts() const;
-    QList<Ms::EngravingItem*> findTremolos() const;
-    QList<Ms::EngravingItem*> findLines(Ms::ElementType lineType) const;
+    QList<mu::engraving::EngravingItem*> findChords() const;
+    QList<mu::engraving::EngravingItem*> findNotes() const;
+    QList<mu::engraving::EngravingItem*> findElementsForNotes() const;
+    QList<mu::engraving::EngravingItem*> findNoteHeads() const;
+    QList<mu::engraving::EngravingItem*> findStems() const;
+    QList<mu::engraving::EngravingItem*> findHooks() const;
+    QList<mu::engraving::EngravingItem*> findBeams() const;
+    QList<mu::engraving::EngravingItem*> findStaffs() const;
+    QList<mu::engraving::EngravingItem*> findSectionBreaks() const;
+    QList<mu::engraving::EngravingItem*> findTexts() const;
+    QList<mu::engraving::EngravingItem*> findBrackets() const;
+    QList<mu::engraving::EngravingItem*> findLines(mu::engraving::ElementType lineType) const;
+    QList<mu::engraving::EngravingItem*> findRests() const;
+    QList<mu::engraving::EngravingItem*> findOrnaments() const;
+    QList<mu::engraving::EngravingItem*> findLyrics() const;
 
-    QList<Ms::EngravingItem*> m_exposedElementList;
-    QList<Ms::EngravingItem*> m_rawElementList;
+    QList<mu::engraving::EngravingItem*> m_exposedElementList;
+    QList<mu::engraving::EngravingItem*> m_rawElementList;
+    mu::engraving::SelState m_selectionState = mu::engraving::SelState::NONE;
 };
 }
 

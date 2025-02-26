@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -34,10 +34,17 @@ class IExcerptNotation
 public:
     virtual ~IExcerptNotation() = default;
 
-    virtual bool isCreated() const = 0;
+    virtual bool isInited() const = 0;
+    virtual bool isCustom() const = 0;
+    virtual bool isEmpty() const = 0;
 
-    virtual QString title() const = 0;
-    virtual void setTitle(const QString& title) = 0;
+    virtual QString name() const = 0;
+    virtual void setName(const QString& name) = 0; // not undoable
+    virtual void undoSetName(const QString& name) = 0; // undoable
+    virtual muse::async::Notification nameChanged() const = 0;
+
+    virtual bool hasFileName() const = 0;
+    virtual const muse::String& fileName() const = 0;
 
     virtual INotationPtr notation() = 0;
     virtual IExcerptNotationPtr clone() const = 0;

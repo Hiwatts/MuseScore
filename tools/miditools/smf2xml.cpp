@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
                          );
                 break;
             default:
-                fprintf(stderr,"unknown event\n");
+                fprintf(stderr, "unknown event\n");
                 xml.tagE(QString("Event   tick=\"%1\" t=\"%2\" c=\"%3\" a=\"%4\" b=\"%5\"")
                          .arg(i->first)
                          .arg(int(i->second.type()), 2, 16)

@@ -19,27 +19,33 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_NAVIGATIONCONTROLLER_H
-#define MU_UI_NAVIGATIONCONTROLLER_H
+#ifndef MUSE_UI_NAVIGATIONCONTROLLER_H
+#define MUSE_UI_NAVIGATIONCONTROLLER_H
 
 #include <QObject>
 #include <QList>
 
-#include "../inavigationcontroller.h"
 #include "modularity/ioc.h"
+#include "global/iinteractive.h"
+#include "async/asyncable.h"
+#include "ui/imainwindow.h"
 #include "actions/iactionsdispatcher.h"
 #include "actions/actionable.h"
-#include "async/asyncable.h"
-#include "global/iinteractive.h"
 
-namespace mu::ui {
-class NavigationController : public QObject, public INavigationController, public actions::Actionable, public async::Asyncable
+#include "../inavigationcontroller.h"
+
+namespace muse::ui {
+class NavigationController : public QObject, public INavigationController, public Injectable, public actions::Actionable,
+    public async::Asyncable
 {
-    INJECT(ui, actions::IActionsDispatcher, dispatcher)
-    INJECT(ui, framework::IInteractive, interactive)
+public:
+    Inject<actions::IActionsDispatcher> dispatcher = { this };
+    Inject<IInteractive> interactive = { this };
+    Inject<IMainWindow> mainWindow = { this };
 
 public:
-    NavigationController() = default;
+    NavigationController(const modularity::ContextPtr& iocCtx)
+        : Injectable(iocCtx) {}
 
     enum MoveDirection {
         First = 0,
@@ -55,21 +61,53 @@ public:
 
     const std::set<INavigationSection*>& sections() const override;
 
-    bool requestActivateByName(const std::string& section, const std::string& panel, const std::string& control) override;
+    bool requestActivateByName(const std::string& section, const std::string& panel, const std::string& controlName) override;
+    bool requestActivateByIndex(const std::string& section, const std::string& panel, const INavigation::Index& controlIndex) override;
 
     INavigationSection* activeSection() const override;
     INavigationPanel* activePanel() const override;
     INavigationControl* activeControl() const override;
 
+    const INavigationControl* findControl(const std::string& section, const std::string& panel,
+                                          const std::string& controlName) const override;
+
+    void setDefaultNavigationControl(INavigationControl* control) override;
+
+    void resetNavigation() override;
+
     async::Notification navigationChanged() const override;
 
+    bool isHighlight() const override;
+    void setIsHighlight(bool isHighlight) override;
+    async::Notification highlightChanged() const override;
+
     void setIsResetOnMousePress(bool arg) override;
+
+    void dump() const override;
 
     void init();
 
 private:
 
+    enum class NavigationType {
+        NextSection,
+        PrevSection,
+        PrevSectionActiveLastPanel,
+        NextPanel,
+        PrevPanel,
+        Left,
+        Right,
+        Up,
+        Down,
+        FirstControl,
+        LastControl,
+        NextRowControl,
+        PrevRowControl
+    };
+
     bool eventFilter(QObject* watched, QEvent* event) override;
+
+    void navigateTo(NavigationType type);
 
     void goToNextSection();
     void goToPrevSection(bool isActivateLastPanel = false);
@@ -102,13 +140,18 @@ private:
     void doActivateFirst();
     void doActivateLast();
 
-    void resetActiveIfNeed(QObject* watched);
-    void resetActive();
+    void resetIfNeed(QObject* watched);
 
     std::set<INavigationSection*> m_sections;
     async::Notification m_navigationChanged;
+    async::Notification m_highlightChanged;
+
+    INavigationControl* m_defaultNavigationControl = nullptr;
+
+    bool m_isHighlight = false;
+
     bool m_isResetOnMousePress = true;
 };
 }
 
-#endif // MU_UI_NAVIGATIONCONTROLLER_H
+#endif // MUSE_UI_NAVIGATIONCONTROLLER_H

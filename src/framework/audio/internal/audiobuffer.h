@@ -19,51 +19,62 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_AUDIO_BUFFER_H
-#define MU_AUDIO_BUFFER_H
+#ifndef MUSE_AUDIO_BUFFER_H
+#define MUSE_AUDIO_BUFFER_H
 
 #include <vector>
 #include <memory>
 #include <atomic>
 
-#include "modularity/ioc.h"
+#include "iaudiosource.h"
+#include "audiotypes.h"
 
-#include "iaudiobuffer.h"
+//!Note Somehow clang has this define, but doesn't have symbols for std::hardware_destructive_interference_size
+#if defined(__cpp_lib_hardware_interference_size) && !defined(Q_OS_MACOS)
+#include <new>
+constexpr size_t cache_line_size = std::hardware_destructive_interference_size;
+#else
+constexpr size_t cache_line_size = 64;
+#endif
 
-namespace mu::audio {
-class AudioBuffer : public IAudioBuffer
+#if (defined (_MSCVER) || defined (_MSC_VER))
+// structure was padded due to alignment specifier
+#pragma warning(disable: 4324)
+#endif
+
+namespace muse::audio {
+class AudioBuffer
 {
-    static const samples_t DEFAULT_SIZE = 16384;
-    static const samples_t FILL_SAMPLES = 1024;
-    static const samples_t FILL_OVER    = 1024;
-
 public:
     AudioBuffer() = default;
 
-    void init(const audioch_t audioChannelsCount, const samples_t samplesPerChannel = DEFAULT_SIZE);
+    void init(const audioch_t audioChannelsCount);
 
-    void setSource(std::shared_ptr<IAudioSource> source) override;
-    void forward() override;
+    void setSource(IAudioSourcePtr source);
+    void setMinSamplesPerChannelToReserve(const samples_t samplesPerChannel);
+    void setRenderStep(const samples_t renderStep);
 
-    void pop(float* dest, size_t sampleCount) override;
-    void setMinSampleLag(size_t lag) override;
+    void forward();
+    void pop(float* dest, size_t sampleCount);
+
+    void reset();
+
+    audioch_t audioChannelCount() const;
 
 private:
+    alignas(cache_line_size) std::atomic<size_t> m_writeIndex = 0;
+    alignas(cache_line_size) std::atomic<size_t> m_readIndex = 0;
+    alignas(cache_line_size) std::vector<float> m_data;
 
-    unsigned int sampleLag() const;
-    void fillup();
-    void updateWriteIndex(const unsigned int samplesPerChannel);
-
-    std::mutex m_mutex;
-    size_t m_minSampleLag = FILL_SAMPLES;
-    size_t m_writeIndex = 0;
-    size_t m_readIndex = 0;
     samples_t m_samplesPerChannel = 0;
     audioch_t m_audioChannelsCount = 0;
+    samples_t m_minSamplesToReserve = 0;
+    samples_t m_renderStep = 0;
 
-    std::vector<float> m_data = {};
-    std::shared_ptr<IAudioSource> m_source = nullptr;
+    IAudioSourcePtr m_source = nullptr;
 };
+
+using AudioBufferPtr = std::shared_ptr<AudioBuffer>;
 }
 
-#endif // MU_AUDIO_BUFFER_H
+#endif // MUSE_AUDIO_BUFFER_H

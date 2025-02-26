@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -26,7 +26,7 @@ using namespace mu::appshell;
 using namespace mu::notation;
 
 MainWindowTitleProvider::MainWindowTitleProvider(QObject* parent)
-    : QObject(parent)
+    : QObject(parent), muse::Injectable(muse::iocCtxForQmlObject(this))
 {
 }
 
@@ -34,15 +34,20 @@ void MainWindowTitleProvider::load()
 {
     update();
 
-    context()->currentMasterNotationChanged().onNotify(this, [this]() {
-        update();
+    context()->currentProjectChanged().onNotify(this, [this]() {
+        if (auto currentProject = context()->currentProject()) {
+            currentProject->displayNameChanged().onNotify(this, [this]() {
+                update();
+            });
 
-        IMasterNotationPtr masterNotation = context()->currentMasterNotation();
-        if (masterNotation) {
-            masterNotation->needSave().notification.onNotify(this, [this]() {
+            currentProject->needSave().notification.onNotify(this, [this]() {
                 update();
             });
         }
+    });
+
+    context()->currentNotationChanged().onNotify(this, [this]() {
+        update();
     });
 }
 
@@ -61,7 +66,7 @@ bool MainWindowTitleProvider::fileModified() const
     return m_fileModified;
 }
 
-void MainWindowTitleProvider::setTitle(QString title)
+void MainWindowTitleProvider::setTitle(const QString& title)
 {
     if (title == m_title) {
         return;
@@ -71,7 +76,7 @@ void MainWindowTitleProvider::setTitle(QString title)
     emit titleChanged(title);
 }
 
-void MainWindowTitleProvider::setFilePath(QString filePath)
+void MainWindowTitleProvider::setFilePath(const QString& filePath)
 {
     if (filePath == m_filePath) {
         return;
@@ -96,14 +101,16 @@ void MainWindowTitleProvider::update()
     project::INotationProjectPtr project = context()->currentProject();
 
     if (!project) {
-        setTitle(qtrc("appshell", "MuseScore 4"));
+        setTitle(muse::qtrc("appshell", "MuseScore Studio"));
         setFilePath("");
         setFileModified(false);
         return;
     }
 
-    project::ProjectMeta meta = project->metaInfo();
-    setTitle(meta.title);
-    setFilePath(project->created().val ? "" : meta.filePath.toQString());
+    INotationPtr notation = context()->currentNotation();
+    setTitle(notation->projectNameAndPartName());
+
+    setFilePath((project->isNewlyCreated() || project->isCloudProject())
+                ? "" : project->path().toQString());
     setFileModified(project->needSave().val);
 }

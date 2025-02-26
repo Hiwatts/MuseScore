@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -27,38 +27,46 @@
 
 #include "modularity/ioc.h"
 #include "ipaletteconfiguration.h"
+#include "internal/ipaletteprovider.h"
 
 namespace mu::palette {
 class PaletteWidget;
 class PaletteScrollArea;
-}
 
-namespace Ms {
-class KeySig;
 class KeyEditor : public QWidget, Ui::KeyEdit
 {
     Q_OBJECT
 
-    INJECT(palette, mu::palette::IPaletteConfiguration, configuration)
+    Q_PROPERTY(bool showKeyPalette READ showKeyPalette WRITE setShowKeyPalette)
 
-    mu::palette::PaletteScrollArea* _keyPalette = nullptr;
-    mu::palette::PaletteWidget* sp = nullptr;
-    mu::palette::PaletteWidget* sp1 = nullptr;
-    bool _dirty = false;
+    INJECT(IPaletteConfiguration, configuration)
+    INJECT(IPaletteProvider, paletteProvider)
+
+public:
+    KeyEditor(QWidget* parent = 0);
+
+    bool dirty() const { return m_dirty; }
+    void save();
+
+    bool showKeyPalette() const;
+
+public slots:
+    void setShowKeyPalette(bool showKeyPalette);
 
 private slots:
     void addClicked();
     void clearClicked();
-    void setDirty() { _dirty = true; }
+    void setDirty() { m_dirty = true; }
 
-signals:
-    void keySigAdded(const std::shared_ptr<KeySig>);
+private:
+    PaletteScrollArea* m_keySigArea = nullptr;
+    PaletteWidget* m_keySigPaletteWidget = nullptr;
+    PaletteWidget* m_accidentalsPaletteWidget = nullptr;
 
-public:
-    KeyEditor(QWidget* parent = 0);
-    bool dirty() const { return _dirty; }
-    void showKeyPalette(bool val);
-    void save();
+    bool m_dirty = false;
 };
-} // namespace Ms
+
+static const int KEYEDIT_ACC_ZERO_POINT = 3;
+}
+
 #endif

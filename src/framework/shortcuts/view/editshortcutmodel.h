@@ -19,53 +19,69 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_SHORTCUTS_EDITSHORTCUTMODEL_H
-#define MU_SHORTCUTS_EDITSHORTCUTMODEL_H
+#ifndef MUSE_SHORTCUTS_EDITSHORTCUTMODEL_H
+#define MUSE_SHORTCUTS_EDITSHORTCUTMODEL_H
 
 #include <QObject>
+#include <QKeySequence>
 
 #include "modularity/ioc.h"
+#include "iinteractive.h"
 
 class QKeySequence;
 
-namespace mu::shortcuts {
-class EditShortcutModel : public QObject
+namespace muse::shortcuts {
+class EditShortcutModel : public QObject, public Injectable
 {
     Q_OBJECT
 
-    Q_PROPERTY(QString originSequence READ originSequence NOTIFY originSequenceChanged)
-    Q_PROPERTY(QString inputedSequence READ inputedSequence NOTIFY inputedSequenceChanged)
-    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY inputedSequenceChanged)
-    Q_PROPERTY(bool canApplySequence READ canApplySequence NOTIFY inputedSequenceChanged)
+    Q_PROPERTY(QString originSequence READ originSequenceInNativeFormat NOTIFY originSequenceChanged)
+    Q_PROPERTY(QString newSequence READ newSequenceInNativeFormat NOTIFY newSequenceChanged)
+    Q_PROPERTY(QString conflictWarning READ conflictWarning NOTIFY newSequenceChanged)
+
+    Q_PROPERTY(bool cleared READ cleared NOTIFY clearedChanged)
+
+    Inject<IInteractive> interactive = { this };
 
 public:
     explicit EditShortcutModel(QObject* parent = nullptr);
 
-    QString originSequence() const;
-    QString inputedSequence() const;
-    QString errorMessage() const;
-    bool canApplySequence() const;
+    QString originSequenceInNativeFormat() const;
+    QString newSequenceInNativeFormat() const;
+    QString conflictWarning() const;
+    bool cleared() const { return m_cleared; }
+    bool isShiftAllowed(Qt::Key key);
 
-    Q_INVOKABLE void load(const QString& sequence, const QVariantList& allShortcuts);
+    Q_INVOKABLE void load(const QVariant& shortcut, const QVariantList& allShortcuts);
+    Q_INVOKABLE void inputKey(Qt::Key key, Qt::KeyboardModifiers modifiers);
     Q_INVOKABLE void clear();
-
-    Q_INVOKABLE void inputKey(int key, Qt::KeyboardModifiers modifiers);
-    Q_INVOKABLE QString unitedSequence() const;
+    Q_INVOKABLE void trySave();
 
 signals:
-    void allShortcutsChanged(const QVariantList& shortcuts);
-    void originSequenceChanged(const QString& sequence);
-    void inputedSequenceChanged(const QString& sequence);
+    void originSequenceChanged();
+    void newSequenceChanged();
+    void clearedChanged();
+
+    void applyNewSequenceRequested(const QString& newSequence, int conflictShortcutIndex = -1);
 
 private:
-    bool needIgnoreKey(int key) const;
-    void validateInputedSequence();
+    void clearNewSequence();
+
+    QString newSequence() const;
+    void checkNewSequenceForConflicts();
 
     QVariantList m_allShortcuts;
-    QKeySequence m_inputedSequence;
+
     QString m_originSequence;
-    QString m_errorMessage;
+    QString m_originShortcutTitle;
+
+    QVariantList m_potentialConflictShortcuts;
+    QVariantMap m_conflictShortcut;
+
+    QKeySequence m_newSequence;
+
+    bool m_cleared = false;
 };
 }
 
-#endif // MU_SHORTCUTS_EDITSHORTCUTMODEL_H
+#endif // MUSE_SHORTCUTS_EDITSHORTCUTMODEL_H

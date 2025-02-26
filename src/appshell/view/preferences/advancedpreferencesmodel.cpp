@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,8 +23,9 @@
 
 #include "settings.h"
 
+using namespace muse;
+using namespace mu;
 using namespace mu::appshell;
-using namespace mu::framework;
 
 AdvancedPreferencesModel::AdvancedPreferencesModel(QObject* parent)
     : QAbstractListModel(parent)
@@ -40,8 +41,11 @@ QVariant AdvancedPreferencesModel::data(const QModelIndex& index, int role) cons
     const Settings::Item& item = m_items.at(index.row());
     switch (role) {
     case KeyRole: return QString::fromStdString(item.key.key);
+    case DescriptionRole: return QString::fromStdString(item.description);
     case TypeRole: return typeToString(item.value.type());
-    case ValRole: return item.value.toQVariant();
+    case ValueRole: return item.value.toQVariant();
+    case MinValueRole: return !item.minValue.isNull() ? item.minValue.toQVariant() : -1000;
+    case MaxValueRole: return !item.maxValue.isNull() ? item.maxValue.toQVariant() : 1000;
     }
     return QVariant();
 }
@@ -53,9 +57,9 @@ bool AdvancedPreferencesModel::setData(const QModelIndex& index, const QVariant&
     }
 
     switch (role) {
-    case ValRole:
-        changeVal(index.row(), value);
-        emit dataChanged(index, index, { ValRole });
+    case ValueRole:
+        changeVal(index.row(), Val::fromQVariant(value));
+        emit dataChanged(index, index, { ValueRole });
         return true;
     default:
         return false;
@@ -71,8 +75,11 @@ QHash<int, QByteArray> AdvancedPreferencesModel::roleNames() const
 {
     static const QHash<int, QByteArray> roles = {
         { KeyRole, "keyRole" },
+        { DescriptionRole, "descriptionRole" },
         { TypeRole, "typeRole" },
-        { ValRole, "valueRole" }
+        { ValueRole, "valueRole" },
+        { MinValueRole, "minValueRole" },
+        { MaxValueRole, "maxValueRole" }
     };
 
     return roles;
@@ -87,22 +94,50 @@ void AdvancedPreferencesModel::load()
     Settings::Items items = settings()->items();
 
     for (auto it = items.cbegin(); it != items.cend(); ++it) {
-        if (it->second.canBeMannualyEdited) {
+        if (it->second.canBeManuallyEdited) {
             m_items << it->second;
+
+            muse::Settings::Key key = it->second.key;
+            settings()->valueChanged(key).onReceive(this, [this, key](const Val& val) {
+                QModelIndex index = findIndex(key);
+                if (!index.isValid() || m_items[index.row()].value == val) {
+                    return;
+                }
+
+                changeModelVal(m_items[index.row()], val);
+                emit dataChanged(index, index, { ValueRole });
+            });
         }
     }
 
     endResetModel();
 }
 
-void AdvancedPreferencesModel::changeVal(int index, QVariant newVal)
+QModelIndex AdvancedPreferencesModel::findIndex(const muse::Settings::Key& key)
+{
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (m_items[i].key == key) {
+            return index(i, 0);
+        }
+    }
+    return QModelIndex();
+}
+
+void AdvancedPreferencesModel::changeVal(int index, const Val& newVal)
 {
     Settings::Item& item = m_items[index];
-    Val::Type type = item.value.type();
-    item.value = Val::fromQVariant(newVal);
-    item.value.setType(type);
-
+    changeModelVal(item, newVal);
     settings()->setSharedValue(item.key, item.value);
+}
+
+void AdvancedPreferencesModel::changeModelVal(Settings::Item& item, const Val& newVal)
+{
+    if (item.value == newVal) {
+        return;
+    }
+    Val::Type type = item.value.type();
+    item.value = newVal;
+    item.value.setType(type);
 }
 
 void AdvancedPreferencesModel::resetToDefault()
@@ -110,7 +145,7 @@ void AdvancedPreferencesModel::resetToDefault()
     beginResetModel();
 
     for (int i = 0; i < m_items.size(); ++i) {
-        changeVal(i, m_items[i].defaultValue.toQVariant());
+        changeVal(i, m_items[i].defaultValue);
     }
 
     endResetModel();
@@ -122,10 +157,12 @@ QString AdvancedPreferencesModel::typeToString(Val::Type type) const
     case Val::Type::Undefined: return "Undefined";
     case Val::Type::Bool: return "Bool";
     case Val::Type::Int: return "Int";
+    case Val::Type::Int64: return "Int";
     case Val::Type::Double: return "Double";
     case Val::Type::String: return "String";
     case Val::Type::Color: return "Color";
-    case Val::Type::Variant: return "Variant";
+    case Val::Type::List: return "List";
+    case Val::Type::Map: return "Map";
     }
     return "Undefined";
 }

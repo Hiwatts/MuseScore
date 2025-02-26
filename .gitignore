@@ -4,13 +4,18 @@
 *.autosave
 .qped
 .directory
+.idea
+.vscode/
 /builds
+build
 /build_overrides.cmake
 build.release
 build.debug
 build.install
+build.tooldata
 build.qtc
 build-*
+build
 win32build
 win32install
 win64build
@@ -26,13 +31,11 @@ MuseScorePortable
 /*.files
 /*.includes
 *.user
-*.qm
-share/manual/en
-share/manual/de
+/share/locale/*placeholder.ts
+/share/locale/*.qm
 /share/instruments/tsv
 Doc
 DocLib
-build.qt5
 *.sfd~
 /.project
 mscore/revision.h
@@ -52,11 +55,24 @@ vtest/Pictures
 dependencies
 
 # Downloaded files during build process
-MuseScore_General.sf3
-MuseScore_General_License.md
-MuseScore_General_Changelog.txt
-MuseScore_General_Readme.md
 VERSION
-SF_VERSION
 /mscore/data/mscore.aps
 /msvc.*
+
+# Backup Files created by Merging Softwares (Example: Meld)
+*.orig
+
+temp_*
+
+*.local.cmake
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pdm-python
+
+**/_deps/*
+
+# Stuff from 3.x builds
+/share/sound/MuseScore_General*

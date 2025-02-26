@@ -20,26 +20,33 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UI_UICONFIGURATION_H
-#define MU_UI_UICONFIGURATION_H
+#ifndef MUSE_UI_UICONFIGURATION_H
+#define MUSE_UI_UICONFIGURATION_H
 
 #include "iuiconfiguration.h"
 
+#include "iglobalconfiguration.h"
+#include "global/types/config.h"
 #include "modularity/ioc.h"
 #include "imainwindow.h"
 #include "internal/iplatformtheme.h"
 
-#include "val.h"
+#include "types/val.h"
 #include "uiarrangement.h"
 #include "async/asyncable.h"
 
-namespace mu::ui {
-class UiConfiguration : public IUiConfiguration, public async::Asyncable
+namespace muse::ui {
+class UiConfiguration : public IUiConfiguration, public Injectable, public async::Asyncable
 {
-    INJECT(ui, IMainWindow, mainWindow)
-    INJECT(ui, IPlatformTheme, platformTheme)
+    Inject<IMainWindow> mainWindow = { this };
+    Inject<IPlatformTheme> platformTheme = { this };
+    Inject<IGlobalConfiguration> globalConfiguration = { this };
 
 public:
+
+    UiConfiguration(const modularity::ContextPtr& iocCtx)
+        : Injectable(iocCtx), m_uiArrangement(iocCtx) {}
+
     void init();
     void load();
     void deinit();
@@ -48,19 +55,25 @@ public:
     QStringList possibleFontFamilies() const override;
     QStringList possibleAccentColors() const override;
 
+    bool isDarkMode() const override;
+    void setIsDarkMode(bool dark) override;
+
     bool isHighContrast() const override;
     void setIsHighContrast(bool highContrast) override;
 
-    void resetCurrentThemeToDefault(const ThemeCode& codeKey) override;
-
     const ThemeInfo& currentTheme() const override;
+    async::Notification currentThemeChanged() const override;
     void setCurrentTheme(const ThemeCode& codeKey) override;
     void setCurrentThemeStyleValue(ThemeStyleKey key, const Val& val) override;
-    async::Notification currentThemeChanged() const override;
+    void resetThemes() override;
+
+    bool isFollowSystemThemeAvailable() const override;
+    ValNt<bool> isFollowSystemTheme() const override;
+    void setFollowSystemTheme(bool follow) override;
 
     std::string fontFamily() const override;
     void setFontFamily(const std::string& family) override;
-    int fontSize(FontSizeType type) const override;
+    int fontSize(FontSizeType type = FontSizeType::BODY) const override;
     void setBodyFontSize(int size) override;
     async::Notification fontChanged() const override;
 
@@ -72,17 +85,25 @@ public:
     int musicalFontSize() const override;
     async::Notification musicalFontChanged() const override;
 
+    std::string defaultFontFamily() const override;
+    int defaultFontSize() const override;
+
+    void resetFonts() override;
+
     double guiScaling() const override;
-    double physicalDotsPerInch() const override;
+    double physicalDpi() const override;
+    double logicalDpi() const override;
 
     void setPhysicalDotsPerInch(std::optional<double> dpi) override;
 
-    QByteArray pageState(const QString& pageName) const override;
+    ValNt<QByteArray> pageState(const QString& pageName) const override;
     void setPageState(const QString& pageName, const QByteArray& state) override;
 
     QByteArray windowGeometry() const override;
     void setWindowGeometry(const QByteArray& geometry) override;
     async::Notification windowGeometryChanged() const override;
+
+    bool isGlobalMenuAvailable() const override;
 
     void applyPlatformStyle(QWindow* window) override;
 
@@ -90,23 +111,37 @@ public:
     void setIsVisible(const QString& key, bool val) override;
     async::Notification isVisibleChanged(const QString& key) const override;
 
-    ToolConfig toolConfig(const QString& toolName) const override;
+    QString uiItemState(const QString& itemName) const override;
+    void setUiItemState(const QString& itemName, const QString& value) override;
+    async::Notification uiItemStateChanged(const QString& itemName) const override;
+
+    ToolConfig toolConfig(const QString& toolName, const ToolConfig& defaultConfig) const override;
     void setToolConfig(const QString& toolName, const ToolConfig& config) override;
     async::Notification toolConfigChanged(const QString& toolName) const override;
 
-private:
-    bool needFollowSystemTheme() const;
+    int flickableMaxVelocity() const override;
 
+    int tooltipDelay() const override;
+
+private:
     void initThemes();
     void notifyAboutCurrentThemeChanged();
     void updateCurrentTheme();
     void updateThemes();
+
+    void updateSystemThemeListeningStatus();
+    void synchThemeWithSystemIfNecessary();
+
+    void doSetIsDarkMode(bool dark);
+    void doSetCurrentTheme(const ThemeCode& themeCode);
 
     ThemeCode currentThemeCodeKey() const;
     ThemeInfo makeStandardTheme(const ThemeCode& codeKey) const;
 
     ThemeList readThemes() const;
     void writeThemes(const ThemeList& themes);
+
+    void updateToolConfig(const QString& toolName, ToolConfig& userConfig, const ToolConfig& defaultConfig) const;
 
     UiArrangement m_uiArrangement;
 
@@ -116,10 +151,12 @@ private:
     async::Notification m_iconsFontChanged;
     async::Notification m_windowGeometryChanged;
 
+    ValNt<bool> m_isFollowSystemTheme;
+
     ThemeList m_themes;
     size_t m_currentThemeIndex = 0;
     std::optional<double> m_customDPI;
 };
 }
 
-#endif // MU_UI_UICONFIGURATION_H
+#endif // MUSE_UI_UICONFIGURATION_H

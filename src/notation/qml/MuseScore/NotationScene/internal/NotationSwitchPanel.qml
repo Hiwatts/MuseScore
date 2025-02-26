@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,20 +20,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.2
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.NotationScene 1.0
 
 Rectangle {
     id: root
 
-    property NavigationSection navigationSection: null
-
-    height: 30
+    height: 26
     visible: notationsView.count > 0
     color: ui.theme.backgroundSecondaryColor
+
+    property NavigationPanel navigationPanel: NavigationPanel {
+        name: "NotationViewTabs"
+        enabled: root.enabled && root.visible
+        direction: NavigationPanel.Horizontal
+    }
 
     function ensureActive() {
         var item = notationsView.itemAtIndex(notationsView.currentIndex)
@@ -43,7 +48,7 @@ Rectangle {
     NotationSwitchListModel {
         id: notationSwitchModel
 
-        onCurrentNotationIndexChanged: {
+        onCurrentNotationIndexChanged: function(index) {
             notationsView.currentIndex = index
         }
     }
@@ -52,65 +57,112 @@ Rectangle {
         notationSwitchModel.load()
     }
 
-    NavigationPanel {
-        id: navPanel
-        name: "NotationViewTabs"
-        section: root.navigationSection
-        direction: NavigationPanel.Horizontal
-        order: 1
-    }
-
-    RadioButtonGroup {
-        id: notationsView
-
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-
-        width: Math.min(contentWidth, parent.width)
-
-        model: notationSwitchModel
-        currentIndex: 0
+    RowLayout {
+        anchors.fill: parent
         spacing: 0
-        interactive: width < contentWidth
-        boundsBehavior: Flickable.StopAtBounds
 
-        delegate: NotationSwitchButton {
-            id: button
+        RadioButtonGroup {
+            id: notationsView
 
-            navigation.name: "NotationTab" + model.index
-            navigation.panel: navPanel
-            navigation.row: 1
-            navigation.column: model.index + 1
+            // - 1: don't need to see the right separator of the rightmost tab
+            readonly property bool needsScrollArrowButtons: contentWidth - 1 > root.width
 
-            text: model.title
-            needSave: model.needSave
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-            ButtonGroup.group: notationsView.radioButtonGroup
-            checked: model.index === notationsView.currentIndex
+            ScrollBar.horizontal: null
 
-            function resolveNextNotationIndex() {
-                var nextIndex = model.index - 1
-                if (nextIndex < 0) {
-                    return 0
-                }
+            model: notationSwitchModel
+            currentIndex: 0
+            spacing: 0
 
-                return nextIndex
+            clip: true
+            interactive: true
+
+            function scrollLeft() {
+                let leftmostTab = indexAt(contentX, 0)
+                let newLeftmostTab = Math.max(0, leftmostTab - 1)
+                positionViewAtIndex(newLeftmostTab, ListView.Contain)
             }
 
-            onToggled: {
-                notationSwitchModel.setCurrentNotation(model.index)
+            function scrollRight() {
+                let rightmostTab = indexAt(contentX + width - 1, 0)
+                let newRightmostTab = Math.min(count - 1, rightmostTab + 1)
+                positionViewAtIndex(newRightmostTab, ListView.Contain)
             }
 
-            onCloseRequested: {
-                if (model.index !== notationsView.currentIndex) {
-                    notationSwitchModel.closeNotation(model.index)
-                    return
+            delegate: NotationSwitchButton {
+                id: button
+
+                navigation.name: "NotationTab" + index
+                navigation.panel: root.navigationPanel
+                navigation.row: index * 10  + 1 // * 10 - for close button
+                navigation.accessible.name: text + (needSave ? (" " + qsTrc("notation", "Not saved")) : "")
+
+                text: model.title
+                needSave: model.needSave
+                isCloud: model.isCloud
+
+                ButtonGroup.group: notationsView.radioButtonGroup
+                checked: index === notationsView.currentIndex
+
+                onToggled: {
+                    notationSwitchModel.setCurrentNotation(index)
                 }
 
-                var index = button.resolveNextNotationIndex()
-                notationSwitchModel.closeNotation(model.index)
-                notationSwitchModel.setCurrentNotation(index)
+                onCloseRequested: {
+                    notationSwitchModel.closeNotation(index)
+                }
+
+                onContextMenuItemsRequested: {
+                    contextMenuItems = notationSwitchModel.contextMenuItems(index)
+                }
+
+                onHandleContextMenuItem: function(itemId) {
+                    notationSwitchModel.handleContextMenuItem(index, itemId)
+                }
+            }
+        }
+
+        Row {
+            Layout.fillHeight: true
+            Layout.leftMargin: -1
+            spacing: 0
+
+            visible: notationsView.needsScrollArrowButtons
+
+            SeparatorLine {}
+
+            NotationSwitchScrollArrowButton {
+                enabled: !notationsView.atXBeginning
+
+                navigation.name: "ScrollLeftButton"
+                navigation.panel: root.navigationPanel
+                navigation.row: notationsView.count * 10 + 1
+                navigation.accessible.name: qsTrc("notation", "Scroll left")
+
+                icon: IconCode.CHEVRON_LEFT
+
+                onScrollRequested: {
+                    notationsView.scrollLeft()
+                }
+            }
+
+            SeparatorLine {}
+
+            NotationSwitchScrollArrowButton {
+                enabled: !notationsView.atXEnd
+
+                navigation.name: "ScrollRightButton"
+                navigation.panel: root.navigationPanel
+                navigation.row: notationsView.count * 10 + 2
+                navigation.accessible.name: qsTrc("notation", "Scroll right")
+
+                icon: IconCode.CHEVRON_RIGHT
+
+                onScrollRequested: {
+                    notationsView.scrollRight()
+                }
             }
         }
     }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,7 +24,7 @@
 
 #include <map>
 
-namespace Ms {
+namespace mu::iex::midi {
 class MTrack;
 class MidiChord;
 class ReducedFraction;
@@ -34,6 +34,6 @@ bool needToSplit(const std::multimap<ReducedFraction, MidiChord>& chords, int mi
 
 void splitIntoLeftRightHands(std::multimap<int, MTrack>& tracks);
 } // namespace LRHand
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_LRHAND_H

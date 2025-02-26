@@ -19,15 +19,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_UI_IUICONTEXTRESOLVER_H
-#define MU_UI_IUICONTEXTRESOLVER_H
+#ifndef MUSE_UI_IUICONTEXTRESOLVER_H
+#define MUSE_UI_IUICONTEXTRESOLVER_H
 
 #include <memory>
-#include "modularity/imoduleexport.h"
-#include "uitypes.h"
-#include "async/notification.h"
 
-namespace mu::ui {
+#include "modularity/imoduleinterface.h"
+#include "global/async/notification.h"
+#include "uiaction.h"
+
+namespace muse::ui {
 class IUiContextResolver : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IUiContextResolver)
@@ -40,9 +41,11 @@ public:
 
     virtual bool match(const ui::UiContext& currentCtx, const ui::UiContext& actCtx) const = 0;
     virtual bool matchWithCurrent(const ui::UiContext& ctx) const = 0;
+
+    virtual bool isShortcutContextAllowed(const std::string& scContext) const = 0;
 };
 
 using IUiContextResolverPtr = std::shared_ptr<IUiContextResolver>;
 }
 
-#endif // MU_UI_IUICONTEXTRESOLVER_H
+#endif // MUSE_UI_IUICONTEXTRESOLVER_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -25,22 +25,23 @@
 #include <set>
 #include <map>
 
-namespace Ms {
+namespace mu::engraving {
 class TimeSigMap;
+}
+
+namespace mu::iex::midi {
 class ReducedFraction;
 class MidiChord;
 class MTrack;
-class ReducedFraction;
-class Score;
 
 namespace MidiBeat {
 void removeEvery2ndBeat(std::set<ReducedFraction>& beatSet);
 void findBeatLocations(
-    const std::multimap<ReducedFraction, MidiChord>& allChords, TimeSigMap* sigmap, double ticksPerSec);
+    const std::multimap<ReducedFraction, MidiChord>& allChords, engraving::TimeSigMap* sigmap, double ticksPerSec);
 
 void adjustChordsToBeats(std::multimap<int, MTrack>& tracks);
-void setTimeSignature(TimeSigMap* sigmap);
+void setTimeSignature(engraving::TimeSigMap* sigmap);
 } // namespace MidiBeat
-} // namespace Ms
+} // namespace mu::iex::midi
 
 #endif // IMPORTMIDI_BEAT_H

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,19 +29,19 @@ MeasureRepeatSettingsModel::MeasureRepeatSettingsModel(QObject* parent, IElement
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_MEASURE_REPEAT);
-    setTitle(qtrc("inspector", "Measure repeat"));
-    setIcon(ui::IconCode::Code::QUESTION_MARK);
+    setTitle(muse::qtrc("inspector", "Measure repeat"));
+    setIcon(muse::ui::IconCode::Code::MEASURE_REPEAT);
     createProperties();
 }
 
 void MeasureRepeatSettingsModel::createProperties()
 {
-    m_numberPosition = buildPropertyItem(Ms::Pid::MEASURE_REPEAT_NUMBER_POS);
+    m_numberPosition = buildPropertyItem(mu::engraving::Pid::MEASURE_REPEAT_NUMBER_POS);
 }
 
 void MeasureRepeatSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::MEASURE_REPEAT);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::MEASURE_REPEAT);
 }
 
 void MeasureRepeatSettingsModel::loadProperties()

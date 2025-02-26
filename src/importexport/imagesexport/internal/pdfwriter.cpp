@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,23 +23,26 @@
 #include "pdfwriter.h"
 
 #include <QPdfWriter>
+#include <QBuffer>
 
-#include "libmscore/masterscore.h"
+#include "engraving/dom/masterscore.h"
 
 #include "log.h"
 
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
-using namespace mu::io;
-using namespace Ms;
+using namespace muse;
+using namespace muse::io;
+using namespace muse::draw;
+using namespace mu::engraving;
 
 std::vector<INotationWriter::UnitType> PdfWriter::supportedUnitTypes() const
 {
     return { UnitType::PER_PART, UnitType::MULTI_PART };
 }
 
-mu::Ret PdfWriter::write(INotationPtr notation, io::Device& destinationDevice, const Options& options)
+Ret PdfWriter::write(INotationPtr notation, io::IODevice& destinationDevice, const Options& options)
 {
     UnitType unitType = unitTypeFromOptions(options);
     IF_ASSERT_FAILED(unitType == UnitType::PER_PART) {
@@ -49,27 +52,38 @@ mu::Ret PdfWriter::write(INotationPtr notation, io::Device& destinationDevice, c
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
     }
-    Ms::Score* score = notation->elements()->msScore();
-    IF_ASSERT_FAILED(score) {
-        return make_ret(Ret::Code::UnknownError);
-    }
 
-    QPdfWriter pdfWriter(&destinationDevice);
-    preparePdfWriter(pdfWriter, documentTitle(*score));
+    QByteArray qdata;
+    QBuffer buf(&qdata);
+    buf.open(QIODevice::WriteOnly);
 
-    mu::draw::Painter painter(&pdfWriter, "pdfwriter");
+    QPdfWriter pdfWriter(&buf);
+    preparePdfWriter(pdfWriter, notation->projectWorkTitleAndPartName(), notation->painting()->pageSizeInch().toQSizeF());
+
+    Painter painter(&pdfWriter, "pdfwriter");
     if (!painter.isActive()) {
         return false;
     }
 
-    doWrite(pdfWriter, painter, score);
+    const bool TRANSPARENT_BACKGROUND = muse::value(options, OptionKey::TRANSPARENT_BACKGROUND,
+                                                    Val(configuration()->exportPdfWithTransparentBackground())).toBool();
+
+    INotationPainting::Options opt;
+    opt.deviceDpi = pdfWriter.logicalDpiX();
+    opt.onNewPage = [&pdfWriter]() { pdfWriter.newPage(); };
+    opt.printPageBackground = !TRANSPARENT_BACKGROUND;
+
+    notation->painting()->paintPdf(&painter, opt);
 
     painter.endDraw();
+
+    ByteArray data = ByteArray::fromQByteArrayNoCopy(qdata);
+    destinationDevice.write(data);
 
     return true;
 }
 
-mu::Ret PdfWriter::writeList(const INotationPtrList& notations, io::Device& destinationDevice, const Options& options)
+Ret PdfWriter::writeList(const INotationPtrList& notations, io::IODevice& destinationDevice, const Options& options)
 {
     IF_ASSERT_FAILED(!notations.empty()) {
         return make_ret(Ret::Code::UnknownError);
@@ -85,94 +99,53 @@ mu::Ret PdfWriter::writeList(const INotationPtrList& notations, io::Device& dest
         return make_ret(Ret::Code::UnknownError);
     }
 
-    Ms::Score* firstScore = firstNotation->elements()->msScore();
-    IF_ASSERT_FAILED(firstScore) {
-        return make_ret(Ret::Code::UnknownError);
-    }
+    QByteArray qdata;
+    QBuffer buf(&qdata);
+    buf.open(QIODevice::WriteOnly);
 
-    QPdfWriter pdfWriter(&destinationDevice);
-    preparePdfWriter(pdfWriter, documentTitle(*(firstScore->masterScore())));
+    QPdfWriter pdfWriter(&buf);
+    preparePdfWriter(pdfWriter, firstNotation->projectWorkTitle(), firstNotation->painting()->pageSizeInch().toQSizeF());
 
-    mu::draw::Painter painter(&pdfWriter, "pdfwriter");
+    Painter painter(&pdfWriter, "pdfwriter");
     if (!painter.isActive()) {
         return false;
     }
 
-    for (auto notation : notations) {
+    const bool TRANSPARENT_BACKGROUND = muse::value(options, OptionKey::TRANSPARENT_BACKGROUND,
+                                                    Val(configuration()->exportPdfWithTransparentBackground())).toBool();
+
+    INotationPainting::Options opt;
+    opt.deviceDpi = pdfWriter.logicalDpiX();
+    opt.onNewPage = [&pdfWriter]() { pdfWriter.newPage(); };
+    opt.printPageBackground = !TRANSPARENT_BACKGROUND;
+
+    for (const auto& notation : notations) {
         IF_ASSERT_FAILED(notation) {
             return make_ret(Ret::Code::UnknownError);
         }
 
-        Ms::Score* score = notation->elements()->msScore();
-        IF_ASSERT_FAILED(score) {
-            return make_ret(Ret::Code::UnknownError);
-        }
-
-        if (score != firstScore) {
+        if (notation != firstNotation) {
+            QSizeF size = notation->painting()->pageSizeInch().toQSizeF();
+            pdfWriter.setPageSize(QPageSize(size, QPageSize::Inch));
             pdfWriter.newPage();
         }
 
-        doWrite(pdfWriter, painter, score);
+        notation->painting()->paintPdf(&painter, opt);
     }
 
     painter.endDraw();
 
+    ByteArray data = ByteArray::fromQByteArrayNoCopy(qdata);
+    destinationDevice.write(data);
+
     return true;
 }
 
-QString PdfWriter::documentTitle(const Score& score) const
-{
-    QString title = score.metaTag("workTitle");
-    if (title.isEmpty()) { // workTitle unset?
-        title = score.masterScore()->title(); // fall back to (master)score's tab title
-    }
-
-    if (!score.isMaster()) { // excerpt?
-        QString partName = score.metaTag("partName");
-        if (partName.isEmpty()) { // partName unset?
-            partName = score.title(); // fall back to excerpt's tab title
-        }
-
-        title += " - " + partName;
-    }
-
-    return title;
-}
-
-void PdfWriter::preparePdfWriter(QPdfWriter& pdfWriter, const QString& title) const
+void PdfWriter::preparePdfWriter(QPdfWriter& pdfWriter, const QString& title, const QSizeF& size) const
 {
     pdfWriter.setResolution(configuration()->exportPdfDpiResolution());
-    pdfWriter.setCreator("MuseScore Version: " VERSION);
+    pdfWriter.setCreator(QString("MuseScore Studio Version: ") + application()->version().toString().toQString());
     pdfWriter.setTitle(title);
     pdfWriter.setPageMargins(QMarginsF());
-}
-
-void PdfWriter::doWrite(QPdfWriter& pdfWriter, mu::draw::Painter& painter, Score* score) const
-{
-    IF_ASSERT_FAILED(score) {
-        return;
-    }
-
-    score->setPrinting(true);
-    MScore::pdfPrinting = true;
-
-    QSizeF size(score->styleD(Sid::pageWidth), score->styleD(Sid::pageHeight));
-    painter.setAntialiasing(true);
-    painter.setViewport(RectF(0.0, 0.0, size.width() * pdfWriter.logicalDpiX(), size.height() * pdfWriter.logicalDpiY()));
-    painter.setWindow(RectF(0.0, 0.0, size.width() * DPI, size.height() * DPI));
-
-    double pixelRationBackup = MScore::pixelRatio;
-    MScore::pixelRatio = DPI / pdfWriter.logicalDpiX();
-
-    for (int pageNumber = 0; pageNumber < score->npages(); ++pageNumber) {
-        if (pageNumber > 0) {
-            pdfWriter.newPage();
-        }
-
-        score->print(&painter, pageNumber);
-    }
-
-    score->setPrinting(false);
-    MScore::pixelRatio = pixelRationBackup;
-    MScore::pdfPrinting = false;
+    pdfWriter.setPageLayout(QPageLayout(QPageSize(size, QPageSize::Inch), QPageLayout::Orientation::Portrait, QMarginsF()));
 }

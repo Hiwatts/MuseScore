@@ -19,8 +19,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_MIDI_MIDIPORTDEVMODEL_H
-#define MU_MIDI_MIDIPORTDEVMODEL_H
+#ifndef MUSE_MIDI_MIDIPORTDEVMODEL_H
+#define MUSE_MIDI_MIDIPORTDEVMODEL_H
 
 #include <QObject>
 #include <QVariantList>
@@ -30,35 +30,36 @@
 #include "midi/imidiinport.h"
 #include "async/asyncable.h"
 
-namespace mu::midi {
-class MidiPortDevModel : public QObject, public async::Asyncable
+namespace muse::midi {
+class MidiPortDevModel : public QObject, public Injectable, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(midi, IMidiOutPort, midiOutPort)
-    INJECT(midi, IMidiInPort, midiInPort)
+    Q_PROPERTY(QVariantList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
+    Q_PROPERTY(QVariantList inputDevices READ inputDevices NOTIFY inputDevicesChanged)
+    Q_PROPERTY(QVariantList inputEvents READ inputEvents NOTIFY inputEventsChanged)
 
-    Q_PROPERTY(bool isInputConnected READ isInputConnected NOTIFY isInputConnectedChanged)
+    Inject<IMidiOutPort> midiOutPort = { this };
+    Inject<IMidiInPort> midiInPort = { this };
 
 public:
     explicit MidiPortDevModel(QObject* parent = nullptr);
 
-    bool isInputConnected() const;
+    Q_INVOKABLE void init();
 
-    Q_INVOKABLE QVariantList outputDevices() const;
+    QVariantList outputDevices() const;
     Q_INVOKABLE void outputDeviceAction(const QString& deviceID, const QString& action);
 
-    Q_INVOKABLE QVariantList inputDevices() const;
+    QVariantList inputDevices() const;
     Q_INVOKABLE void inputDeviceAction(const QString& deviceID, const QString& action);
 
-    Q_INVOKABLE QVariantList inputEvents() const;
+    QVariantList inputEvents() const;
     Q_INVOKABLE void generateMIDI20();
 
 signals:
     void outputDevicesChanged();
     void inputDevicesChanged();
     void inputEventsChanged();
-    void isInputConnectedChanged();
 
 private:
     QMap<QString, QString> m_connectionErrors;
@@ -66,4 +67,4 @@ private:
 };
 }
 
-#endif // MU_MIDI_MIDIPORTDEVMODEL_H
+#endif // MUSE_MIDI_MIDIPORTDEVMODEL_H

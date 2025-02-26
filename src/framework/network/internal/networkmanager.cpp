@@ -30,10 +30,8 @@
 #include "log.h"
 #include "networkerrors.h"
 
-using namespace mu;
-using namespace mu::network;
-using namespace mu::framework;
-using namespace mu::io;
+using namespace muse;
+using namespace muse::network;
 
 static constexpr int NET_TIMEOUT_MS = 60000;
 
@@ -50,9 +48,9 @@ NetworkManager::~NetworkManager()
     }
 }
 
-Ret NetworkManager::get(const QUrl& url, IncomingDevice* incommingData, const RequestHeaders& headers)
+Ret NetworkManager::get(const QUrl& url, IncomingDevice* incomingData, const RequestHeaders& headers)
 {
-    return execRequest(GET_REQUEST, url, incommingData, nullptr, headers);
+    return execRequest(GET_REQUEST, url, incomingData, nullptr, headers);
 }
 
 Ret NetworkManager::head(const QUrl& url, const RequestHeaders& headers)
@@ -60,38 +58,44 @@ Ret NetworkManager::head(const QUrl& url, const RequestHeaders& headers)
     return execRequest(HEAD_REQUEST, url, nullptr, nullptr, headers);
 }
 
-Ret NetworkManager::post(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incommingData, const RequestHeaders& headers)
+Ret NetworkManager::post(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incomingData, const RequestHeaders& headers)
 {
-    return execRequest(POST_REQUEST, url, incommingData, outgoingData, headers);
+    return execRequest(POST_REQUEST, url, incomingData, outgoingData, headers);
 }
 
-Ret NetworkManager::put(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incommingData, const RequestHeaders& headers)
+Ret NetworkManager::put(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incomingData, const RequestHeaders& headers)
 {
-    return execRequest(PUT_REQUEST, url, incommingData, outgoingData, headers);
+    return execRequest(PUT_REQUEST, url, incomingData, outgoingData, headers);
 }
 
-Ret NetworkManager::del(const QUrl& url, IncomingDevice* incommingData, const RequestHeaders& headers)
+Ret NetworkManager::patch(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incomingData, const RequestHeaders& headers)
 {
-    return execRequest(DELETE_REQUEST, url, incommingData, nullptr, headers);
+    return execRequest(PATCH_REQUEST, url, incomingData, outgoingData, headers);
 }
 
-Ret NetworkManager::execRequest(RequestType requestType, const QUrl& url, IncomingDevice* incommingData, OutgoingDevice* outgoingData,
+Ret NetworkManager::del(const QUrl& url, IncomingDevice* incomingData, const RequestHeaders& headers)
+{
+    return execRequest(DELETE_REQUEST, url, incomingData, nullptr, headers);
+}
+
+Ret NetworkManager::execRequest(RequestType requestType, const QUrl& url, IncomingDevice* incomingData, OutgoingDevice* outgoingData,
                                 const RequestHeaders& headers)
 {
     if (outgoingData && outgoingData->device()) {
-        if (!openDevice(outgoingData->device(), Device::ReadOnly)) {
+        if (!openDevice(outgoingData->device(), QIODevice::ReadOnly)) {
             return make_ret(Err::FiledOpenIODeviceRead);
         }
     }
 
-    if (incommingData) {
-        if (!openDevice(incommingData, Device::WriteOnly)) {
+    if (incomingData) {
+        if (!openDevice(incomingData, QIODevice::WriteOnly)) {
             return make_ret(Err::FiledOpenIODeviceWrite);
         }
-        m_incommingData = incommingData;
+        m_incomingData = incomingData;
     }
 
     QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
 
     for (QNetworkRequest::KnownHeaders knownHeader: headers.knownHeaders.keys()) {
         request.setHeader(knownHeader, headers.knownHeaders[knownHeader]);
@@ -101,14 +105,16 @@ Ret NetworkManager::execRequest(RequestType requestType, const QUrl& url, Incomi
         request.setRawHeader(rawHeader, headers.rawHeaders[rawHeader]);
     }
 
+    m_progress.start();
+
     QNetworkReply* reply = receiveReply(requestType, request, outgoingData);
 
     if (outgoingData) {
         prepareReplyTransmit(reply);
     }
 
-    if (incommingData) {
-        prepareReplyReceive(reply, m_incommingData);
+    if (incomingData) {
+        prepareReplyReceive(reply, m_incomingData);
     }
 
     Ret ret = waitForReplyFinished(reply, NET_TIMEOUT_MS);
@@ -116,12 +122,14 @@ Ret NetworkManager::execRequest(RequestType requestType, const QUrl& url, Incomi
         LOGE() << ret.toString();
     }
 
+    m_progress.finish(ret);
+
     if (outgoingData && outgoingData->device()) {
         closeDevice(outgoingData->device());
     }
 
-    closeDevice(m_incommingData);
-    m_incommingData = nullptr;
+    closeDevice(m_incomingData);
+    m_incomingData = nullptr;
 
     return ret;
 }
@@ -140,6 +148,14 @@ QNetworkReply* NetworkManager::receiveReply(RequestType requestType, const QNetw
         }
         break;
     }
+    case PATCH_REQUEST: {
+        if (outgoingData->device()) {
+            return m_manager->sendCustomRequest(request, "PATCH", outgoingData->device());
+        } else if (outgoingData->multiPart()) {
+            return m_manager->sendCustomRequest(request, "PATCH", outgoingData->multiPart());
+        }
+        break;
+    }
     case POST_REQUEST: {
         if (outgoingData->device()) {
             return m_manager->post(request, outgoingData->device());
@@ -153,9 +169,9 @@ QNetworkReply* NetworkManager::receiveReply(RequestType requestType, const QNetw
     return nullptr;
 }
 
-ProgressChannel NetworkManager::progressChannel() const
+Progress NetworkManager::progress() const
 {
-    return m_progressCh;
+    return m_progress;
 }
 
 void NetworkManager::abort()
@@ -163,11 +179,12 @@ void NetworkManager::abort()
     if (m_reply) {
         m_reply->abort();
     }
+
     m_isAborted = true;
-    emit aborted();
+    m_progress.finish(make_ret(Err::Abort));
 }
 
-bool NetworkManager::openDevice(Device* device, Device::OpenModeFlag flags)
+bool NetworkManager::openDevice(QIODevice* device, QIODevice::OpenModeFlag flags)
 {
     IF_ASSERT_FAILED(device) {
         return false;
@@ -180,7 +197,7 @@ bool NetworkManager::openDevice(Device* device, Device::OpenModeFlag flags)
     return device->open(flags);
 }
 
-void NetworkManager::closeDevice(Device* device)
+void NetworkManager::closeDevice(QIODevice* device)
 {
     if (device && device->isOpen()) {
         device->close();
@@ -192,15 +209,15 @@ bool NetworkManager::isAborted() const
     return m_isAborted;
 }
 
-void NetworkManager::prepareReplyReceive(QNetworkReply* reply, IncomingDevice* incommingData)
+void NetworkManager::prepareReplyReceive(QNetworkReply* reply, IncomingDevice* incomingData)
 {
-    if (incommingData) {
+    if (incomingData) {
         connect(reply, &QNetworkReply::downloadProgress, this, [this](const qint64 curr, const qint64 total) {
-            m_progressCh.send(Progress(curr, total));
+            m_progress.progress(curr, total, "");
         });
 
         connect(reply, &QNetworkReply::readyRead, this, [this]() {
-            IF_ASSERT_FAILED(m_incommingData) {
+            IF_ASSERT_FAILED(m_incomingData) {
                 return;
             }
 
@@ -209,7 +226,7 @@ void NetworkManager::prepareReplyReceive(QNetworkReply* reply, IncomingDevice* i
                 return;
             }
 
-            m_incommingData->write(reply->readAll());
+            m_incomingData->write(reply->readAll());
         });
     }
 }
@@ -217,7 +234,7 @@ void NetworkManager::prepareReplyReceive(QNetworkReply* reply, IncomingDevice* i
 void NetworkManager::prepareReplyTransmit(QNetworkReply* reply)
 {
     connect(reply, &QNetworkReply::uploadProgress, [this](const qint64 curr, const qint64 total) {
-        m_progressCh.send(Progress(curr, total));
+        m_progress.progress(curr, total, "");
     });
 }
 
@@ -225,6 +242,7 @@ Ret NetworkManager::waitForReplyFinished(QNetworkReply* reply, int timeoutMs)
 {
     QTimer timeoutTimer;
     timeoutTimer.setSingleShot(true);
+    m_isAborted = false;
 
     bool isTimeout = false;
     connect(&timeoutTimer, &QTimer::timeout, this, [this, &isTimeout]() {
@@ -257,28 +275,30 @@ Ret NetworkManager::waitForReplyFinished(QNetworkReply* reply, int timeoutMs)
         return make_ret(Err::Abort);
     }
 
-    if (reply) {
-        return errorFromReply(reply->error());
-    }
-
-    return errorFromReply(QNetworkReply::ServiceUnavailableError);
+    return errorFromReply(reply);
 }
 
-Ret NetworkManager::errorFromReply(int err)
+Ret NetworkManager::errorFromReply(const QNetworkReply* reply) const
 {
-    if (err == QNetworkReply::NoError) {
-        return make_ret(Err::NoError);
-    }
-    if (err >= QNetworkReply::ContentAccessDenied && err <= QNetworkReply::UnknownContentError) {
-        return make_ret(Err::NoError);
+    if (!reply) {
+        return make_ret(Err::NetworkError);
     }
 
-    switch (err) {
-    case QNetworkReply::HostNotFoundError:
-        return make_ret(Err::HostNotFound);
-    case QNetworkReply::RemoteHostClosedError:
-        return make_ret(Err::HostClosed);
+    Ret ret = muse::make_ok();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        ret.setCode(static_cast<int>(Err::NetworkError));
     }
 
-    return make_ret(Err::NetworkError);
+    QString errorString = reply->errorString();
+    if (!errorString.isEmpty()) {
+        ret.setText(errorString.toStdString());
+    }
+
+    QVariant status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    if (status.isValid()) {
+        ret.setData("status", status.toInt());
+    }
+
+    return ret;
 }

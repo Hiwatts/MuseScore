@@ -19,14 +19,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_SHORTCUTS_ISHORTCUTSCONFIGURATION_H
-#define MU_SHORTCUTS_ISHORTCUTSCONFIGURATION_H
+#ifndef MUSE_SHORTCUTS_ISHORTCUTSCONFIGURATION_H
+#define MUSE_SHORTCUTS_ISHORTCUTSCONFIGURATION_H
 
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 #include "io/path.h"
-#include "retval.h"
+#include "types/retval.h"
 
-namespace mu::shortcuts {
+namespace muse::shortcuts {
 class IShortcutsConfiguration : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IShortcutsConfiguration)
@@ -34,14 +34,18 @@ class IShortcutsConfiguration : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IShortcutsConfiguration() = default;
 
-    virtual io::path shortcutsUserAppDataPath() const = 0;
-    virtual io::path shortcutsAppDataPath() const = 0;
+    virtual QString currentKeyboardLayout() const = 0;
+    virtual void setCurrentKeyboardLayout(const QString& layout) = 0;
 
-    virtual io::path midiMappingUserAppDataPath() const = 0;
+    virtual io::path_t shortcutsUserAppDataPath() const = 0;
+    virtual io::path_t shortcutsAppDataPath() const = 0;
+
+    virtual io::path_t midiMappingUserAppDataPath() const = 0;
 
     virtual bool advanceToNextNoteOnKeyRelease() const = 0;
     virtual void setAdvanceToNextNoteOnKeyRelease(bool value) = 0;
+    virtual muse::async::Channel<bool> advanceToNextNoteOnKeyReleaseChanged() const = 0;
 };
 }
 
-#endif // MU_SHORTCUTS_ISHORTCUTSCONFIGURATION_H
+#endif // MUSE_SHORTCUTS_ISHORTCUTSCONFIGURATION_H

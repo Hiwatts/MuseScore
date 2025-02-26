@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,76 +21,246 @@
  */
 #include "applicationactioncontroller.h"
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QCloseEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QFileOpenEvent>
 #include <QWindow>
+#include <QMimeData>
 
+#include "async/async.h"
+#include "audio/soundfonttypes.h"
+
+#include "defer.h"
 #include "translation.h"
+#include "log.h"
 
 using namespace mu::appshell;
-using namespace mu::framework;
-using namespace mu::actions;
+using namespace muse;
+using namespace muse::actions;
+
+void ApplicationActionController::preInit()
+{
+    qApp->installEventFilter(this);
+}
 
 void ApplicationActionController::init()
 {
     dispatcher()->reg(this, "quit", [this](const ActionData& args) {
         bool isAllInstances = args.count() > 0 ? args.arg<bool>(0) : true;
-        quit(isAllInstances);
+        muse::io::path_t installatorPath = args.count() > 1 ? args.arg<muse::io::path_t>(1) : "";
+        quit(isAllInstances, installatorPath);
+    });
+
+    dispatcher()->reg(this, "restart", [this]() {
+        restart();
     });
 
     dispatcher()->reg(this, "fullscreen", this, &ApplicationActionController::toggleFullScreen);
 
-    dispatcher()->reg(this, "about", this, &ApplicationActionController::openAboutDialog);
+    dispatcher()->reg(this, "about-musescore", this, &ApplicationActionController::openAboutDialog);
     dispatcher()->reg(this, "about-qt", this, &ApplicationActionController::openAboutQtDialog);
     dispatcher()->reg(this, "about-musicxml", this, &ApplicationActionController::openAboutMusicXMLDialog);
     dispatcher()->reg(this, "online-handbook", this, &ApplicationActionController::openOnlineHandbookPage);
     dispatcher()->reg(this, "ask-help", this, &ApplicationActionController::openAskForHelpPage);
-    dispatcher()->reg(this, "report-bug", this, &ApplicationActionController::openBugReportPage);
-    dispatcher()->reg(this, "leave-feedback", this, &ApplicationActionController::openLeaveFeedbackPage);
     dispatcher()->reg(this, "preference-dialog", this, &ApplicationActionController::openPreferencesDialog);
 
     dispatcher()->reg(this, "revert-factory", this, &ApplicationActionController::revertToFactorySettings);
 
-    qApp->installEventFilter(this);
+    dispatcher()->reg(this, "manage-plugins", [this]() {
+        interactive()->open("musescore://home?section=plugins");
+    });
 }
 
 bool ApplicationActionController::eventFilter(QObject* watched, QEvent* event)
 {
-    QCloseEvent* closeEvent = dynamic_cast<QCloseEvent*>(event);
-    if (closeEvent && watched == mainWindow()->qWindow()) {
-        quit(false);
-        closeEvent->ignore();
+    if ((event->type() == QEvent::Close && watched == mainWindow()->qWindow())
+        || event->type() == QEvent::Quit) {
+        bool accepted = quit(false);
+        event->setAccepted(accepted);
+
         return true;
+    }
+
+    if (watched == qApp) {
+        if (event->type() == QEvent::FileOpen) {
+            const QFileOpenEvent* openEvent = static_cast<const QFileOpenEvent*>(event);
+            const QUrl url = openEvent->url();
+
+            if (projectFilesController()->isUrlSupported(url)) {
+                if (startupScenario()->startupCompleted()) {
+                    dispatcher()->dispatch("file-open", ActionData::make_arg1<QUrl>(url));
+                } else {
+                    startupScenario()->setStartupScoreFile(project::ProjectFile { url });
+                }
+
+                return true;
+            }
+        }
+    }
+
+    if (watched == mainWindow()->qWindow()) {
+        if (event->type() == QEvent::DragEnter) {
+            if (onDragEnterEvent(static_cast<QDragEnterEvent*>(event))) {
+                return true;
+            }
+        } else if (event->type() == QEvent::DragMove) {
+            if (onDragMoveEvent(static_cast<QDragMoveEvent*>(event))) {
+                return true;
+            }
+        } else if (event->type() == QEvent::Drop) {
+            if (onDropEvent(static_cast<QDropEvent*>(event))) {
+                return true;
+            }
+        }
     }
 
     return QObject::eventFilter(watched, event);
 }
 
-mu::ValCh<bool> ApplicationActionController::isFullScreen() const
+ApplicationActionController::DragTarget ApplicationActionController::dragTarget(const QUrl& url) const
 {
-    ValCh<bool> result;
-    result.ch = m_fullScreenChannel;
-    result.val = mainWindow()->isFullScreen();
-
-    return result;
+    if (projectFilesController()->isUrlSupported(url)) {
+        return DragTarget::ProjectFile;
+    } else if (url.isLocalFile()) {
+        muse::io::path_t filePath = url.toLocalFile();
+        if (muse::audio::synth::isSoundFont(filePath)) {
+            return DragTarget::SoundFont;
+        } else if (extensionInstaller()->isFileSupported(filePath)) {
+            return DragTarget::Extension;
+        }
+    }
+    return DragTarget::Unknown;
 }
 
-void ApplicationActionController::quit(bool isAllInstances)
+bool ApplicationActionController::onDragEnterEvent(QDragEnterEvent* event)
 {
-    if (projectFilesController()->closeOpenedProject()) {
-        if (isAllInstances) {
-            multiInstancesProvider()->quitForAll();
+    return onDragMoveEvent(event);
+}
+
+bool ApplicationActionController::onDragMoveEvent(QDragMoveEvent* event)
+{
+    const QMimeData* mime = event->mimeData();
+    QList<QUrl> urls = mime->urls();
+    if (urls.count() > 0) {
+        const QUrl& url = urls.front();
+        DragTarget target = dragTarget(url);
+        if (target != DragTarget::Unknown) {
+            event->setDropAction(Qt::LinkAction);
+            event->acceptProposedAction();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ApplicationActionController::onDropEvent(QDropEvent* event)
+{
+    const QMimeData* mime = event->mimeData();
+    QList<QUrl> urls = mime->urls();
+    if (urls.count() > 0) {
+        const QUrl& url = urls.front();
+
+        bool shouldBeHandled = true;
+        DragTarget target = dragTarget(url);
+        switch (target) {
+        case DragTarget::ProjectFile: {
+            async::Async::call(this, [this, url]() {
+                    Ret ret = projectFilesController()->openProject(url);
+                    if (!ret) {
+                        LOGE() << ret.toString();
+                    }
+                });
+        } break;
+        case DragTarget::SoundFont: {
+            muse::io::path_t filePath = url.toLocalFile();
+            async::Async::call(this, [this, filePath]() {
+                    Ret ret = soundFontRepository()->addSoundFont(filePath);
+                    if (!ret) {
+                        LOGE() << ret.toString();
+                    }
+                });
+        } break;
+        case DragTarget::Extension: {
+            muse::io::path_t filePath = url.toLocalFile();
+            async::Async::call(this, [this, filePath]() {
+                    Ret ret = extensionInstaller()->installExtension(filePath);
+                    if (!ret) {
+                        LOGE() << ret.toString();
+                    }
+                });
+        } break;
+        case DragTarget::Unknown:
+            shouldBeHandled = false;
+            break;
         }
 
-        QCoreApplication::quit();
+        if (shouldBeHandled) {
+            event->accept();
+        } else {
+            event->ignore();
+        }
+
+        return shouldBeHandled;
+    }
+
+    return false;
+}
+
+bool ApplicationActionController::quit(bool isAllInstances, const muse::io::path_t& installerPath)
+{
+    if (m_quiting) {
+        return false;
+    }
+
+    m_quiting = true;
+    DEFER {
+        m_quiting = false;
+    };
+
+    if (!projectFilesController()->closeOpenedProject()) {
+        return false;
+    }
+
+    if (isAllInstances) {
+        multiInstancesProvider()->quitForAll();
+    }
+
+    if (multiInstancesProvider()->instances().size() == 1 && !installerPath.empty()) {
+#if defined(Q_OS_LINUX)
+        interactive()->revealInFileBrowser(installerPath);
+#else
+        interactive()->openUrl(QUrl::fromLocalFile(installerPath.toQString()));
+#endif
+    }
+
+    if (multiInstancesProvider()->instances().size() > 1) {
+        multiInstancesProvider()->notifyAboutInstanceWasQuited();
+    }
+
+    QCoreApplication::exit();
+    return true;
+}
+
+void ApplicationActionController::restart()
+{
+    if (projectFilesController()->closeOpenedProject()) {
+        if (multiInstancesProvider()->instances().size() == 1) {
+            application()->restart();
+        } else {
+            multiInstancesProvider()->quitAllAndRestartLast();
+
+            QCoreApplication::exit();
+        }
     }
 }
 
 void ApplicationActionController::toggleFullScreen()
 {
     mainWindow()->toggleFullScreen();
-    bool isFullScreen = mainWindow()->isFullScreen();
-    m_fullScreenChannel.send(isFullScreen);
 }
 
 void ApplicationActionController::openAboutDialog()
@@ -120,41 +290,73 @@ void ApplicationActionController::openAskForHelpPage()
     interactive()->openUrl(askForHelpUrl);
 }
 
-void ApplicationActionController::openBugReportPage()
-{
-    std::string bugReportUrl = configuration()->bugReportUrl();
-    interactive()->openUrl(bugReportUrl);
-}
-
-void ApplicationActionController::openLeaveFeedbackPage()
-{
-    std::string leaveFeedbackUrl = configuration()->leaveFeedbackUrl();
-    interactive()->openUrl(leaveFeedbackUrl);
-}
-
 void ApplicationActionController::openPreferencesDialog()
+{
+    const context::IPlaybackStatePtr state = globalContext()->playbackState();
+    if (state->playbackStatus() == audio::PlaybackStatus::Running) {
+        dispatcher()->dispatch("stop");
+
+        async::Channel<audio::PlaybackStatus> statusChanged = state->playbackStatusChanged();
+        statusChanged.onReceive(this, [statusChanged, this](audio::PlaybackStatus) {
+            auto statusChangedMut = statusChanged;
+            statusChangedMut.resetOnReceive(this);
+            doOpenPreferencesDialog();
+        });
+
+        return;
+    }
+
+    doOpenPreferencesDialog();
+}
+
+void ApplicationActionController::doOpenPreferencesDialog()
 {
     if (multiInstancesProvider()->isPreferencesAlreadyOpened()) {
         multiInstancesProvider()->activateWindowWithOpenedPreferences();
         return;
     }
 
-    interactive()->open("musescore://preferences");
+    interactive()->open("muse://preferences");
 }
 
 void ApplicationActionController::revertToFactorySettings()
 {
-    std::string question = trc("appshell", "This will reset all your preferences.\n"
-                                           "Custom palettes, custom shortcuts, and the list of recent scores will be deleted. "
-                                           "Reverting will not remove any scores from your computer.\n"
-                                           "Are you sure you want to proceed?");
+    std::string title = muse::trc("appshell", "Are you sure you want to revert to factory settings?");
+    std::string question = muse::trc("appshell", "This action will reset all your app preferences and delete all custom palettes and custom shortcuts. "
+                                                 "The list of recent scores will also be cleared.\n\n"
+                                                 "This action will not delete any of your scores.");
 
-    IInteractive::Result result = interactive()->question(std::string(), question, {
-        IInteractive::Button::Yes,
-        IInteractive::Button::No
-    });
+    IInteractive::ButtonData cancelBtn = interactive()->buttonData(IInteractive::Button::Cancel);
+    cancelBtn.accent = true;
 
-    if (result.standardButton() == IInteractive::Button::Yes) {
-        configuration()->revertToFactorySettings();
+    int revertBtn = int(IInteractive::Button::Apply);
+    IInteractive::Result result = interactive()->warning(title, question,
+                                                         { cancelBtn,
+                                                           IInteractive::ButtonData(revertBtn, muse::trc("appshell", "Revert")) },
+                                                         cancelBtn.btn, { muse::IInteractive::Option::WithIcon },
+                                                         muse::trc("appshell", "Revert to factory settings"));
+
+    if (result.standardButton() == IInteractive::Button::Cancel) {
+        return;
     }
+
+    static constexpr bool KEEP_DEFAULT_SETTINGS = false;
+    static constexpr bool NOTIFY_ABOUT_CHANGES = false;
+    static constexpr bool NOTIFY_OTHER_INSTANCES = false;
+    configuration()->revertToFactorySettings(KEEP_DEFAULT_SETTINGS, NOTIFY_ABOUT_CHANGES, NOTIFY_OTHER_INSTANCES);
+
+    title = muse::trc("appshell", "Would you like to restart MuseScore Studio now?");
+    question = muse::trc("appshell", "MuseScore Studio needs to be restarted for these changes to take effect.");
+
+    int restartBtn = int(IInteractive::Button::Apply);
+    result = interactive()->question(title, question,
+                                     { interactive()->buttonData(IInteractive::Button::Cancel),
+                                       IInteractive::ButtonData(restartBtn, muse::trc("appshell", "Restart"), true) },
+                                     restartBtn);
+
+    if (result.standardButton() == IInteractive::Button::Cancel) {
+        return;
+    }
+
+    restart();
 }

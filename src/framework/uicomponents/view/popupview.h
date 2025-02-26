@@ -20,28 +20,44 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef MU_UICOMPONENTS_POPUPVIEW_H
-#define MU_UICOMPONENTS_POPUPVIEW_H
+#ifndef MUSE_UICOMPONENTS_POPUPVIEW_H
+#define MUSE_UICOMPONENTS_POPUPVIEW_H
 
 #include <QQuickItem>
 #include <QQmlParserStatus>
 
-#include "ret.h"
+#include "types/ret.h"
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
 #include "ui/imainwindow.h"
 #include "ui/iuiconfiguration.h"
 #include "ui/inavigationcontroller.h"
-#include "ui/view/navigationcontrol.h"
-#include "popupwindow/ipopupwindow.h"
 
-namespace mu::uicomponents {
-class PopupView : public QObject, public QQmlParserStatus
+#include "popupwindow/ipopupwindow.h"
+#include "internal/popupviewclosecontroller.h"
+
+Q_MOC_INCLUDE(< QWindow >)
+
+class QQuickCloseEvent;
+
+namespace muse::ui {
+class INavigationControl;
+}
+
+namespace muse::uicomponents {
+class PopupView : public QObject, public QQmlParserStatus, public Injectable, public async::Asyncable
 {
     Q_OBJECT
     Q_INTERFACES(QQmlParserStatus)
 
     Q_PROPERTY(QQuickItem * parent READ parentItem WRITE setParentItem NOTIFY parentItemChanged)
+
     Q_PROPERTY(QQuickItem * contentItem READ contentItem WRITE setContentItem NOTIFY contentItemChanged)
+    Q_PROPERTY(int contentWidth READ contentWidth WRITE setContentWidth NOTIFY contentWidthChanged)
+    Q_PROPERTY(int contentHeight READ contentHeight WRITE setContentHeight NOTIFY contentHeightChanged)
+
+    Q_PROPERTY(QWindow * window READ window NOTIFY windowChanged)
 
     //! NOTE Local, related parent
     Q_PROPERTY(qreal x READ localX WRITE setLocalX NOTIFY xChanged)
@@ -49,50 +65,72 @@ class PopupView : public QObject, public QQmlParserStatus
 
     Q_PROPERTY(bool showArrow READ showArrow WRITE setShowArrow NOTIFY showArrowChanged)
     Q_PROPERTY(int padding READ padding WRITE setPadding NOTIFY paddingChanged)
+    Q_PROPERTY(Placement placement READ placement WRITE setPlacement NOTIFY placementChanged)
 
     Q_PROPERTY(QQuickItem * anchorItem READ anchorItem WRITE setAnchorItem NOTIFY anchorItemChanged)
     Q_PROPERTY(bool opensUpward READ opensUpward NOTIFY opensUpwardChanged)
     Q_PROPERTY(int arrowX READ arrowX WRITE setArrowX NOTIFY arrowXChanged)
-    Q_PROPERTY(Qt::AlignmentFlag cascadeAlign READ cascadeAlign WRITE setCascadeAlign NOTIFY cascadeAlignChanged)
 
     Q_PROPERTY(bool isOpened READ isOpened NOTIFY isOpenedChanged)
-    Q_PROPERTY(ClosePolicy closePolicy READ closePolicy WRITE setClosePolicy NOTIFY closePolicyChanged)
+    Q_PROPERTY(OpenPolicies openPolicies READ openPolicies WRITE setOpenPolicies NOTIFY openPoliciesChanged)
 
-    //! NOTE We use QObject (instead ui::NavigationControl) for avoid add  UI module dependency at link time.
-    //! Itself not bad for uicomponents, but we have dependency uicomponents - instruments - libmscore - imports - tests
-    //! So, add ui dependency is bad and problems with compilation
-    Q_PROPERTY(QObject * navigationParentControl
-               READ navigationParentControl
-               WRITE setNavigationParentControl
-               NOTIFY navigationParentControlChanged
-               )
+    Q_PROPERTY(bool isContentReady READ isContentReady WRITE setIsContentReady NOTIFY isContentReadyChanged)
+
+    Q_PROPERTY(ClosePolicies closePolicies READ closePolicies WRITE setClosePolicies NOTIFY closePoliciesChanged)
+
+    Q_PROPERTY(
+        bool activateParentOnClose READ activateParentOnClose WRITE setActivateParentOnClose NOTIFY activateParentOnCloseChanged)
+
+    Q_PROPERTY(bool takeFocusOnClick READ takeFocusOnClick WRITE setTakeFocusOnClick NOTIFY takeFocusOnClickChanged)
 
     //! NOTE Used for dialogs, but be here so that dialogs and just popups have one api
     Q_PROPERTY(QString title READ title WRITE setTitle NOTIFY titleChanged)
-    Q_PROPERTY(QString objectID READ objectID WRITE setObjectID NOTIFY objectIDChanged)
+    Q_PROPERTY(QString objectId READ objectId WRITE setObjectId NOTIFY objectIdChanged)
     Q_PROPERTY(bool modal READ modal WRITE setModal NOTIFY modalChanged)
+    Q_PROPERTY(bool frameless READ frameless WRITE setFrameless NOTIFY framelessChanged)
     Q_PROPERTY(bool resizable READ resizable WRITE setResizable NOTIFY resizableChanged)
+    Q_PROPERTY(bool alwaysOnTop READ alwaysOnTop WRITE setAlwaysOnTop NOTIFY alwaysOnTopChanged)
     Q_PROPERTY(QVariantMap ret READ ret WRITE setRet NOTIFY retChanged)
 
-    Q_ENUMS(ClosePolicy)
-
-    INJECT(uicomponents, ui::IMainWindow, mainWindow)
-    INJECT(uicomponents, ui::IUiConfiguration, uiConfiguration)
-    INJECT(uicomponents, ui::INavigationController, navigationController)
+public:
+    Inject<ui::IMainWindow> mainWindow = { this };
+    Inject<ui::IUiConfiguration> uiConfiguration = { this };
+    Inject<ui::INavigationController> navigationController = { this };
 
 public:
 
     explicit PopupView(QQuickItem* parent = nullptr);
-    ~PopupView() override = default;
+    ~PopupView() override;
 
-    enum ClosePolicy {
-        NoAutoClose = 0,
-        CloseOnPressOutsideParent,
-        CloseOnReleaseOutsideParent
+    enum class OpenPolicy {
+        Default = 0x00000000,
+        NoActivateFocus = 0x00000001,
+        OpenOnContentReady = 0x00000002
     };
+    Q_DECLARE_FLAGS(OpenPolicies, OpenPolicy)
+    Q_FLAG(OpenPolicies)
+
+    enum class ClosePolicy {
+        NoAutoClose = 0x00000000,
+        CloseOnPressOutsideParent = 0x00000001,
+    };
+    Q_DECLARE_FLAGS(ClosePolicies, ClosePolicy)
+    Q_FLAG(ClosePolicies)
+
+    enum class Placement {
+        Default,
+        PreferBelow,
+        PreferAbove
+    };
+    Q_ENUM(Placement)
 
     QQuickItem* parentItem() const;
+
     QQuickItem* contentItem() const;
+    int contentWidth() const;
+    int contentHeight() const;
+
+    QWindow* window() const;
 
     qreal localX() const;
     qreal localY() const;
@@ -100,122 +138,185 @@ public:
 
     Q_INVOKABLE void forceActiveFocus();
 
+    void init();
+
     Q_INVOKABLE void open();
-    Q_INVOKABLE void close();
+    Q_INVOKABLE void close(bool force = false);
     Q_INVOKABLE void toggleOpened();
 
-    ClosePolicy closePolicy() const;
-    QObject* navigationParentControl() const;
+    Q_INVOKABLE void setParentWindow(QWindow* window);
+
+    Q_INVOKABLE QRectF anchorGeometry() const;
+
+    OpenPolicies openPolicies() const;
+    ClosePolicies closePolicies() const;
+    Placement placement() const;
+
+    bool activateParentOnClose() const;
+    bool takeFocusOnClick() const;
+
+    ui::INavigationControl* navigationParentControl() const;
 
     bool isOpened() const;
 
-    QString objectID() const;
+    QString objectId() const;
     QString title() const;
     bool modal() const;
+    bool frameless() const;
     bool resizable() const;
+    bool alwaysOnTop() const;
     QVariantMap ret() const;
 
     bool opensUpward() const;
     int arrowX() const;
-    Qt::AlignmentFlag cascadeAlign() const;
     int padding() const;
     bool showArrow() const;
     QQuickItem* anchorItem() const;
 
+    bool isContentReady() const;
+    void setIsContentReady(bool ready);
+
 public slots:
     void setParentItem(QQuickItem* parent);
+    void setEngine(QQmlEngine* engine);
+    void setComponent(QQmlComponent* component);
     void setContentItem(QQuickItem* content);
+    void setContentWidth(int contentWidth);
+    void setContentHeight(int contentHeight);
     void setLocalX(qreal x);
     void setLocalY(qreal y);
-    void setClosePolicy(ClosePolicy closePolicy);
-    void setNavigationParentControl(QObject* parentNavigationControl);
-    void setObjectID(QString objectID);
+    void setOpenPolicies(muse::uicomponents::PopupView::OpenPolicies openPolicies);
+    void setClosePolicies(muse::uicomponents::PopupView::ClosePolicies closePolicies);
+    void setPlacement(muse::uicomponents::PopupView::Placement newPlacement);
+    void setNavigationParentControl(ui::INavigationControl* parentNavigationControl);
+    void setObjectId(QString objectId);
     void setTitle(QString title);
     void setModal(bool modal);
+    void setFrameless(bool frameless);
     void setResizable(bool resizable);
+    void setAlwaysOnTop(bool alwaysOnTop);
     void setRet(QVariantMap ret);
 
     void setOpensUpward(bool opensUpward);
     void setArrowX(int arrowX);
-    void setCascadeAlign(Qt::AlignmentFlag cascadeAlign);
     void setPadding(int padding);
     void setShowArrow(bool showArrow);
     void setAnchorItem(QQuickItem* anchorItem);
 
+    void setActivateParentOnClose(bool activateParentOnClose);
+    void setTakeFocusOnClick(bool takeFocusOnClick);
+
 signals:
     void parentItemChanged();
     void contentItemChanged();
+    void contentWidthChanged();
+    void contentHeightChanged();
+    void windowChanged();
     void xChanged(qreal x);
     void yChanged(qreal y);
-    void closePolicyChanged(ClosePolicy closePolicy);
-    void navigationParentControlChanged(QObject* navigationParentControl);
-    void objectIDChanged(QString objectID);
+    void openPoliciesChanged(muse::uicomponents::PopupView::OpenPolicies openPolicies);
+    void closePoliciesChanged(muse::uicomponents::PopupView::ClosePolicies closePolicies);
+    void placementChanged(muse::uicomponents::PopupView::Placement placement);
+    void navigationParentControlChanged(ui::INavigationControl* navigationParentControl);
+    void objectIdChanged(QString objectId);
     void titleChanged(QString title);
     void modalChanged(bool modal);
+    void framelessChanged(bool frameless);
     void resizableChanged(bool resizable);
+    void alwaysOnTopChanged();
     void retChanged(QVariantMap ret);
 
     void isOpenedChanged();
     void opened();
-    void closed();
+    void aboutToClose(QQuickCloseEvent* closeEvent);
+    void closed(bool force);
 
     void opensUpwardChanged(bool opensUpward);
     void arrowXChanged(int arrowX);
-    void cascadeAlignChanged(Qt::AlignmentFlag cascadeAlign);
     void paddingChanged(int padding);
     void showArrowChanged(bool showArrow);
     void anchorItemChanged(QQuickItem* anchorItem);
 
-private slots:
-    void onApplicationStateChanged(Qt::ApplicationState state);
+    void activateParentOnCloseChanged(bool activateParentOnClose);
+    void takeFocusOnClickChanged(bool takeFocusOnClick);
+
+    void isContentReadyChanged();
 
 protected:
     virtual bool isDialog() const;
     void classBegin() override;
     void componentComplete() override;
     bool eventFilter(QObject* watched, QEvent* event) override;
-    void mousePressEvent(QMouseEvent* event);
-    void mouseReleaseEvent(QMouseEvent* event);
 
-    bool isMouseWithinBoundaries(const QPoint& mousePos) const;
+    void initCloseController();
+
+    void doFocusOut();
+    void windowMoveEvent();
+
+    bool isMouseWithinBoundaries(const QPointF& mousePos) const;
+
+    virtual void beforeOpen();
+    void doOpen();
 
     QWindow* qWindow() const;
-    virtual void beforeShow();
     virtual void onHidden();
 
     void repositionWindowIfNeed();
 
     void setErrCode(Ret::Code code);
 
+    virtual QScreen* resolveScreen() const;
     QRect currentScreenGeometry() const;
-    void updatePosition();
-    void updateContentPosition();
+    virtual void updateGeometry();
+    virtual void updateContentPosition();
 
-    QQuickItem* parentPopupContentItem() const;
-    Qt::AlignmentFlag parentCascadeAlign(const QQuickItem* parent) const;
+    virtual QRect viewGeometry() const;
 
-    QRectF anchorGeometry() const;
+    void resolveNavigationParentControl();
+    void activateNavigationParentControl();
+
+    QQmlEngine* engine() const;
 
     IPopupWindow* m_window = nullptr;
+
+    QQmlComponent* m_component = nullptr;
+    QQmlEngine* m_engine = nullptr;
+
     QQuickItem* m_contentItem = nullptr;
+    int m_contentWidth = 0;
+    int m_contentHeight = 0;
 
     QQuickItem* m_anchorItem = nullptr;
 
     QPointF m_localPos;
     QPointF m_globalPos;
-    ClosePolicy m_closePolicy = ClosePolicy::CloseOnPressOutsideParent;
-    QObject* m_navigationParentControl = nullptr;
-    QString m_objectID;
+
+    OpenPolicies m_openPolicies = { OpenPolicy::Default };
+    bool m_shouldOpenOnReady = false;
+    bool m_isContentReady = false;
+
+    ClosePolicies m_closePolicies = { ClosePolicy::CloseOnPressOutsideParent };
+
+    Placement m_placement = { Placement::Default };
+
+    bool m_activateParentOnClose = true;
+    bool m_takeFocusOnClick = true;
+    ui::INavigationControl* m_navigationParentControl = nullptr;
+    QString m_objectId;
     QString m_title;
     bool m_modal = true;
+    bool m_frameless = false;
     bool m_resizable = false;
+    bool m_alwaysOnTop = false;
     QVariantMap m_ret;
     bool m_opensUpward = false;
     int m_arrowX = 0;
-    Qt::AlignmentFlag m_cascadeAlign = Qt::AlignmentFlag::AlignRight;
     int m_padding = 0;
     bool m_showArrow = false;
+
+    PopupViewCloseController* m_closeController = nullptr;
+    bool m_forceClosed = false;
 };
 }
 
-#endif // MU_UICOMPONENTS_POPUPVIEW_H
+#endif // MUSE_UICOMPONENTS_POPUPVIEW_H

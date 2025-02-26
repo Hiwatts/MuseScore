@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,9 @@
 #ifndef MU_IMPORTEXPORT_IGUITARPROCONFIGURATION_H
 #define MU_IMPORTEXPORT_IGUITARPROCONFIGURATION_H
 
-#include <string>
-#include "modularity/imoduleexport.h"
+#include <optional>
+
+#include "modularity/imoduleinterface.h"
 
 namespace mu::iex::guitarpro {
 class IGuitarProConfiguration : MODULE_EXPORT_INTERFACE
@@ -33,8 +34,11 @@ class IGuitarProConfiguration : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IGuitarProConfiguration() = default;
 
-    virtual std::string importGuitarProCharset() const = 0;
-    virtual void setImportGuitarProCharset(const std::string& charset) = 0;
+    virtual bool linkedTabStaffCreated() const = 0;
+    virtual void setLinkedTabStaffCreated(std::optional<bool> created) = 0;
+
+    virtual bool experimental() const = 0;
+    virtual void setExperimental(std::optional<bool> experimental) = 0;
 };
 }
 

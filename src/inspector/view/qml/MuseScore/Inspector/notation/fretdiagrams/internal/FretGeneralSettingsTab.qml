@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
 import "../../../common"
@@ -62,12 +62,11 @@ FocusableItem {
 
                 enabled: root.model ? !root.model.isMultipleDotsModeOn : false
                 checked: root.model && enabled ? root.model.isBarreModeOn : false
-                text: qsTrc("inspector", "Barre")
+                text: qsTrc("inspector", "Barré")
 
                 navigation.name: "BarreModeCheckBox"
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 1
-                navigation.enabled: root.enabled
 
                 onClicked: { root.model.isBarreModeOn = !checked }
             }
@@ -86,7 +85,6 @@ FocusableItem {
                 navigation.name: "MultipleDotsCheckBox"
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 2
-                navigation.enabled: root.enabled
 
                 onClicked: { root.model.isMultipleDotsModeOn = !checked }
             }
@@ -99,7 +97,9 @@ FocusableItem {
 
             StyledTextLabel {
                 id: markerTypeLabel
+                width: parent.width
                 text: qsTrc("inspector", "Marker type")
+                horizontalAlignment: Text.AlignLeft
             }
 
             RadioButtonGroup {
@@ -124,7 +124,6 @@ FocusableItem {
                     navigation.name: "LineStyleGroup"
                     navigation.panel: root.navigationPanel
                     navigation.row: root.navigationRowStart + 3 + index
-                    navigation.enabled: root.enabled
                     navigation.accessible.name: markerTypeLabel.text + " " + modelData["titleRole"]
 
                     onToggled: {

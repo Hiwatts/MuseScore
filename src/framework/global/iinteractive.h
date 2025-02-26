@@ -19,18 +19,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef MU_FRAMEWORK_IINTERACTIVE_H
-#define MU_FRAMEWORK_IINTERACTIVE_H
+#ifndef MUSE_GLOBAL_IINTERACTIVE_H
+#define MUSE_GLOBAL_IINTERACTIVE_H
 
-#include <QString>
-
-#include "modularity/imoduleexport.h"
+#include "modularity/imoduleinterface.h"
 #include "io/path.h"
-#include "val.h"
-#include "retval.h"
-#include "uri.h"
+#include "types/val.h"
+#include "types/retval.h"
+#include "types/uri.h"
+#include "types/flags.h"
+#include "async/promise.h"
+#include "progress.h"
 
-namespace mu::framework {
+namespace muse {
 class IInteractive : MODULE_EXPORT_INTERFACE
 {
     INTERFACE_ID(IInteractive)
@@ -42,53 +43,80 @@ public:
     enum class Button {
         NoButton,
         Ok,
-        Save,
-        SaveAll,
-        DontSave,
-        Open,
-        Yes,
-        YesToAll,
-        No,
-        NoToAll,
-        Abort,
-        Retry,
-        Ignore,
-        Close,
-        Cancel,
-        Discard,
-        Help,
-        Apply,
-        Reset,
-        RestoreDefaults,
         Continue,
+        RestoreDefaults,
+        Reset,
+        Apply,
+        Help,
+        Discard,
+        Cancel,
+        Close,
+        Ignore,
+        Retry,
+        Abort,
+        NoToAll,
+        No,
+        YesToAll,
+        Yes,
+        Open,
+        DontSave,
+        SaveAll,
+        Save,
+        Next,
+        Back,
+        Select,
+        Clear,
+        Done,
 
-        CustomButton
+        CustomButton,
     };
     using Buttons = std::vector<Button>;
+
+    enum ButtonRole { // Keep updated with ButtonRole in buttonboxmodel.h
+        AcceptRole,
+        RejectRole,
+        DestructiveRole,
+        ResetRole,
+        ApplyRole,
+        RetryRole,
+        HelpRole,
+        ContinueRole,
+        BackRole,
+        CustomRole
+    };
 
     struct ButtonData {
         int btn = int(Button::CustomButton);
         std::string text;
         bool accent = false;
+        bool leftSide = false;
+        ButtonRole role = ButtonRole::CustomRole;
+
         ButtonData(int btn, const std::string& text)
             : btn(btn), text(text) {}
-        ButtonData(int btn, const std::string& text, bool accent)
-            : btn(btn), text(text), accent(accent) {}
+        ButtonData(Button btn, const std::string& text)
+            : btn(int(btn)), text(text) {}
+        ButtonData(int btn, const std::string& text, bool accent, bool leftSide = false, ButtonRole role = ButtonRole::CustomRole)
+            : btn(btn), text(text), accent(accent), leftSide(leftSide), role(role) {}
+        ButtonData(Button btn, const std::string& text, bool accent, bool leftSide = false, ButtonRole role = ButtonRole::CustomRole)
+            : btn(int(btn)), text(text), accent(accent), leftSide(leftSide), role(role) {}
     };
     using ButtonDatas = std::vector<ButtonData>;
 
     enum class TextFormat {
-        PlainText = 0,
+        Auto = 0,
+        PlainText,
         RichText
     };
 
     struct Text {
         std::string text;
-        TextFormat format = TextFormat::PlainText;
+        TextFormat format = TextFormat::Auto;
+
         Text() = default;
         Text(const char* t)
-            : text(t), format(TextFormat::PlainText) {}
-        Text(const std::string& t, const TextFormat& f = TextFormat::PlainText)
+            : text(t), format(TextFormat::Auto) {}
+        Text(const std::string& t, const TextFormat& f = TextFormat::Auto)
             : text(t), format(f) {}
     };
 
@@ -113,58 +141,99 @@ public:
     enum Option {
         NoOptions = 0x0,
         WithIcon = 0x1,
-        WithShowAgain = 0x2
+        WithDontShowAgainCheckBox = 0x2
     };
-    Q_DECLARE_FLAGS(Options, Option)
+    DECLARE_FLAGS(Options, Option)
 
-    virtual Result question(const std::string& title, const std::string& text, const Buttons& buttons, const Button& def = Button::NoButton,
-                            const Options& options = {}) const = 0;
+    virtual Result question(const std::string& contentTitle, const std::string& text, const Buttons& buttons,
+                            const Button& def = Button::NoButton, const Options& options = {},
+                            const std::string& dialogTitle = "") const = 0;
 
-    virtual Result question(const std::string& title, const Text& text, const ButtonDatas& buttons, int defBtn = int(Button::NoButton),
-                            const Options& options = {}) const = 0;
+    virtual Result question(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons,
+                            int defBtn = int(Button::NoButton), const Options& options = {}, const std::string& dialogTitle = "") const = 0;
 
     virtual ButtonData buttonData(Button b) const = 0;
 
     // info
-    virtual Result info(const std::string& title, const std::string& text, const ButtonDatas& buttons = {},
-                        int defBtn = int(Button::NoButton), const Options& options = {}) const = 0;
+    virtual Result info(const std::string& contentTitle, const std::string& text, const Buttons& buttons = {},
+                        int defBtn = int(Button::NoButton), const Options& options = {}, const std::string& dialogTitle = "") const = 0;
+
+    virtual Result info(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons = {},
+                        int defBtn = int(Button::NoButton), const Options& options = {}, const std::string& dialogTitle = "") const = 0;
 
     // warning
-    virtual Result warning(const std::string& title, const std::string& text, const Buttons& buttons = {},
-                           const Button& def = Button::NoButton, const Options& options = {}) const = 0;
+    virtual Result warning(const std::string& contentTitle, const std::string& text, const Buttons& buttons = {},
+                           const Button& def = Button::NoButton, const Options& options = { WithIcon },
+                           const std::string& dialogTitle = "") const = 0;
 
-    virtual Result warning(const std::string& title, const Text& text, const ButtonDatas& buttons = {}, int defBtn = int(Button::NoButton),
-                           const Options& options = {}) const = 0;
+    virtual Result warning(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons = {},
+                           int defBtn = int(Button::NoButton), const Options& options = { WithIcon },
+                           const std::string& dialogTitle = "") const = 0;
+
+    virtual Result warning(const std::string& contentTitle, const Text& text, const std::string& detailedText,
+                           const ButtonDatas& buttons = {}, int defBtn = int(Button::NoButton), const Options& options = { WithIcon },
+                           const std::string& dialogTitle = "") const = 0;
 
     // error
-    virtual Result error(const std::string& title, const std::string& text, const Buttons& buttons = {},
-                         const Button& def = Button::NoButton, const Options& options = {}) const = 0;
+    virtual Result error(const std::string& contentTitle, const std::string& text, const Buttons& buttons = {},
+                         const Button& def = Button::NoButton, const Options& options = { WithIcon },
+                         const std::string& dialogTitle = "") const = 0;
 
-    virtual Result error(const std::string& title, const Text& text, const ButtonDatas& buttons = {}, int defBtn = int(Button::NoButton),
-                         const Options& options = {}) const = 0;
+    virtual Result error(const std::string& contentTitle, const Text& text, const ButtonDatas& buttons = {},
+                         int defBtn = int(Button::NoButton), const Options& options = { WithIcon },
+                         const std::string& dialogTitle = "") const = 0;
+
+    virtual Result error(const std::string& contentTitle, const Text& text, const std::string& detailedText,
+                         const ButtonDatas& buttons = {}, int defBtn = int(Button::NoButton), const Options& options = { WithIcon },
+                         const std::string& dialogTitle = "") const = 0;
+
+    // progress
+    virtual Ret showProgress(const std::string& title, Progress* progress) const = 0;
 
     // files
-    virtual io::path selectOpeningFile(const QString& title, const io::path& dir, const QString& filter) = 0;
-    virtual io::path selectSavingFile(const QString& title, const io::path& dir, const QString& filter, bool confirmOverwrite = true) = 0;
+    virtual io::path_t selectOpeningFile(const QString& title, const io::path_t& dir, const std::vector<std::string>& filter) = 0;
+    virtual io::path_t selectSavingFile(const QString& title, const io::path_t& path, const std::vector<std::string>& filter,
+                                        bool confirmOverwrite = true) = 0;
 
     // dirs
-    virtual io::path selectDirectory(const QString& title, const io::path& dir) = 0;
+    virtual io::path_t selectDirectory(const QString& title, const io::path_t& dir) = 0;
+    virtual io::paths_t selectMultipleDirectories(const QString& title, const io::path_t& dir, const io::paths_t& selectedDirectories) = 0;
+
+    // color
+    virtual QColor selectColor(const QColor& color = Qt::white, const QString& title = "") = 0;
+    virtual bool isSelectColorOpened() const = 0;
 
     // custom
     virtual RetVal<Val> open(const std::string& uri) const = 0;
+    virtual RetVal<Val> open(const Uri& uri) const = 0;
     virtual RetVal<Val> open(const UriQuery& uri) const = 0;
     virtual RetVal<bool> isOpened(const std::string& uri) const = 0;
     virtual RetVal<bool> isOpened(const Uri& uri) const = 0;
+    virtual RetVal<bool> isOpened(const UriQuery& uri) const = 0;
+    virtual async::Channel<Uri> opened() const = 0;
+
+    virtual void raise(const UriQuery& uri) = 0;
 
     virtual void close(const std::string& uri) = 0;
     virtual void close(const Uri& uri) = 0;
+    virtual void close(const UriQuery& uri) = 0;
+    virtual void closeAllDialogs() = 0;
 
     virtual ValCh<Uri> currentUri() const = 0;
     virtual std::vector<Uri> stack() const = 0;
 
     virtual Ret openUrl(const std::string& url) const = 0;
+    virtual Ret openUrl(const QUrl& url) const = 0;
+
+    virtual Ret isAppExists(const std::string& appIdentifier) const = 0;
+    virtual Ret canOpenApp(const Uri& uri) const = 0;
+    virtual async::Promise<Ret> openApp(const Uri& uri) const = 0;
+
+    /// Opens a file browser at the parent directory of filePath,
+    /// and selects the file at filePath on OSs that support it
+    virtual Ret revealInFileBrowser(const io::path_t& filePath) const = 0;
 };
-Q_DECLARE_OPERATORS_FOR_FLAGS(IInteractive::Options)
+DECLARE_OPERATORS_FOR_FLAGS(IInteractive::Options)
 }
 
-#endif // MU_FRAMEWORK_IINTERACTIVE_H
+#endif // MUSE_GLOBAL_IINTERACTIVE_H

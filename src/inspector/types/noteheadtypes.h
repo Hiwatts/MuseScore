@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -48,6 +48,7 @@ public:
         HEAD_BREVIS_ALT,
 
         HEAD_SLASH,
+        HEAD_LARGE_DIAMOND,
 
         HEAD_SOL,
         HEAD_LA,
@@ -64,12 +65,6 @@ public:
         TYPE_HALF,
         TYPE_QUARTER,
         TYPE_BREVIS
-    };
-
-    enum class HorizontalDirection {
-        DIRECTION_H_AUTO = 0,
-        DIRECTION_H_LEFT,
-        DIRECTION_H_RIGHT
     };
 
     enum class NoteDotPosition {
@@ -92,7 +87,6 @@ public:
     };
 
     Q_ENUM(Group)
-    Q_ENUM(HorizontalDirection)
     Q_ENUM(Type)
     Q_ENUM(NoteDotPosition)
     Q_ENUM(SchemeType)

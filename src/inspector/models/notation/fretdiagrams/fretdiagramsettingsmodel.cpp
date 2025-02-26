@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,8 +21,10 @@
  */
 #include "fretdiagramsettingsmodel.h"
 
-#include "translation.h"
 #include "dataformatter.h"
+#include "translation.h"
+
+#include "engraving/dom/fret.h"
 
 using namespace mu::inspector;
 
@@ -30,44 +32,71 @@ FretDiagramSettingsModel::FretDiagramSettingsModel(QObject* parent, IElementRepo
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_FRET_DIAGRAM);
-    setTitle(qtrc("inspector", "Fretboard diagram"));
-    setIcon(ui::IconCode::Code::FRETBOARD_DIAGRAM);
+    setTitle(muse::qtrc("inspector", "Fretboard diagram"));
+    setIcon(muse::ui::IconCode::Code::FRETBOARD_DIAGRAM);
     createProperties();
 }
 
 void FretDiagramSettingsModel::createProperties()
 {
-    m_scale = buildPropertyItem(Ms::Pid::MAG, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_scale = buildPropertyItem(mu::engraving::Pid::MAG,
+                                [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue.toDouble() / 100);
+    },
+                                [this](const mu::engraving::Sid sid, const QVariant& newValue) {
+        updateStyleValue(sid, newValue.toDouble() / 100);
+        emit requestReloadPropertyItems();
     });
 
-    m_stringsCount = buildPropertyItem(Ms::Pid::FRET_STRINGS, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_stringsCount = buildPropertyItem(mu::engraving::Pid::FRET_STRINGS, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
+        loadPropertyItem(m_fingerings);
+
         emit fretDiagramChanged(fretDiagram());
     });
 
-    m_fretsCount = buildPropertyItem(Ms::Pid::FRET_FRETS, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_fretsCount = buildPropertyItem(mu::engraving::Pid::FRET_FRETS, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
+
         emit fretDiagramChanged(fretDiagram());
     });
 
-    m_startingFretNumber = buildPropertyItem(Ms::Pid::FRET_OFFSET, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_fretNumber = buildPropertyItem(mu::engraving::Pid::FRET_OFFSET, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue.toInt() - 1);
+
         emit fretDiagramChanged(fretDiagram());
     });
 
-    m_isNutVisible = buildPropertyItem(Ms::Pid::FRET_NUT, [this](const Ms::Pid pid, const QVariant& newValue) {
+    m_isNutVisible = buildPropertyItem(mu::engraving::Pid::FRET_NUT, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
         onPropertyValueChanged(pid, newValue);
 
         emit fretDiagramChanged(fretDiagram());
     });
 
-    m_placement = buildPropertyItem(Ms::Pid::PLACEMENT);
+    m_placement = buildPropertyItem(mu::engraving::Pid::PLACEMENT);
+    m_orientation = buildPropertyItem(mu::engraving::Pid::ORIENTATION);
+
+    m_showFingerings
+        = buildPropertyItem(mu::engraving::Pid::FRET_SHOW_FINGERINGS, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
+        onPropertyValueChanged(pid, newValue);
+
+        emit fretDiagramChanged(fretDiagram());
+    });
+
+    m_fingerings = buildPropertyItem(mu::engraving::Pid::FRET_FINGERING, [this](const mu::engraving::Pid pid, const QVariant& newValue){
+        onPropertyValueChanged(pid, newValue);
+
+        emit fretDiagramChanged(fretDiagram());
+    });
+
+    connect(m_fingerings, &PropertyItem::valueChanged, this, [this]() {
+        emit fingeringsChanged(fingerings());
+    });
 }
 
 void FretDiagramSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::FRET_DIAGRAM);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::FRET_DIAGRAM);
 
     emit fretDiagramChanged(fretDiagram());
     emit areSettingsAvailableChanged(areSettingsAvailable());
@@ -76,17 +105,21 @@ void FretDiagramSettingsModel::requestElements()
 void FretDiagramSettingsModel::loadProperties()
 {
     loadPropertyItem(m_scale, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble()) * 100;
+        return muse::DataFormatter::roundDouble(elementPropertyValue.toDouble()) * 100;
     });
 
     loadPropertyItem(m_stringsCount);
     loadPropertyItem(m_fretsCount);
-    loadPropertyItem(m_startingFretNumber, [](const QVariant& elementPropertyValue) -> QVariant {
+    loadPropertyItem(m_fretNumber, [](const QVariant& elementPropertyValue) -> QVariant {
         return elementPropertyValue.toInt() + 1;
     });
 
     loadPropertyItem(m_isNutVisible);
     loadPropertyItem(m_placement);
+    loadPropertyItem(m_orientation);
+    loadPropertyItem(m_showFingerings);
+    loadPropertyItem(m_fingerings);
+    emit fingeringsChanged(fingerings());
 }
 
 void FretDiagramSettingsModel::resetProperties()
@@ -94,9 +127,10 @@ void FretDiagramSettingsModel::resetProperties()
     m_scale->resetToDefault();
     m_stringsCount->resetToDefault();
     m_fretsCount->resetToDefault();
-    m_startingFretNumber->resetToDefault();
+    m_fretNumber->resetToDefault();
     m_isNutVisible->resetToDefault();
     m_placement->resetToDefault();
+    m_showFingerings->resetToDefault();
 }
 
 PropertyItem* FretDiagramSettingsModel::scale() const
@@ -114,6 +148,11 @@ PropertyItem* FretDiagramSettingsModel::fretsCount() const
     return m_fretsCount;
 }
 
+PropertyItem* FretDiagramSettingsModel::fretNumber() const
+{
+    return m_fretNumber;
+}
+
 PropertyItem* FretDiagramSettingsModel::isNutVisible() const
 {
     return m_isNutVisible;
@@ -124,9 +163,39 @@ PropertyItem* FretDiagramSettingsModel::placement() const
     return m_placement;
 }
 
-PropertyItem* FretDiagramSettingsModel::startingFretNumber() const
+PropertyItem* FretDiagramSettingsModel::orientation() const
 {
-    return m_startingFretNumber;
+    return m_orientation;
+}
+
+PropertyItem* FretDiagramSettingsModel::showFingerings() const
+{
+    return m_showFingerings;
+}
+
+QStringList FretDiagramSettingsModel::fingerings() const
+{
+    QString fingerings = m_fingerings->value().value<QString>();
+    return fingerings.split(',');
+}
+
+void FretDiagramSettingsModel::setFingering(int string, int finger)
+{
+    finger = std::clamp(finger, 0, 5);
+
+    QStringList curFingerings = fingerings();
+    assert(string < curFingerings.size());
+
+    QString newFinger = QString::number(finger);
+    curFingerings[string] = newFinger;
+    QString newFingerings = curFingerings.join(",");
+
+    m_fingerings->setValue(newFingerings);
+}
+
+void FretDiagramSettingsModel::resetFingerings()
+{
+    m_fingerings->resetToDefault();
 }
 
 QVariant FretDiagramSettingsModel::fretDiagram() const
@@ -135,7 +204,7 @@ QVariant FretDiagramSettingsModel::fretDiagram() const
         return QVariant();
     }
 
-    return QVariant::fromValue(Ms::toFretDiagram(m_elementList.first()));
+    return QVariant::fromValue(mu::engraving::toFretDiagram(m_elementList.first()));
 }
 
 bool FretDiagramSettingsModel::isBarreModeOn() const

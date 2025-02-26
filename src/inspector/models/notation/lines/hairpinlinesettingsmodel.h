@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,12 +22,15 @@
 #ifndef MU_INSPECTOR_HAIRPINLINESETTINGSMODEL_H
 #define MU_INSPECTOR_HAIRPINLINESETTINGSMODEL_H
 
-#include "linesettingsmodel.h"
+#include "textlinesettingsmodel.h"
 
 namespace mu::inspector {
-class HairpinLineSettingsModel : public LineSettingsModel
+class HairpinLineSettingsModel : public TextLineSettingsModel
 {
     Q_OBJECT
+
+    Q_PROPERTY(PropertyItem * snapBefore READ snapBefore CONSTANT)
+    Q_PROPERTY(PropertyItem * snapAfter READ snapAfter CONSTANT)
 
 public:
     enum HairpinLineType {
@@ -37,9 +40,19 @@ public:
 
     explicit HairpinLineSettingsModel(QObject* parent, IElementRepositoryService* repository, HairpinLineType lineType);
 
+    PropertyItem* snapBefore() const;
+    PropertyItem* snapAfter() const;
+
 private:
+    engraving::HairpinType m_hairpinType = engraving::HairpinType::CRESC_LINE;
+
     void createProperties() override;
+    void loadProperties() override;
+    void resetProperties() override;
     void requestElements() override;
+
+    PropertyItem* m_snapBefore = nullptr;
+    PropertyItem* m_snapAfter = nullptr;
 };
 }
 

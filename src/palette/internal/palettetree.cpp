@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -24,7 +24,8 @@
 
 #include <QBuffer>
 
-#include "engraving/infrastructure/io/xml.h"
+#include "engraving/rw/xmlreader.h"
+#include "engraving/rw/xmlwriter.h"
 
 using namespace mu::palette;
 
@@ -38,13 +39,13 @@ void PaletteTree::append(PalettePtr palette)
     palettes.emplace_back(palette);
 }
 
-bool PaletteTree::read(Ms::XmlReader& e)
+bool PaletteTree::read(mu::engraving::XmlReader& e, bool pasteMode)
 {
     while (e.readNextStartElement()) {
-        const QStringRef tag(e.name());
+        const muse::AsciiStringView tag(e.name());
         if (tag == "Palette") {
             PalettePtr p = std::make_shared<Palette>();
-            p->read(e);
+            p->read(e, pasteMode);
             palettes.push_back(p);
         } else {
             e.unknown();
@@ -54,15 +55,15 @@ bool PaletteTree::read(Ms::XmlReader& e)
     return true;
 }
 
-void PaletteTree::write(Ms::XmlWriter& xml) const
+void PaletteTree::write(mu::engraving::XmlWriter& xml, bool pasteMode) const
 {
-    xml.startObject("PaletteBox"); // for compatibility with old palettes file format
+    xml.startElement("PaletteBox"); // for compatibility with old palettes file format
 
     for (PalettePtr palette : palettes) {
-        palette->write(xml);
+        palette->write(xml, pasteMode);
     }
 
-    xml.endObject();
+    xml.endElement();
 }
 
 void PaletteTree::retranslate()

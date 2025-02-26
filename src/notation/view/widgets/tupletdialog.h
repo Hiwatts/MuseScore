@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -22,27 +22,24 @@
 #ifndef MU_NOTATION_TUPLETDIALOG_H
 #define MU_NOTATION_TUPLETDIALOG_H
 
-#include "libmscore/duration.h"
 #include "ui_tupletdialog.h"
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
+#include "actions/iactionsdispatcher.h"
 
-//---------------------------------------------------------
-//   TupletDialog
-//---------------------------------------------------------
 namespace mu::notation {
-class TupletDialog : public QDialog, Ui::TupletDialog
+class TupletDialog : public QDialog, Ui::TupletDialog, public muse::Injectable
 {
     Q_OBJECT
 
-    INJECT(notation, context::IGlobalContext, globalContext)
+    muse::Inject<context::IGlobalContext> globalContext = { this };
+    muse::Inject<muse::actions::IActionsDispatcher> dispatcher = { this };
 
     virtual void hideEvent(QHideEvent*);
 
 public:
     TupletDialog(QWidget* parent = nullptr);
-    TupletDialog(const TupletDialog&);
 
     void defaultToStyleSettings();
 
@@ -58,7 +55,5 @@ private slots:
     void bboxClicked(QAbstractButton* button);
 };
 }
-
-Q_DECLARE_METATYPE(mu::notation::TupletDialog)
 
 #endif // MU_NOTATION_TUPLETDIALOG_H

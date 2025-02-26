@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,16 +23,14 @@
 #ifndef MU_ENGRAVING_STYLE_H
 #define MU_ENGRAVING_STYLE_H
 
-#include <functional>
-
 #include <array>
-#include <QIODevice>
-#include <QSet>
+#include <cassert>
 
-#include "libmscore/types.h"
-#include "libmscore/spatium.h"
+#include "global/io/iodevice.h"
+#include "draw/types/geometry.h"
 
-#include "infrastructure/draw/geometry.h"
+#include "../types/dimension.h"
+#include "../types/propertyvalue.h"
 
 #include "styledef.h"
 
@@ -41,7 +39,7 @@ class ReadChordListHook;
 class ReadStyleHook;
 }
 
-namespace Ms {
+namespace mu::engraving {
 class XmlReader;
 class XmlWriter;
 
@@ -50,49 +48,59 @@ class MStyle
 public:
     MStyle() = default;
 
-    //! TODO Can be optimized
-    const QVariant& styleV(Sid idx) const { return value(idx); }
-    Spatium  styleS(Sid idx) const { Q_ASSERT(!strcmp(MStyle::valueType(idx), "Ms::Spatium")); return value(idx).value<Spatium>(); }
-    qreal    styleP(Sid idx) const { Q_ASSERT(!strcmp(MStyle::valueType(idx), "Ms::Spatium")); return pvalue(idx); }
-    QString  styleSt(Sid idx) const { Q_ASSERT(!strcmp(MStyle::valueType(idx), "QString")); return value(idx).toString(); }
-    bool     styleB(Sid idx) const { Q_ASSERT(!strcmp(MStyle::valueType(idx), "bool")); return value(idx).toBool(); }
-    qreal    styleD(Sid idx) const { Q_ASSERT(!strcmp(MStyle::valueType(idx), "double")); return value(idx).toDouble(); }
-    int      styleI(Sid idx) const { Q_ASSERT(!strcmp(MStyle::valueType(idx), "int")); return value(idx).toInt(); }
+    const PropertyValue& styleV(Sid idx) const { return value(idx); }
+    Spatium styleS(Sid idx) const
+    {
+        assert(MStyle::valueType(idx) == P_TYPE::SPATIUM);
+        return value(idx).value<Spatium>();
+    }
 
-    const QVariant& value(Sid idx) const;
-    qreal pvalue(Sid idx) const;
+    Millimetre styleMM(Sid idx) const { assert(MStyle::valueType(idx) == P_TYPE::SPATIUM); return valueMM(idx); }
+    String  styleSt(Sid idx) const { assert(MStyle::valueType(idx) == P_TYPE::STRING); return value(idx).value<String>(); }
+    bool     styleB(Sid idx) const { assert(MStyle::valueType(idx) == P_TYPE::BOOL); return value(idx).toBool(); }
+    double   styleD(Sid idx) const { assert(MStyle::valueType(idx) == P_TYPE::REAL); return value(idx).toReal(); }
+    int      styleI(Sid idx) const { /* can be int or enum, so no assert */ return value(idx).toInt(); }
 
-    void set(Sid idx, const QVariant& v);
-    void set(Sid idx, const mu::PointF& v);
+    const PropertyValue& value(Sid idx) const;
+    Millimetre valueMM(Sid idx) const;
+
+    void set(Sid idx, const PropertyValue& v);
+
+    double spatium() const { return styleD(Sid::spatium); }
+    void setSpatium(double v) { set(Sid::spatium, v); }
+    double defaultSpatium() const;
 
     bool isDefault(Sid idx) const;
     void setDefaultStyleVersion(const int defaultsVersion);
     int defaultStyleVersion() const;
 
-    bool read(QIODevice* device, bool ign = false);
-    bool write(QIODevice* device);
+    bool read(muse::io::IODevice* device, bool ign = false);
+    bool write(muse::io::IODevice* device);
     void save(XmlWriter& xml, bool optimize);
-    static bool isValid(QIODevice* device);
+    static bool isValid(muse::io::IODevice* device);
 
     void precomputeValues();
 
-    static const char* valueType(const Sid);
+    static P_TYPE valueType(const Sid);
     static const char* valueName(const Sid);
-    static Sid styleIdx(const QString& name);
+    static Sid styleIdx(const String& name);
 
 private:
 
-    friend class mu::engraving::compat::ReadStyleHook;
+    friend class compat::ReadStyleHook;
 
-    void read(XmlReader& e, mu::engraving::compat::ReadChordListHook* readChordListHook);
+    void read(XmlReader& e, compat::ReadChordListHook* readChordListHook);
 
     bool readProperties(XmlReader&);
     bool readStyleValCompat(XmlReader&);
     bool readTextStyleValCompat(XmlReader&);
 
-    std::array<QVariant, size_t(Sid::STYLES)> m_values;
-    std::array<qreal, size_t(Sid::STYLES)> m_precomputedValues;
+    std::array<PropertyValue, size_t(Sid::STYLES)> m_values;
+    std::array<Millimetre, size_t(Sid::STYLES)> m_precomputedValues;
+
+    void readVersion(String versionTag);
+    int m_version = 0;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 
 #endif // MU_ENGRAVING_STYLE_H

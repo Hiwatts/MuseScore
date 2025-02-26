@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -26,24 +26,24 @@
 #include "importmidi_inner.h"
 #include "importmidi_voice.h"
 #include "importmidi_operations.h"
-#include "libmscore/mscore.h"
+#include "engraving/dom/mscore.h"
 
 #include <set>
 
-namespace Ms {
+namespace mu::iex::midi {
 namespace MidiTuplet {
 int tupletVoiceLimit()
 {
     const auto& opers = midiImportOperations.data()->trackOpers;
     const int currentTrack = midiImportOperations.currentTrack();
-    const int allowedVoices = MidiVoice::toIntVoiceCount(opers.maxVoiceCount.value(currentTrack));
+    const size_t allowedVoices = MidiVoice::toIntVoiceCount(opers.maxVoiceCount.value(currentTrack));
 
-    Q_ASSERT_X(allowedVoices <= VOICES,
+    Q_ASSERT_X(allowedVoices <= engraving::VOICES,
                "MidiTuplet::tupletVoiceLimit",
-               "Allowed voice count exceeds MuseScore voice limit");
+               "Allowed voice count exceeds MuseScore Studio voice limit");
 
     // for multiple voices: one voice is reserved for non-tuplet chords
-    return (allowedVoices == 1) ? 1 : allowedVoices - 1;
+    return (allowedVoices == 1) ? 1 : static_cast<int>(allowedVoices) - 1;
 }
 
 std::pair<ReducedFraction, ReducedFraction>
@@ -923,4 +923,4 @@ void assignVoices(
 #endif
 }
 } // namespace MidiTuplet
-} // namespace Ms
+} // namespace mu::iex::midi

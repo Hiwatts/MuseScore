@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -29,22 +29,22 @@ JumpSettingsModel::JumpSettingsModel(QObject* parent, IElementRepositoryService*
     : AbstractInspectorModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_JUMP);
-    setTitle(qtrc("inspector", "Jump"));
-    setIcon(ui::IconCode::Code::JUMP);
+    setTitle(muse::qtrc("inspector", "Jump"));
+    setIcon(muse::ui::IconCode::Code::JUMP);
     createProperties();
 }
 
 void JumpSettingsModel::createProperties()
 {
-    m_jumpTo = buildPropertyItem(Ms::Pid::JUMP_TO);
-    m_playUntil = buildPropertyItem(Ms::Pid::PLAY_UNTIL);
-    m_continueAt = buildPropertyItem(Ms::Pid::CONTINUE_AT);
-    m_hasToPlayRepeats = buildPropertyItem(Ms::Pid::PLAY_REPEATS);
+    m_jumpTo = buildPropertyItem(mu::engraving::Pid::JUMP_TO);
+    m_playUntil = buildPropertyItem(mu::engraving::Pid::PLAY_UNTIL);
+    m_continueAt = buildPropertyItem(mu::engraving::Pid::CONTINUE_AT);
+    m_hasToPlayRepeats = buildPropertyItem(mu::engraving::Pid::PLAY_REPEATS);
 }
 
 void JumpSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::JUMP);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::JUMP);
 }
 
 void JumpSettingsModel::loadProperties()

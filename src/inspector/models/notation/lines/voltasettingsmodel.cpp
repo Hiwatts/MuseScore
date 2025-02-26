@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -28,20 +28,23 @@
 
 using namespace mu::inspector;
 
-using IconCode = mu::ui::IconCode::Code;
+using IconCode = muse::ui::IconCode::Code;
 
 VoltaSettingsModel::VoltaSettingsModel(QObject* parent, IElementRepositoryService* repository)
-    : LineSettingsModel(parent, repository, Ms::ElementType::VOLTA)
+    : TextLineSettingsModel(parent, repository, mu::engraving::ElementType::VOLTA)
 {
     setModelType(InspectorModelType::TYPE_VOLTA);
-    setTitle(qtrc("inspector", "Volta"));
+    setTitle(muse::qtrc("inspector", "Volta"));
+    setIcon(muse::ui::IconCode::Code::VOLTA);
 
-    static const QList<HookTypeInfo> hookTypes {
-        { Ms::HookType::NONE, IconCode::LINE_WITH_INVERTED_START_HOOK, qtrc("inspector", "Normal") },
-        { Ms::HookType::HOOK_90, IconCode::LINE_WITH_TWO_INVERTED_HOOKS, qtrc("inspector", "Hooked 90") }
+    setPossibleStartHookTypes({});
+
+    static const QList<HookTypeInfo> endHookTypes {
+        { mu::engraving::HookType::NONE, IconCode::LINE_WITH_INVERTED_START_HOOK, muse::qtrc("inspector", "Normal") },
+        { mu::engraving::HookType::HOOK_90, IconCode::LINE_WITH_TWO_INVERTED_HOOKS, muse::qtrc("inspector", "Hooked 90°") }
     };
 
-    setPossibleEndHookTypes(hookTypes);
+    setPossibleEndHookTypes(endHookTypes);
 
     createProperties();
 }
@@ -53,25 +56,25 @@ PropertyItem* VoltaSettingsModel::repeatCount() const
 
 void VoltaSettingsModel::createProperties()
 {
-    LineSettingsModel::createProperties();
+    TextLineSettingsModel::createProperties();
 
-    m_repeatCount = buildPropertyItem(Ms::Pid::VOLTA_ENDING);
+    m_repeatCount = buildPropertyItem(mu::engraving::Pid::VOLTA_ENDING);
 
+    isLineVisible()->setIsVisible(true);
+    allowDiagonal()->setIsVisible(true);
     placement()->setIsVisible(false);
-    beginingTextHorizontalOffset()->setIsVisible(false);
-    continiousTextHorizontalOffset()->setIsVisible(false);
 }
 
 void VoltaSettingsModel::loadProperties()
 {
-    LineSettingsModel::loadProperties();
+    TextLineSettingsModel::loadProperties();
 
     loadPropertyItem(m_repeatCount);
 }
 
 void VoltaSettingsModel::resetProperties()
 {
-    LineSettingsModel::resetProperties();
+    TextLineSettingsModel::resetProperties();
 
     m_repeatCount->resetToDefault();
 }

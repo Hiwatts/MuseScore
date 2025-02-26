@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,19 +20,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import QtQuick 2.8
+import QtQuick 2.15
 import QtQuick.Controls 2.1
 import QtQuick.Layouts 1.12
 import QtQml.Models 2.2
 
 import MuseScore.Palette 1.0
-import MuseScore.UiComponents 1.0
-import MuseScore.Ui 1.0
+import Muse.UiComponents 1.0
+import Muse.Ui 1.0
 
 import "utils.js" as Utils
 
 StyledPopupView {
-    id: moreElementsPopup
+    id: root
 
     property var poolPalette : null
     property var poolPaletteRootIndex: null
@@ -52,6 +52,8 @@ StyledPopupView {
     property size cellSize
     property bool drawGrid
 
+    readonly property bool isDragInProgress: masterPalette.state == "drag" || customPalette.state == "drag"
+
     property int maxHeight: 400
     contentHeight: column.implicitHeight
     contentWidth: 300
@@ -62,7 +64,7 @@ StyledPopupView {
 
     property NavigationPanel navigationPanel: NavigationPanel {
         name: "MoreElementsPopup"
-        section: moreElementsPopup.navigationSection
+        section: root.navigationSection
         order: 1
         direction: NavigationPanel.Both
     }
@@ -84,10 +86,10 @@ StyledPopupView {
             id: addToPaletteButton
             width: parent.width
 
-            text: qsTrc("palette", "Add to %1").arg(paletteName)
-            enabled: moreElementsPopup.paletteEditingEnabled && (masterPaletteSelectionModel.hasSelection || customPaletteSelectionModel.hasSelection)
+            text: qsTrc("palette", "Add to %1").arg(root.paletteName)
+            enabled: root.paletteEditingEnabled && (masterPaletteSelectionModel.hasSelection || customPaletteSelectionModel.hasSelection)
 
-            navigation.panel: moreElementsPopup.navigationPanel
+            navigation.panel: root.navigationPanel
             navigation.name: "addToPaletteButton"
             navigation.column: 1
             navigation.row: 1
@@ -109,18 +111,22 @@ StyledPopupView {
                 masterPaletteSelectionModel.clear();
                 customPaletteSelectionModel.clear();
 
-                if (mimeMasterPalette.length)
-                    addElementsRequested(mimeMasterPalette);
-                if (mimeCustomPalette.length)
-                    addElementsRequested(mimeCustomPalette);
+                if (mimeMasterPalette.length) {
+                    root.addElementsRequested(mimeMasterPalette)
+                }
+
+                if (mimeCustomPalette.length) {
+                    root.addElementsRequested(mimeCustomPalette)
+                }
             }
         }
 
         RowLayout {
             id: masterIndexControls
-            enabled: moreElementsPopup.paletteIsCustom && poolPalette && poolPaletteRootIndex
+            enabled: root.paletteIsCustom && poolPalette && poolPaletteRootIndex
             visible: enabled
-            anchors { left: parent.left; right: parent.right }
+            anchors.left: parent.left
+            anchors.right: parent.right
 
             FlatButton {
                 id: prevButton
@@ -129,7 +135,7 @@ StyledPopupView {
                 transparent: true
                 enabled: prevIndex && prevIndex.valid
 
-                navigation.panel: moreElementsPopup.navigationPanel
+                navigation.panel: root.navigationPanel
                 navigation.name: "prevButton"
                 navigation.column: 1
                 navigation.row: 2
@@ -149,12 +155,12 @@ StyledPopupView {
                 }
 
                 onClicked: {
-                    poolPaletteRootIndex = prevIndex
+                    root.poolPaletteRootIndex = prevIndex
                 }
             }
 
             StyledTextLabel {
-                text: moreElementsPopup.libraryPaletteName
+                text: root.libraryPaletteName
 
                 Layout.alignment: Qt.AlignHCenter
             }
@@ -177,12 +183,14 @@ StyledPopupView {
 
                 enabled: nextIndex && nextIndex.valid
 
-                navigation.panel: moreElementsPopup.navigationPanel
+                navigation.panel: root.navigationPanel
                 navigation.name: "nextButton"
                 navigation.column: 1
                 navigation.row: 3
 
-                onClicked: poolPaletteRootIndex = nextIndex
+                onClicked: {
+                    root.poolPaletteRootIndex = nextIndex
+                }
             }
         }
 
@@ -190,10 +198,17 @@ StyledPopupView {
             id: paletteContainer
             width: parent.width
             height: childrenRect.height
-            border { width: 1; color: ui.theme.strokeColor }
-            color: ui.theme.backgroundPrimaryColor
 
-            readonly property int availableHeight: moreElementsPopup.maxHeight - addToPaletteButton.height - (masterIndexControls ? masterIndexControls.height : 0) - bottomText.height - (elementEditorButton.visible ? elementEditorButton.height : 0) - 40
+            color: ui.theme.backgroundPrimaryColor
+            border.color: ui.theme.strokeColor
+            border.width: 1
+
+            readonly property int availableHeight: root.maxHeight
+                                                   - addToPaletteButton.height
+                                                   - (masterIndexControls ? masterIndexControls.height : 0)
+                                                   - bottomText.height
+                                                   - (elementEditorButton.visible ? elementEditorButton.height : 0)
+                                                   - 40
 
             Column {
                 padding: 1
@@ -206,7 +221,7 @@ StyledPopupView {
                     model: masterPalette.paletteModel
                 }
 
-                Palette {
+                PaletteGridView {
                     id: masterPalette
                     height: Math.max(
                                 cellSize.height,
@@ -217,22 +232,22 @@ StyledPopupView {
                                 )
                     width: parent.contentWidth
 
-                    ScrollBar.vertical: ScrollBar { enabled: masterPalette.height < masterPalette.implicitHeight }
+                    ScrollBar.vertical: StyledScrollBar {}
 
                     // TODO: change settings to "hidden" model?
-                    cellSize: moreElementsPopup.cellSize
-                    drawGrid: moreElementsPopup.drawGrid
+                    cellSize: root.cellSize
+                    drawGrid: root.drawGrid
 
-                    navigationPanel: moreElementsPopup.navigationPanel
+                    navigationPanel: root.navigationPanel
                     navigationCol: 1
                     navigationRow: 4
 
-                    paletteModel: moreElementsPopup.poolPalette
-                    paletteRootIndex: moreElementsPopup.poolPaletteRootIndex
-                    paletteController: moreElementsPopup.poolPaletteController
+                    paletteModel: root.poolPalette
+                    paletteRootIndex: root.poolPaletteRootIndex
+                    paletteController: root.poolPaletteController
                     selectionModel: masterPaletteSelectionModel
 
-                    enableAnimations: moreElementsPopup.enablePaletteAnimations
+                    enableAnimations: root.enablePaletteAnimations
                 }
 
                 Item {
@@ -258,13 +273,13 @@ StyledPopupView {
 
                         toolTipTitle: text
 
-                        navigation.panel: moreElementsPopup.navigationPanel
+                        navigation.panel: root.navigationPanel
                         navigation.name: "deleteButton"
                         navigation.column: 1
                         navigation.row: 100 // Should be more than palette cells
 
                         onClicked: {
-                            Utils.removeSelectedItems(moreElementsPopup.customPaletteController, customPaletteSelectionModel, moreElementsPopup.customPaletteRootIndex)
+                            Utils.removeSelectedItems(root.customPaletteController, customPaletteSelectionModel, root.customPaletteRootIndex)
                         }
                     }
                 }
@@ -274,24 +289,24 @@ StyledPopupView {
                     model: customPalette.paletteModel
                 }
 
-                Palette {
+                PaletteGridView {
                     id: customPalette
                     visible: !empty
                     width: parent.contentWidth
 
-                    cellSize: control.cellSize
-                    drawGrid: control.drawGrid
+                    cellSize: root.cellSize
+                    drawGrid: root.drawGrid
 
-                    navigationPanel: moreElementsPopup.navigationPanel
+                    navigationPanel: root.navigationPanel
                     navigationCol: 1
                     navigationRow: 4
 
-                    paletteModel: moreElementsPopup.customPalette
-                    paletteRootIndex: moreElementsPopup.customPaletteRootIndex
-                    paletteController: moreElementsPopup.customPaletteController
+                    paletteModel: root.customPalette
+                    paletteRootIndex: root.customPaletteRootIndex
+                    paletteController: root.customPaletteController
                     selectionModel: customPaletteSelectionModel
 
-                    enableAnimations: moreElementsPopup.enablePaletteAnimations
+                    enableAnimations: root.enablePaletteAnimations
                 }
             }
         }
@@ -305,15 +320,19 @@ StyledPopupView {
 
         FlatButton {
             id: elementEditorButton
-            visible: moreElementsPopup.elementEditor && moreElementsPopup.elementEditor.valid
-            enabled: moreElementsPopup.paletteEditingEnabled
+            visible: root.elementEditor && root.elementEditor.valid
+            enabled: root.paletteEditingEnabled
             width: parent.width
-            text: moreElementsPopup.elementEditor ? moreElementsPopup.elementEditor.actionName : ""
-            navigation.panel: moreElementsPopup.navigationPanel
+            text: root.elementEditor?.actionName ?? ""
+            navigation.panel: root.navigationPanel
             navigation.name: "elementEditorButton"
             navigation.column: 1
             navigation.row: 101 // after deleteButton
-            onClicked: moreElementsPopup.elementEditor.open()
+
+            onClicked: {
+                Qt.callLater(root.elementEditor.open)
+                root.close()
+            }
         }
     }
 }

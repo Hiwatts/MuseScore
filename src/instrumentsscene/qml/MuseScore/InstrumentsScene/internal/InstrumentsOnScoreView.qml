@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -23,56 +23,19 @@ import QtQuick 2.9
 import QtQuick.Layouts 1.3
 import QtQuick.Controls 2.12
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 import MuseScore.InstrumentsScene 1.0
 
 Item {
     id: root
 
-    readonly property bool hasInstruments: instrumentsOnScore.count > 0
-    readonly property alias isMovingUpAvailable: instrumentsOnScore.isMovingUpAvailable
-    readonly property alias isMovingDownAvailable: instrumentsOnScore.isMovingDownAvailable
+    required property InstrumentsOnScoreListModel instrumentsOnScoreModel
 
-    property alias navigation: navPanel
-
-    function instruments() {
-        return instrumentsOnScore.instruments()
-    }
-
-    function currentOrder() {
-        return instrumentsOnScore.currentOrder()
-    }
-
-    function addInstruments(instruments) {
-        instrumentsOnScore.addInstruments(instruments)
-    }
-
-    function moveSelectedInstrumentsUp() {
-        instrumentsOnScore.moveSelectionUp()
-    }
-
-    function moveSelectedInstrumentsDown() {
-        instrumentsOnScore.moveSelectionDown()
-    }
+    property alias navigation: instrumentsView.navigation
 
     function scrollViewToEnd() {
         instrumentsView.positionViewAtEnd()
-    }
-
-    InstrumentsOnScoreListModel {
-        id: instrumentsOnScore
-    }
-
-    Component.onCompleted: {
-        instrumentsOnScore.load()
-    }
-
-    NavigationPanel {
-        id: navPanel
-        name: "InstrumentsOnScoreView"
-        direction: NavigationPanel.Both
-        enabled: root.visible
     }
 
     StyledTextLabel {
@@ -93,30 +56,24 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        Dropdown {
+        StyledDropdown {
             id: ordersDropdown
 
             Layout.fillWidth: true
 
             navigation.name: "Orders"
-            navigation.panel: navPanel
+            navigation.panel: instrumentsView.navigation
             navigation.row: 0
             navigation.column: 0
 
-            model: instrumentsOnScore.orders
+            model: root.instrumentsOnScoreModel.orders
 
-            Connections {
-                target: instrumentsOnScore
+            currentIndex: root.instrumentsOnScoreModel.currentOrderIndex
 
-                function onCurrentOrderChanged() {
-                    ordersDropdown.currentIndex = instrumentsOnScore.currentOrderIndex
-                }
-            }
+            displayText: qsTrc("instruments", "Order:") + " " + currentText
 
-            displayText: qsTrc("instruments", "Order: ") + currentText
-
-            onActivated: {
-                instrumentsOnScore.currentOrderIndex = currentIndex
+            onActivated: function(index, value) {
+                root.instrumentsOnScoreModel.currentOrderIndex = index
             }
         }
 
@@ -124,21 +81,22 @@ Item {
             Layout.preferredWidth: width
 
             navigation.name: "Delete"
-            navigation.panel: navPanel
+            navigation.panel: instrumentsView.navigation
             navigation.row: 0
             navigation.column: 1
 
             icon: IconCode.DELETE_TANK
+            toolTipTitle: qsTrc("instruments", "Remove selected instruments from score")
 
-            enabled: instrumentsOnScore.isRemovingAvailable
+            enabled: root.instrumentsOnScoreModel.isRemovingAvailable
 
             onClicked: {
-                instrumentsOnScore.removeSelection()
+                root.instrumentsOnScoreModel.removeSelection()
             }
         }
     }
 
-    ListView {
+    StyledListView {
         id: instrumentsView
 
         anchors.top: operationsRow.bottom
@@ -147,16 +105,9 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        boundsBehavior: ListView.StopAtBounds
-        clip: true
+        model: root.instrumentsOnScoreModel
 
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
-        }
-
-        model: instrumentsOnScore
+        accessible.name: instrumentsLabel.text
 
         delegate: ListItemBlank {
             id: item
@@ -164,14 +115,12 @@ Item {
             isSelected: model.isSelected
 
             navigation.name: model.name
-            navigation.panel: navPanel
+            navigation.panel: instrumentsView.navigation
             navigation.row: 1 + model.index
             navigation.column: 0
             navigation.accessible.name: itemTitleLabel.text
-
-            onNavigationActived: {
-                item.clicked()
-            }
+            navigation.accessible.description: model.description
+            navigation.accessible.row: model.index
 
             StyledTextLabel {
                 id: itemTitleLabel
@@ -182,7 +131,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
 
                 horizontalAlignment: Text.AlignLeft
-                text:  model.isSoloist ? qsTrc("instruments", "Soloist: ") + model.name : model.name
+                text:  model.isSoloist ? qsTrc("instruments", "Soloist:") + " " + model.name : model.name
                 font: ui.theme.bodyBoldFont
             }
 
@@ -192,13 +141,13 @@ Item {
                 anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
 
-                narrowMargins: true
+                isNarrow: true
 
                 text: model.isSoloist ? qsTrc("instruments", "Undo soloist") : qsTrc("instruments", "Make soloist")
                 visible: model.isSelected
 
                 navigation.name: model.name + "MakeSoloist"
-                navigation.panel: navPanel
+                navigation.panel: instrumentsView.navigation
                 navigation.row: 1 + model.index
                 navigation.column: 1
 
@@ -208,11 +157,15 @@ Item {
             }
 
             onClicked: {
-                instrumentsOnScore.selectRow(model.index)
+                root.instrumentsOnScoreModel.selectRow(model.index)
             }
 
             onDoubleClicked: {
-                instrumentsOnScore.removeSelection()
+                root.instrumentsOnScoreModel.removeSelection()
+            }
+
+            onRemoveSelectionRequested: {
+                root.instrumentsOnScoreModel.removeSelection()
             }
         }
     }

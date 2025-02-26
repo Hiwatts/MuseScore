@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2021 MuseScore BVBA and others
+ * Copyright (C) 2021 MuseScore Limited
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,11 +20,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 1.4
-import QtQuick.Controls.Styles 1.4
 
-import MuseScore.Ui 1.0
-import MuseScore.UiComponents 1.0
+import Muse.Ui 1.0
+import Muse.UiComponents 1.0
 
 Item {
     id: root
@@ -33,14 +31,15 @@ Item {
 
     property NavigationPanel navigation: NavigationPanel {
         name: "PreferencesMenuPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Both
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
         }
 
-        onNavigationEvent: {
+        onNavigationEvent: function(event) {
             if (event.type === NavigationEvent.AboutActive) {
                 event.setData("controlIndex", prv.currentItemNavigationIndex)
             }
@@ -94,7 +93,7 @@ Item {
             }
         }
 
-        itemDelegate: GradientTabButton {
+        itemDelegate: PageTabButton {
             property bool expanded: Boolean(model) ? model.itemRole.expanded : false
             property int navigationRow: styleData.index.row
             property int navigationColumn: styleData.depth
@@ -115,12 +114,10 @@ Item {
             navigation.panel: root.navigation
             navigation.row: navigationRow
             navigation.column: navigationColumn
-            navigation.enabled: enabled
             navigation.accessible.name: title
             navigation.accessible.role: MUAccessible.ListItem
             navigation.onActiveChanged: {
                 if (navigation.active) {
-                    prv.currentItemNavigationIndex = [navigationRow, navigationColumn]
                     treeView.model.selectRow(styleData.index)
                 }
             }
@@ -148,8 +145,8 @@ Item {
             }
 
             onCheckedChanged: {
-                if (checked && !navigation.active) {
-                    Qt.callLater(navigation.requestActive)
+                if (checked) {
+                    prv.currentItemNavigationIndex = [navigationRow, navigationColumn]
                 }
             }
 
